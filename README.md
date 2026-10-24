@@ -14,7 +14,15 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.34)
+## Stato attuale (v0.35)
+
+**Novita' della 0.35**
+- Lunghezza del pattern libera da 1 a 48 step (frecce o griglia), al posto di 16/32
+- Il channel rack scorre in orizzontale (dito sugli step o sul righello); mentre si scorre compaiono
+  in trasparenza i numeri dei beat; in riproduzione la vista segue la musica
+- Rullanti e clap asciutti: code accorciate in libreria, nei kit sintetizzati e senza riverbero nei kit di DrumForge
+- French Roulette: distorsione a frequenza doppia (meno "gracchiare"), nuovi preset Buzz Growl ed Electro Buzz,
+  growl e bassi senza grana di bitcrusher
 
 **Novita' della 0.34: FRENCH ROULETTE**
 - Nuovo synth per bassi choppati, lead distorti e arpeggi lo-fi (electro francese 2007-2012)

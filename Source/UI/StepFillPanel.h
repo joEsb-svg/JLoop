@@ -146,7 +146,7 @@ private:
         const int shift = fromHere.getToggleState() ? step : 0;
         for (int s = 0; s < length(); ++s)
         {
-            const auto ch = pattern[(s - shift + 32) % pattern.length()];
+            const auto ch = pattern[((s - shift) % pattern.length() + pattern.length()) % pattern.length()];
             setStep (s, ch == 'x' ? SequencerEngine::defaultVelocity : ch == 'o' ? 60 : 0);
         }
         done();

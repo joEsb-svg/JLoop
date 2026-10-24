@@ -158,6 +158,7 @@ namespace fr
         // Crunch
         float holdSample = 0.0f, holdCount = 0.0f, dcX = 0.0f, dcY = 0.0f;
         forge::Effects fx;
+        std::unique_ptr<juce::dsp::Oversampling<float>> oversampler;
     };
 
     //==========================================================================

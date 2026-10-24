@@ -65,37 +65,61 @@ juce::Rectangle<float> ChannelRow::getPadsArea() const
     return r.reduced (0.0f, 1.0f);
 }
 
-juce::Rectangle<float> ChannelRow::getPadBounds (int column) const
+float ChannelRow::getStepPitch() const
+{
+    // 4 step = 4 pad + 3 spazi piccoli + 1 spazio tra i gruppi
+    const auto area = getPadsArea();
+    const float groupGap = 6.0f, padGap = 2.0f;
+    const int numGroups = juce::jmax (1, visibleSteps / 4);
+    const float padWidth = (area.getWidth() - groupGap * (float) (numGroups - 1) - padGap * (float) (visibleSteps - numGroups)) / (float) visibleSteps;
+    return padWidth + (3.0f * padGap + groupGap) / 4.0f;
+}
+
+juce::Rectangle<float> ChannelRow::getStepBounds (int step) const
 {
     auto area = getPadsArea();
-    const float groupGap = 6.0f;
-    const float padGap   = 2.0f;
-    const int numGroups  = visibleSteps / 4;
-
-    const float padWidth = (area.getWidth() - groupGap * (float) (numGroups - 1)
-                                            - padGap * (float) (visibleSteps - numGroups)) / (float) visibleSteps;
-    const int group = column / 4;
-    const float x = area.getX() + (float) column * padWidth + (float) group * groupGap + (float) (column - group) * padGap;
-
+    const float groupGap = 6.0f, padGap = 2.0f;
+    const int numGroups = juce::jmax (1, visibleSteps / 4);
+    const float padWidth = (area.getWidth() - groupGap * (float) (numGroups - 1) - padGap * (float) (visibleSteps - numGroups)) / (float) visibleSteps;
+    auto absX = [&] (float s)
+    {
+        const float group = std::floor (s / 4.0f);
+        return s * padWidth + group * groupGap + (s - group) * padGap;
+    };
+    // posizione assoluta meno lo scorrimento (lo scorrimento usa il passo medio: e' continuo)
+    const float x = area.getX() + absX ((float) step) - firstStep * getStepPitch();
     return { x, area.getY(), padWidth, area.getHeight() };
 }
 
-int ChannelRow::columnAt (juce::Point<float> p) const
+bool ChannelRow::isStepVisible (int step) const
 {
-    for (int i = 0; i < visibleSteps; ++i)
-        if (getPadBounds (i).expanded (1.5f, 4.0f).contains (p))
-            return i;
+    const auto area = getPadsArea();
+    const auto b = getStepBounds (step);
+    return b.getRight() > area.getX() + 1.0f && b.getX() < area.getRight() - 1.0f;
+}
 
+int ChannelRow::stepAt (juce::Point<float> p) const
+{
+    if (! getPadsArea().expanded (2.0f, 4.0f).contains (p))
+        return -1;
+    const int guess = (int) std::floor (firstStep + (p.x - getPadsArea().getX()) / getStepPitch());
+    for (int s = juce::jmax (0, guess - 1); s <= guess + 1 && s < SequencerEngine::maxSteps; ++s)
+        if (getStepBounds (s).expanded (1.5f, 4.0f).contains (p))
+            return s;
     return -1;
 }
 
-void ChannelRow::setView (int firstStepToShow, EditMode newMode)
+void ChannelRow::setView (float firstStepToShow, EditMode newMode)
 {
     if (firstStepToShow != firstStep || newMode != mode)
     {
+        const bool onlyScroll = newMode == mode;
         firstStep = firstStepToShow;
         mode = newMode;
-        repaint();
+        if (onlyScroll)
+            repaint (getPadsArea().toNearestInt().expanded (3));
+        else
+            repaint();
     }
 }
 
@@ -183,11 +207,13 @@ void ChannelRow::paint (juce::Graphics& g)
         return;
     }
 
-    // Step
-    for (int col = 0; col < visibleSteps; ++col)
+    // Step (solo quelli in vista: il rack scorre in orizzontale)
+    g.reduceClipRegion (getPadsArea().expanded (3.0f, 3.0f).toNearestInt());
+    const int fromStep = juce::jmax (0, (int) std::floor (firstStep) - 1);
+    const int toStep = juce::jmin (SequencerEngine::maxSteps, (int) std::ceil (firstStep) + visibleSteps + 1);
+    for (int step = fromStep; step < toStep; ++step)
     {
-        const int step = firstStep + col;
-        auto pad = getPadBounds (col);
+        auto pad = getStepBounds (step);
 
         if (step >= length)   // oltre la lunghezza del pattern
         {
@@ -312,12 +338,17 @@ void ChannelRow::mouseDown (const juce::MouseEvent& e)
         return;
     }
 
-    const int col = columnAt (e.position);
-    if (col < 0 || firstStep + col >= engine.getPatternLength())
+    const int step = stepAt (e.position);
+    if (step < 0 || step >= engine.getPatternLength())
         return;
 
-    const int step = firstStep + col;
-    lastColumn = col;
+    lastColumn = step;
+    pressPos = e.position;
+    hScrolling = false;
+    pressedStep = step;
+    savedVelocity = engine.getStepVelocity (channel, step);
+    savedProbability = engine.getStepProbability (channel, step);
+    savedRatchet = engine.getStepRatchet (channel, step);
 
     switch (mode)
     {
@@ -335,10 +366,6 @@ void ChannelRow::mouseDown (const juce::MouseEvent& e)
             // Tenendo premuto (senza muoversi) si apre il riempimento automatico: si ricorda com'era lo step
             pressOnStep = true;
             stepLongPress = false;
-            pressedStep = step;
-            savedVelocity = engine.getStepVelocity (channel, step);
-            savedProbability = engine.getStepProbability (channel, step);
-            savedRatchet = engine.getStepRatchet (channel, step);
             startTimer (500);
 
             paintValue = ! engine.isStepOn (channel, step);
@@ -378,6 +405,29 @@ void ChannelRow::mouseDrag (const juce::MouseEvent& e)
     if (lastColumn < 0)
         return;
 
+    // Pattern piu' lungo dello schermo: trascinando in orizzontale si scorre (il tocco iniziale viene annullato)
+    if (scrollable && (mode == EditMode::step || mode == EditMode::ratchet) && ! stepLongPress)
+    {
+        const float dx = (float) e.getDistanceFromDragStartX(), dy = (float) e.getDistanceFromDragStartY();
+        if (! hScrolling && std::abs (dx) > 10.0f && std::abs (dx) > std::abs (dy))
+        {
+            hScrolling = true;
+            stopTimer();
+            pressOnStep = false;
+            engine.setStepVelocity (channel, pressedStep, savedVelocity);
+            engine.setStepProbability (channel, pressedStep, savedProbability);
+            engine.setStepRatchet (channel, pressedStep, savedRatchet);
+            repaint();
+            if (onScrollSteps) onScrollSteps (0.0f, 0);
+        }
+        if (hScrolling)
+        {
+            if (onScrollSteps) onScrollSteps (dx, 1);
+            return;
+        }
+        return;   // finche' non si capisce se e' uno scorrimento, niente "pittura"
+    }
+
     if (mode == EditMode::velocity || mode == EditMode::probability)
     {
         applyVerticalValueAt (e.position);
@@ -387,14 +437,14 @@ void ChannelRow::mouseDrag (const juce::MouseEvent& e)
     if (mode != EditMode::step)
         return;
 
-    const int col = columnAt ({ e.position.x, getPadsArea().getCentreY() });
+    const int col = stepAt ({ e.position.x, getPadsArea().getCentreY() });
     if (stepLongPress)
         return;
-    if (col >= 0 && col != lastColumn && firstStep + col < engine.getPatternLength())
+    if (col >= 0 && col != lastColumn && col < engine.getPatternLength())
     {
         pressOnStep = false;   // e' un trascinamento: niente riempimento
         stopTimer();
-        const int step = firstStep + col;
+        const int step = col;
         engine.setStepVelocity (channel, step, paintValue ? SequencerEngine::defaultVelocity : 0);
         if (paintValue)
         {
@@ -407,9 +457,16 @@ void ChannelRow::mouseDrag (const juce::MouseEvent& e)
     }
 }
 
-void ChannelRow::mouseUp (const juce::MouseEvent&)
+void ChannelRow::mouseUp (const juce::MouseEvent& e)
 {
     stopTimer();
+    if (hScrolling)
+    {
+        hScrolling = false;
+        lastColumn = -1;
+        if (onScrollSteps) onScrollSteps ((float) e.getDistanceFromDragStartX(), 2);
+        return;
+    }
     if (stepLongPress)
     {
         stepLongPress = pressOnStep = false;
@@ -476,12 +533,12 @@ void ChannelRow::showFillPanel (int step)
 void ChannelRow::applyVerticalValueAt (juce::Point<float> p)
 {
     // Il dito puo' scorrere sugli step: conta la colonna sotto il dito e la sua altezza nella riga.
-    const int col = columnAt ({ p.x, getPadsArea().getCentreY() });
-    if (col < 0 || firstStep + col >= engine.getPatternLength())
+    const int col = stepAt ({ p.x, getPadsArea().getCentreY() });
+    if (col < 0 || col >= engine.getPatternLength())
         return;
 
-    const int step = firstStep + col;
-    auto pad = getPadBounds (col).reduced (3.0f);
+    const int step = col;
+    auto pad = getStepBounds (step).reduced (3.0f);
     const float norm = juce::jlimit (0.0f, 1.0f, 1.0f - (p.y - pad.getY()) / juce::jmax (1.0f, pad.getHeight()));
 
     if (mode == EditMode::velocity)
@@ -595,8 +652,8 @@ void ChannelRow::refresh (int currentStep)
         repaint (nameArea.toNearestInt().expanded (3));
     if (stepMoved && ! engine.hasNotes (channel))
         for (int s : { previousStep, currentStep })
-            if (s >= firstStep && s < firstStep + visibleSteps)
-                repaint (getPadBounds (s - firstStep).toNearestInt().expanded (3));
+            if (s >= 0 && isStepVisible (s))
+                repaint (getStepBounds (s).toNearestInt().expanded (3).getIntersection (getPadsArea().toNearestInt().expanded (3)));
 }
 
 //==============================================================================
@@ -777,7 +834,7 @@ void ChannelRow::paintNotesPreview (juce::Graphics& g, bool muted)
 
     const auto notes = engine.getNotes (channel);
     const int lengthTicks = engine.getPatternLength() * SequencerEngine::ticksPerStep;
-    const int firstTick = firstStep * SequencerEngine::ticksPerStep;
+    const int firstTick = juce::roundToInt (firstStep * (float) SequencerEngine::ticksPerStep);
     const int visibleTicks = visibleSteps * SequencerEngine::ticksPerStep;
 
     // Linee dei quarti

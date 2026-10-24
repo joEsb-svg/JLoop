@@ -136,17 +136,14 @@ MainComponent::MainComponent()
 
     // --- Modalita' di modifica, lunghezza e pagina
     modeSwitch.onChange   = [this] (int) { updateViews(); };
-    lengthSwitch.onChange = [this] (int i)
+    lengthChip.onChange = [this] (int len)
     {
-        engine.setPatternLength (i == 1 ? 32 : 16);
-        if (i == 0)
-            pageSwitch.setSelected (0);
+        engine.setPatternLength (len);
+        Haptics::tick (this);
         updateViews();
     };
-    pageSwitch.onChange   = [this] (int) { updateViews(); };
     addAndMakeVisible (modeSwitch);
-    addAndMakeVisible (lengthSwitch);
-    addAndMakeVisible (pageSwitch);
+    addAndMakeVisible (lengthChip);
 
     // --- Swing, kit, master
     setupKnob (swingKnob, 0.0, 1.0, 0.0);
@@ -225,12 +222,18 @@ MainComponent::MainComponent()
     editor.handleSoundMenu = [this] (int ch, int result) { handleSoundMenu (ch, result); };
     addChildComponent (editor);
 
-    ruler.getColumnBounds = [this] (int i)
+    ruler.getStepBounds = [this] (int s)
     {
         // Il righello e' allineato al contenuto del rack (le righe partono da x = 0)
-        return rows.isEmpty() ? juce::Rectangle<float>() : rows.getFirst()->getPadBounds (i);
+        return rows.isEmpty() ? juce::Rectangle<float>() : rows.getFirst()->getStepBounds (s);
     };
+    ruler.onScrollDrag = [this] (float dx, int phase) { scrollStepsBy (dx, phase); };
     addAndMakeVisible (ruler);
+    beatWatermark.getStepBounds = [this] (int s)
+    {
+        return rows.isEmpty() ? juce::Rectangle<float>() : rows.getFirst()->getStepBounds (s);
+    };
+    addAndMakeVisible (beatWatermark);
 
     // --- Ripristina l'ultima sessione
     projectName = untitled;
@@ -502,7 +505,6 @@ void MainComponent::layoutRack (juce::Rectangle<int> full, bool portrait)
     auto rack = full.reduced (6, 4);
 
     // Barra degli strumenti del sequencer: modalita', lunghezza, pagina, kit, swing, metronomo, CPU, + Strumento
-    const bool multiPage = getVisibleSteps() < engine.getPatternLength();
     const bool showKit = hasDrumSynthChannels();   // il kit vale solo per la batteria sintetizzata
     kitButton.setVisible (showKit);
     auto bar = rack.removeFromTop (portrait ? 28 : 32);
@@ -515,7 +517,7 @@ void MainComponent::layoutRack (juce::Rectangle<int> full, bool portrait)
     const bool tight = ! portrait && bar.getWidth() < 900;   // telefono in orizzontale
     modeSwitch.setBounds (bar.removeFromLeft (juce::jmin (portrait ? 200 : (tight ? 184 : 240), bar.getWidth() - 110)).reduced (0, 1));
     bar.removeFromLeft (6);
-    lengthSwitch.setBounds (bar.removeFromLeft (tight ? 58 : 64).reduced (0, 1));
+    lengthChip.setBounds (bar.removeFromLeft (tight ? 70 : 84).reduced (0, 1));
     bar.removeFromLeft (6);
 
     if (portrait)
@@ -534,9 +536,6 @@ void MainComponent::layoutRack (juce::Rectangle<int> full, bool portrait)
             row2.removeFromLeft (6);
         }
         swingChip (row2.removeFromLeft (juce::jmin (112, row2.getWidth() / 2)));
-        row2.removeFromLeft (6);
-        pageSwitch.setVisible (multiPage);
-        pageSwitch.setBounds (row2.reduced (0, 1));
     }
     else
     {
@@ -549,12 +548,6 @@ void MainComponent::layoutRack (juce::Rectangle<int> full, bool portrait)
         metroButton.setBounds (bar.removeFromRight (bar.getHeight() + 4));
         bar.removeFromRight (6);
 
-        pageSwitch.setVisible (multiPage);
-        if (multiPage)
-        {
-            pageSwitch.setBounds (bar.removeFromLeft (tight ? 104 : 200).reduced (0, 1));
-            bar.removeFromLeft (6);
-        }
         const int swingW = juce::jmin (tight ? 84 : 118, bar.getWidth() / 2);
         if (showKit)
         {
@@ -586,6 +579,7 @@ void MainComponent::layoutRack (juce::Rectangle<int> full, bool portrait)
     }
 
     ruler.setBounds (rack.getX(), rulerArea.getY(), w, rulerArea.getHeight());
+    beatWatermark.setBounds (rack.getX(), rack.getY(), w, rack.getHeight());
     editor.setBounds (rack.withTop (rulerArea.getY()).expanded (2, 2));
     pianoRoll.setBounds (full);   // il piano roll copre tutto il channel rack, barra compresa
     browser.setBounds (full);
@@ -603,9 +597,57 @@ int MainComponent::getVisibleSteps() const
     return rows.isEmpty() ? 16 : rows.getFirst()->getVisibleSteps();
 }
 
-int MainComponent::getFirstVisibleStep() const
+float MainComponent::getFirstVisibleStep() const
 {
-    return pageSwitch.getSelected() * getVisibleSteps();
+    return scrollPos;
+}
+
+float MainComponent::getMaxScroll() const
+{
+    return (float) juce::jmax (0, engine.getPatternLength() - getVisibleSteps());
+}
+
+void MainComponent::setScroll (float pos, bool animate)
+{
+    scrollTarget = juce::jlimit (0.0f, getMaxScroll(), pos);
+    if (! animate)
+        scrollPos = scrollTarget;
+    applyScroll();
+}
+
+void MainComponent::applyScroll()
+{
+    const auto mode = (ChannelRow::EditMode) modeSwitch.getSelected();
+    for (auto* row : rows)
+        row->setView (scrollPos, mode);
+    beatWatermark.length = engine.getPatternLength();
+    if (! rows.isEmpty())
+        beatWatermark.clipLeft = rows.getFirst()->getHeaderWidth() + 8.0f;
+}
+
+/** Trascinamento orizzontale sugli step o sul righello (dx in pixel dall'inizio). */
+void MainComponent::scrollStepsBy (float dx, int phase)
+{
+    if (getMaxScroll() <= 0.0f)
+        return;
+    const float pitch = rows.isEmpty() ? 40.0f : juce::jmax (4.0f, rows.getFirst()->getStepPitch());
+    lastUserScrollMs = juce::Time::getMillisecondCounterHiRes();
+    if (phase == 0)
+    {
+        scrollDragStart = scrollPos;
+        scrollDragging = true;
+        beatWatermark.poke();
+        return;
+    }
+    scrollPos = juce::jlimit (0.0f, getMaxScroll(), scrollDragStart - dx / pitch);
+    scrollTarget = scrollPos;
+    beatWatermark.poke();
+    if (phase == 2)
+    {
+        scrollDragging = false;
+        scrollTarget = juce::jlimit (0.0f, getMaxScroll(), std::round (scrollPos));   // si ferma su uno step intero
+    }
+    applyScroll();
 }
 
 //==============================================================================
@@ -613,27 +655,14 @@ void MainComponent::updateViews()
 {
     const int length  = engine.getPatternLength();
     const int visible = getVisibleSteps();
-    lengthSwitch.setSelected (length > 16 ? 1 : 0);
+    lengthChip.setValue (length);
 
-    // Una pagina per ogni gruppo di step visibili (es. 32 step a 16 per volta = 2 pagine)
-    juce::StringArray pages;
-    for (int first = 0; first < length; first += visible)
-        pages.add (juce::String (first + 1) + "-" + juce::String (first + visible));
-    pageSwitch.setOptions (pages);
-    pageSwitch.setEnabled (pages.size() > 1);
-    if ((pages.size() > 1) != pageSwitch.isVisible() && ! getLocalBounds().isEmpty())
-    {
-        // Compare o sparisce il selettore delle pagine: si rifa' la barra (resized richiama updateViews)
-        pageSwitch.setVisible (pages.size() > 1);
-        resized();
-        return;
-    }
-
-    const int firstStep = getFirstVisibleStep();
-    const auto mode = (ChannelRow::EditMode) modeSwitch.getSelected();
-
+    // Pattern piu' lungo dello schermo: si scorre in orizzontale (dito sugli step o sul righello)
     for (auto* row : rows)
-        row->setView (firstStep, mode);
+        row->scrollable = length > visible;
+    scrollPos = juce::jlimit (0.0f, getMaxScroll(), scrollPos);
+    scrollTarget = juce::jlimit (0.0f, getMaxScroll(), scrollTarget);
+    applyScroll();
 
     undoButton.setEnabled (! undoStack.isEmpty());
     redoButton.setEnabled (! redoStack.isEmpty());
@@ -706,8 +735,28 @@ void MainComponent::timerCallback()
         rebuildRows();
 
     const int step = engine.getCurrentStep();
-    const int firstStep = getFirstVisibleStep();
     const int visible = getVisibleSteps();
+
+    // Scorrimento: animazione verso la destinazione; mentre suona segue la riproduzione
+    // (se il dito non ha toccato il pattern negli ultimi 2 secondi)
+    if (! scrollDragging)
+    {
+        const bool playingThisPattern = engine.isPlaying() && engine.getPlayingPattern() == engine.getCurrentPattern();
+        const double now = juce::Time::getMillisecondCounterHiRes();
+        if (playingThisPattern && step >= 0 && now - lastUserScrollMs > 2000.0
+            && ((float) step < scrollTarget || (float) step >= scrollTarget + (float) visible))
+        {
+            scrollTarget = juce::jlimit (0.0f, getMaxScroll(), (float) ((step / visible) * visible));
+            beatWatermark.poke();
+        }
+        if (std::abs (scrollTarget - scrollPos) > 0.001f)
+        {
+            scrollPos += (scrollTarget - scrollPos) * 0.35f;
+            if (std::abs (scrollTarget - scrollPos) < 0.02f) scrollPos = scrollTarget;
+            applyScroll();
+        }
+    }
+    const float firstStep = scrollPos;
 
     const int tick = engine.getPlayingPattern() == engine.getCurrentPattern() ? engine.getCurrentTick() : -1;
 
@@ -727,8 +776,7 @@ void MainComponent::timerCallback()
         songSwitch.setSelected (engine.isSongMode() ? 1 : 0);
 
     const bool playingThis = engine.getPlayingPattern() == engine.getCurrentPattern();
-    const int column = (playingThis && step >= firstStep && step < firstStep + visible) ? step - firstStep : -1;
-    ruler.setState (column, firstStep, visible);
+    ruler.setState (playingThis ? step : -1, firstStep, engine.getPatternLength());
     meter.setLevel (engine.takeOutputPeak());
 
     // Display: la posizione si muove mentre suona; lo spettro ~20 volte al secondo (non in "Risparmio")
@@ -1002,7 +1050,7 @@ void MainComponent::openProject (const juce::String& name)
         resolveSamples();
         instruments->resolve();
         projectName = name;
-        pageSwitch.setSelected (0);
+        setScroll (0.0f, false);
         undoStack.clear(); redoStack.clear(); undoLabels.clear(); redoLabels.clear(); lastSnapshot = takeSnapshot();
         syncControlsFromEngine();
         saveSession();
@@ -1064,7 +1112,7 @@ void MainComponent::newProject()
     applyDefaultDrums();
     instruments->resolve();      // strumenti nuovi, al preset "Init"
     projectName = untitled;
-    pageSwitch.setSelected (0);
+    setScroll (0.0f, false);
     modeSwitch.setSelected (0);
     undoStack.clear(); redoStack.clear(); undoLabels.clear(); redoLabels.clear(); lastSnapshot = takeSnapshot();
     editor.setVisible (false);
@@ -1572,6 +1620,18 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
             c.colour = info->colour;
             applySoundChoice (-1, c);
         }
+
+    if (const int i = args.indexOf ("--pattern-length"); i >= 0)   // test: lunghezza del pattern e scorrimento
+    {
+        engine.setPatternLength (args[i + 1].getIntValue());
+        updateViews();
+        if (args.size() > i + 2)
+        {
+            setScroll (args[i + 2].getFloatValue(), false);
+            beatWatermark.holdForTest();
+            lastUserScrollMs = juce::Time::getMillisecondCounterHiRes() + 1.0e7;   // niente "segui la riproduzione"
+        }
+    }
 
     if (args.contains ("--mixer-demo"))   // test: qualche effetto nel mixer
     {
@@ -2311,6 +2371,7 @@ void MainComponent::rebuildRows()
         row->onLongPress = [this] { Haptics::tick (this); };
         row->onOpenPianoRoll = [this] (int ch) { Haptics::tick (this); setLiveTarget (ch); openPianoRoll (ch); };
         row->onCommand = [this] (int ch, int command) { handleChannelCommand (ch, command); };
+        row->onScrollSteps = [this] (float dx, int phase) { scrollStepsBy (dx, phase); };
         row->onScrollDrag = [this] (float delta, bool started)
         {
             if (started)

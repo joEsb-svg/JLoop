@@ -369,7 +369,7 @@ namespace ProjectIO
             {
                 const auto& o = patterns->getReference (p);
                 auto& pat = engine.getPattern (p);
-                pat.length.store ((int) o.getProperty ("length", 16) > 16 ? 32 : 16);
+                pat.length.store (juce::jlimit (1, SequencerEngine::maxSteps, (int) o.getProperty ("length", 16)));
                 engine.setPatternName (p, o.getProperty ("name", {}).toString());
 
                 auto readRows = [&o, numChannels] (const char* key, std::array<SequencerEngine::Pattern::Row, SequencerEngine::maxChannels>& target,

@@ -251,34 +251,38 @@ private:
 class StepRuler : public juce::Component
 {
 public:
-    /** Dove sta la colonna i della pagina visibile, fornita dal channel rack. */
-    std::function<juce::Rectangle<float> (int)> getColumnBounds;
+    /** Dove sta lo step (assoluto), fornito dal channel rack; e quanti step ha il pattern. */
+    std::function<juce::Rectangle<float> (int step)> getStepBounds;
+    /** Trascinamento orizzontale sul righello: scorre il pattern (fase 0 inizio, 1 movimento, 2 fine). */
+    std::function<void (float dx, int phase)> onScrollDrag;
 
-    void setState (int newPlayingColumn, int newFirstStep, int newNumColumns)
+    void setState (int newPlayingStep, float newFirstStep, int newLength)
     {
-        if (newPlayingColumn != playingColumn || newFirstStep != firstStep || newNumColumns != numColumns)
+        if (newPlayingStep != playingStep || newFirstStep != firstStep || newLength != length)
         {
-            playingColumn = newPlayingColumn;
+            playingStep = newPlayingStep;
             firstStep = newFirstStep;
-            numColumns = newNumColumns;
+            length = newLength;
             repaint();
         }
     }
 
     void paint (juce::Graphics& g) override
     {
-        if (! getColumnBounds)
+        if (! getStepBounds)
             return;
 
         const float h = (float) getHeight();
-
-        for (int i = 0; i < numColumns; ++i)
+        for (int step = juce::jmax (0, (int) firstStep - 1); step < length; ++step)
         {
-            auto col = getColumnBounds (i).withY (0.0f).withHeight (h);
-            const int step = firstStep + i;
+            auto col = getStepBounds (step).withY (0.0f).withHeight (h);
+            if (col.getX() > (float) getWidth())
+                break;
+            if (col.getRight() < 0.0f)
+                continue;
             const bool beat = step % 4 == 0;
 
-            if (i == playingColumn)
+            if (step == playingStep)
             {
                 g.setColour (Theme::accent);
                 g.fillRect (col.removeFromBottom (3.0f));
@@ -291,7 +295,7 @@ public:
 
             if (beat)
             {
-                g.setColour (i == playingColumn ? Theme::accent : Theme::textDim);
+                g.setColour (step == playingStep ? Theme::accent : Theme::textDim);
                 g.setFont (Theme::font (11.0f, true));
                 g.drawText (juce::String (step / 4 + 1), col.withHeight (h - 5.0f).withTrimmedLeft (2.0f),
                             juce::Justification::centredLeft, false);
@@ -299,10 +303,138 @@ public:
         }
     }
 
+    void mouseDown (const juce::MouseEvent&) override                { if (onScrollDrag) onScrollDrag (0.0f, 0); }
+    void mouseDrag (const juce::MouseEvent& e) override              { if (onScrollDrag) onScrollDrag ((float) e.getDistanceFromDragStartX(), 1); }
+    void mouseUp (const juce::MouseEvent& e) override                { if (onScrollDrag) onScrollDrag ((float) e.getDistanceFromDragStartX(), 2); }
+
 private:
-    int playingColumn = -1;
-    int firstStep = 0;
-    int numColumns = 16;
+    int playingStep = -1;
+    float firstStep = 0.0f;
+    int length = 16;
+};
+
+//==============================================================================
+/**
+    Numeri dei beat (quarti) in trasparenza sopra gli step, mentre si scorre il pattern:
+    compaiono quando il pattern si muove e svaniscono poco dopo.
+*/
+class BeatWatermark : public juce::Component,
+                      private juce::Timer
+{
+public:
+    BeatWatermark()     { setInterceptsMouseClicks (false, false); }
+
+    std::function<juce::Rectangle<float> (int step)> getStepBounds;   // in coordinate di questo componente
+    int length = 16;
+    float clipLeft = 0.0f;     // dove iniziano gli step (a sinistra ci sono i nomi dei canali)
+
+    /** Il pattern si e' mosso: mostra i numeri (e li fa svanire dopo un po'). */
+    void poke()
+    {
+        alpha = 1.0f;
+        holdFrames = 18;
+        if (! isTimerRunning()) startTimerHz (30);
+        repaint();
+    }
+
+    void holdForTest()  { poke(); holdFrames = 1 << 30; }
+
+    void paint (juce::Graphics& g) override
+    {
+        if (alpha <= 0.0f || ! getStepBounds)
+            return;
+        g.reduceClipRegion (getLocalBounds().withTrimmedLeft (juce::roundToInt (clipLeft)));   // solo sopra gli step
+        const float size = juce::jlimit (26.0f, 64.0f, (float) getHeight() * 0.3f);
+        g.setFont (Theme::font (size, true));
+        for (int beat = 0; beat * 4 < length; ++beat)
+        {
+            const auto a = getStepBounds (beat * 4);
+            const auto b = getStepBounds (juce::jmin (length, beat * 4 + 4) - 1);
+            auto area = juce::Rectangle<float> (a.getX(), 2.0f, b.getRight() - a.getX(), size * 1.1f);
+            if (area.getRight() < 0.0f || area.getX() > (float) getWidth())
+                continue;
+            g.setColour (juce::Colours::black.withAlpha (0.25f * alpha));
+            g.drawText (juce::String (beat + 1), area.translated (0.0f, 2.0f), juce::Justification::centred, false);
+            g.setColour (Theme::accent.withAlpha (0.5f * alpha));
+            g.drawText (juce::String (beat + 1), area, juce::Justification::centred, false);
+        }
+    }
+
+private:
+    void timerCallback() override
+    {
+        if (holdFrames > 0) { --holdFrames; return; }
+        alpha -= 0.08f;
+        if (alpha <= 0.0f) { alpha = 0.0f; stopTimer(); }
+        repaint();
+    }
+
+    float alpha = 0.0f;
+    int holdFrames = 0;
+};
+
+//==============================================================================
+/** Lunghezza del pattern (1..48 step): ◂ 16 ▸, tocca il numero per sceglierla da una griglia. */
+class PatternLengthChip : public juce::Component
+{
+public:
+    std::function<void (int)> onChange;
+
+    void setValue (int v)       { if (v != value) { value = v; repaint(); } }
+    int getValue() const        { return value; }
+
+    void paint (juce::Graphics& g) override
+    {
+        auto r = getLocalBounds().toFloat();
+        Theme::drawSunken (g, r, Theme::panel.darker (0.3f));
+        const float arrowW = juce::jmin (22.0f, r.getWidth() * 0.24f);
+        auto left = r.removeFromLeft (arrowW), right = r.removeFromRight (arrowW);
+        g.setColour (Theme::textDim);
+        g.setFont (Theme::font (juce::jmin (12.0f, r.getHeight() * 0.5f), true));
+        g.drawText (juce::String (juce::CharPointer_UTF8 ("\xe2\x97\x82")), left, juce::Justification::centred, false);
+        g.drawText (juce::String (juce::CharPointer_UTF8 ("\xe2\x96\xb8")), right, juce::Justification::centred, false);
+        Theme::drawRaised (g, r.reduced (1.0f, 2.0f), Theme::raisedHi, Theme::corner - 1.0f);
+        g.setColour (Theme::accent);
+        g.setFont (Theme::font (juce::jmin (13.0f, r.getHeight() * 0.52f), true));
+        g.drawText (juce::String (value), r, juce::Justification::centred, false);
+    }
+
+    void mouseUp (const juce::MouseEvent& e) override
+    {
+        if (! getLocalBounds().contains (e.getPosition()))
+            return;
+        const float arrowW = juce::jmin (22.0f, (float) getWidth() * 0.24f);
+        if ((float) e.x < arrowW)                       change (value - 1);
+        else if ((float) e.x > (float) getWidth() - arrowW) change (value + 1);
+        else                                            showPicker();
+    }
+
+private:
+    void change (int v)
+    {
+        v = juce::jlimit (1, maxValue, v);
+        if (v == value) return;
+        value = v;
+        repaint();
+        if (onChange) onChange (v);
+    }
+
+    void showPicker()
+    {
+        juce::PopupMenu m;
+        m.addSectionHeader ("Lunghezza del pattern (step)");
+        for (int v = 1; v <= maxValue; ++v)
+        {
+            if (v > 1 && (v - 1) % 8 == 0) m.addColumnBreak();
+            m.addItem (v, juce::String (v) + (v % 16 == 0 ? "  (" + juce::String (v / 16) + (v == 16 ? " battuta)" : " battute)") : juce::String()),
+                       true, v == value);
+        }
+        juce::Component::SafePointer<PatternLengthChip> safe (this);
+        m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this), [safe] (int r) { if (safe != nullptr && r > 0) safe->change (r); });
+    }
+
+    int value = 16;
+    static constexpr int maxValue = 48;
 };
 
 //==============================================================================

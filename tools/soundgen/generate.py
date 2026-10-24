@@ -57,12 +57,31 @@ def align_to_family(x, entry):
     return ex.soft_limit(x, 0.89)
 
 
+def tighten(x, hold, k, max_len):
+    """Rullanti e clap asciutti: dopo il colpo la coda scende in fretta (niente effetto "riverbero")."""
+    sr = dsp.SR
+    ip = int(np.argmax(np.abs(x[: int(0.08 * sr)]))) if len(x) else 0
+    t = (np.arange(len(x)) - ip) / sr
+    x = x * np.exp(-np.maximum(0.0, t - hold) * k)
+    n = min(len(x), int(max_len * sr))
+    x = x[:n].copy()
+    fade = min(n, int(0.015 * sr))
+    x[n - fade:] *= np.linspace(1.0, 0.0, fade)
+    return x
+
+
+DRY_FAMILIES = {"Rullanti": (0.05, 9.0, 0.42), "Clap e schiocchi": (0.07, 9.0, 0.45)}
+
+
 def render(index):
     entry = SOUNDS[index]
     dsp.PERCUSSION["on"] = is_percussion(entry)
     x = np.asarray(entry["fn"](), dtype=float)
     if not entry["id"].startswith("x_"):
         x = align_to_family(x, entry)
+    family = classify(entry)[1]
+    if family in DRY_FAMILIES and "reverse" not in entry["id"]:
+        x = tighten(x, *DRY_FAMILIES[family])
     if not np.all(np.isfinite(x)):
         raise RuntimeError(entry["id"] + ": valori non validi")
     pcm = np.clip(np.round(x * 32767), -32768, 32767).astype(np.int16)

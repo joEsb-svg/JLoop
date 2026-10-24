@@ -72,7 +72,7 @@ private:
     void openEditor (int channel);
     void openPianoRoll (int channel);
     int getVisibleSteps() const;
-    int getFirstVisibleStep() const;
+    float getFirstVisibleStep() const;
     void layoutLandscape (juce::Rectangle<int> area);
     void layoutPortrait (juce::Rectangle<int> area);
     void layoutRack (juce::Rectangle<int> rack, bool portrait);
@@ -199,8 +199,15 @@ private:
                metroButton { IconButton::Icon::metronome };
     ChannelEditor editor { engine };
     PianoRoll pianoRoll { engine };
-    SegmentedControl lengthSwitch { { "16", "32" } };
-    SegmentedControl pageSwitch  { { "1-16", "17-32" } };
+    PatternLengthChip lengthChip;
+    BeatWatermark beatWatermark;
+    float scrollPos = 0.0f, scrollTarget = 0.0f, scrollDragStart = 0.0f;   // primo step visibile (il rack scorre in orizzontale)
+    bool scrollDragging = false;
+    double lastUserScrollMs = 0.0;
+    void scrollStepsBy (float dx, int phase);
+    void setScroll (float pos, bool animate);
+    float getMaxScroll() const;
+    void applyScroll();
     juce::Slider swingKnob, masterKnob;
     LevelMeter meter;
     StepRuler ruler;

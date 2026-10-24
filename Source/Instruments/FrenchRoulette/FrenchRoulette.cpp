@@ -433,6 +433,8 @@ namespace fr
         mainBuf.assign ((size_t) maxChunk, 0.0f);
         subBuf.assign (mainBuf.size(), 0.0f);
         fx.prepare (sr);
+        oversampler = std::make_unique<juce::dsp::Oversampling<float>> (1, 1, juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR, true);
+        oversampler->initProcessing ((size_t) maxChunk);
         killAll();
     }
 
@@ -445,6 +447,7 @@ namespace fr
         currentStep.store (-1);
         gateGain = 1.0f;
         holdSample = holdCount = dcX = dcY = 0.0f;
+        if (oversampler != nullptr) oversampler->reset();
     }
 
     Voice* Synth::findVoice()
@@ -528,17 +531,23 @@ namespace fr
 
         // Valvola: saturazione asimmetrica (armoniche pari), volume compensato
         const float drive = 1.0f + p.tube * 10.0f, bias = 0.18f * p.tube;
-        const float tBias = fastTanh (drive * bias), tNorm = 0.5f / juce::jmax (0.05f, fastTanh (drive * (0.5f + bias)) - tBias);
-        // Bitcrusher: bit e riduzione dei campioni
+        const float tBias = std::tanh (drive * bias), tNorm = 0.5f / juce::jmax (0.05f, std::tanh (drive * (0.5f + bias)) - tBias);
+        // Bitcrusher: bit e riduzione dei campioni (contati alla frequenza raddoppiata)
         const float steps = std::exp2 (p.bits - 1.0f);
-        const float hold = 1.0f + p.rate * p.rate * 31.0f;
-        const float cd = 1.0f + p.clipDrive * 9.0f, softNorm = 1.0f / fastTanh (cd);
+        const float hold = 2.0f * (1.0f + p.rate * p.rate * 31.0f);
+        const float cd = 1.0f + p.clipDrive * 9.0f, softNorm = 1.0f / std::tanh (cd);
 
-        for (int i = 0; i < n; ++i)
+        // Distorsione a frequenza doppia: molto meno aliasing (il "gracchiare" delle armoniche ripiegate)
+        float* chans[1] { x };
+        juce::dsp::AudioBlock<float> block (chans, 1, (size_t) n);
+        auto up = oversampler->processSamplesUp (block);
+        float* u = up.getChannelPointer (0);
+        const int m = (int) up.getNumSamples();
+        for (int i = 0; i < m; ++i)
         {
-            float y = x[i];
+            float y = u[i];
             if (tubeOn)
-                y = (fastTanh (drive * (y + bias)) - tBias) * tNorm;
+                y = (std::tanh (drive * (y + bias)) - tBias) * tNorm;
             if (blend > 0.001f)
             {
                 holdCount += 1.0f;
@@ -547,9 +556,15 @@ namespace fr
                 y += blend * (q - y);
             }
             if (clipOn)
-                y = p.clipMode == 0 ? fastTanh (y * cd) * softNorm * 0.8f : juce::jlimit (-0.8f, 0.8f, y * cd * 0.8f);
-            x[i] = y;
+            {
+                const float v = y * cd;
+                // "Hard": quasi squadrata ma con l'angolo arrotondato (niente spigolo che gracchia)
+                y = p.clipMode == 0 ? std::tanh (v) * softNorm * 0.8f
+                                    : 0.8f * v / std::pow (1.0f + std::pow (std::abs (v), 6.0f), 1.0f / 6.0f);
+            }
+            u[i] = y;
         }
+        oversampler->processSamplesDown (block);
     }
 
     void Synth::render (juce::AudioBuffer<float>& buffer, int start, int n, const BlockParams& p, double bpm, double ppq, bool playing)
@@ -757,20 +772,29 @@ namespace fr
                                { "subLevel", 0.55f }, { "subOct", 0 }, { "subDrive", 0.2f },
                                { "cutoff", 700 }, { "reso", 0.45f }, { "fEnv", 0.55f }, { "fD", 0.16f }, { "fKey", 0.4f },
                                { "aA", 0.001f }, { "aR", 0.05f },
-                               { "tube", 0.45f }, { "crunch", 0.15f }, { "bits", 7 }, { "rate", 0.25f }, { "clipDrive", 0.35f },
+                               { "tube", 0.45f }, { "crunch", 0.06f }, { "bits", 9 }, { "rate", 0.0f }, { "clipDrive", 0.35f },
                                { "pump", 0.45f }, { "pumpShape", 0.6f },
-                               { "matOn", 1 }, { "gateLen", 0.55f }, { "matCut", 0.6f }, { "matCrush", 0.7f }, { "master", 4.7f } },
+                               { "matOn", 1 }, { "gateLen", 0.55f }, { "matCut", 0.6f }, { "matCrush", 0.4f }, { "master", 4.7f } },
               true, { "x.xx.xx.x.xxx.x.", "9496738594637282", "0010003000100060", { 0,0,12,0, 0,0,-12,0, 0,0,12,0, 7,0,12,0 }, "..g.....g......." } },
 
-            { "Roulette Growl", { { "o1Wave", 0 }, { "o1Oct", 1 }, { "o1Level", 0.5f },
-                                  { "o2Table", 1 }, { "o2Wave", 0.25f }, { "o2Level", 0.9f }, { "o2Fm", 0.25f }, { "o2Semi", -12 }, { "o2Fine", 0 },
-                                  { "subLevel", 0.5f }, { "subOct", 0 },
-                                  { "fType", 0 }, { "cutoff", 1100 }, { "reso", 0.55f }, { "fEnv", 0.2f }, { "fD", 0.3f },
-                                  { "lfoShape", 0 }, { "lfoDiv", 3 }, { "lfoCut", 0.55f }, { "lfoWave", 0.6f },
-                                  { "tube", 0.55f }, { "crunch", 0.3f }, { "bits", 6 }, { "rate", 0.15f }, { "clipMode", 1 }, { "clipDrive", 0.4f },
-                                  { "mode", 1 }, { "glide", 0.04f }, { "pump", 0.35f },
-                                  { "matOn", 1 }, { "gateLen", 0.9f }, { "matCut", 0.3f }, { "master", -0.1f } },
-              true, { "xxx.xx.xxxx.xx.x", "9999999999999999", "0000300000060000", { 0,0,0,0, 0,0,0,0, 0,0,0,0, 12,0,0,0 }, "............g..." } },
+            { "Buzz Growl", { { "o1Wave", 0 }, { "o1Oct", 1 }, { "o1Drift", 0.2f }, { "o1Level", 0.8f },
+                              { "o2Table", 2 }, { "o2Wave", 0.12f }, { "o2Level", 0.75f }, { "o2Semi", 0 }, { "o2Fine", 12 },
+                              { "subLevel", 0.5f }, { "subOct", 0 }, { "subDrive", 0.15f },
+                              { "fType", 0 }, { "cutoff", 1300 }, { "reso", 0.3f }, { "fEnv", 0.25f }, { "fD", 0.25f }, { "fS", 0.4f }, { "fKey", 0.4f },
+                              { "lfoShape", 1 }, { "lfoDiv", 2 }, { "lfoCut", 0.35f }, { "lfoWave", 0.3f },
+                              { "tube", 0.7f }, { "crunch", 0.0f }, { "rate", 0.0f }, { "clipMode", 0 }, { "clipDrive", 0.35f },
+                              { "mode", 1 }, { "glide", 0.03f }, { "pump", 0.3f },
+                              { "matOn", 1 }, { "gateLen", 0.92f }, { "matCut", 0.25f }, { "master", 1.3f } },
+              true, { "xxxxxxx.xxxxxx.x", "9999999999999999", "0000000000000000", { 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,12,0 }, "..............g." } },
+
+            { "Electro Buzz", { { "o1Wave", 0 }, { "o1Oct", 2 }, { "o1Drift", 0.15f }, { "o1Level", 0.85f },
+                                { "o2Table", 4 }, { "o2Wave", 0.0f }, { "o2Level", 0.6f }, { "o2Semi", 0 }, { "o2Fine", -8 },
+                                { "subLevel", 0.45f }, { "subOct", 0 }, { "subDrive", 0.1f },
+                                { "fType", 0 }, { "cutoff", 2200 }, { "reso", 0.2f }, { "fEnv", 0.15f }, { "fD", 0.3f }, { "fS", 0.6f }, { "fKey", 0.3f },
+                                { "aA", 0.002f }, { "aS", 1.0f }, { "aR", 0.06f },
+                                { "tube", 0.85f }, { "crunch", 0.0f }, { "rate", 0.0f }, { "clipMode", 0 }, { "clipDrive", 0.45f },
+                                { "mode", 1 }, { "glide", 0.04f }, { "pump", 0.25f }, { "master", -2.0f } } },
+
 
             { "Fidget Chop", { { "o1Wave", 1 }, { "o1Oct", 1 }, { "o1Level", 0.7f },
                                { "o2Table", 3 }, { "o2Wave", 0.4f }, { "o2Level", 0.7f }, { "o2Semi", 12 }, { "o2Fine", 0 },
@@ -797,7 +821,7 @@ namespace fr
                                { "subLevel", 0.55f },
                                { "fType", 2 }, { "cutoff", 900 }, { "reso", 0.5f }, { "fEnv", 0.1f },
                                { "lfoShape", 1 }, { "lfoDiv", 6 }, { "lfoCut", 0.7f }, { "lfoWave", 0.85f },
-                               { "tube", 0.5f }, { "crunch", 0.2f }, { "bits", 7 }, { "clipMode", 0 }, { "clipDrive", 0.3f }, { "rate", 0.1f },
+                               { "tube", 0.45f }, { "crunch", 0.0f }, { "bits", 12 }, { "clipMode", 0 }, { "clipDrive", 0.3f }, { "rate", 0.0f },
                                { "mode", 1 }, { "glide", 0.06f },
                                { "matOn", 1 }, { "gateLen", 0.95f }, { "matCut", 0.2f }, { "master", -1.1f } },
               true, { "xxxxxx.xxxxxxx.x", "9999999999999999", "0000000000000000", { 0,0,0,0, 0,0,0,0, 0,0,0,0, -12,-12,0,0 }, "............g.g." } },
@@ -806,7 +830,7 @@ namespace fr
                                 { "o2Table", 5 }, { "o2Wave", 0.5f }, { "o2Level", 0.5f },
                                 { "subLevel", 0.85f }, { "subOct", 0 }, { "subDrive", 0.5f },
                                 { "cutoff", 600 }, { "reso", 0.2f }, { "fEnv", 0.4f }, { "fD", 0.2f },
-                                { "crunch", 0.55f }, { "bits", 4.5f }, { "rate", 0.45f },
+                                { "crunch", 0.55f }, { "bits", 6 }, { "rate", 0.25f },
                                 { "pump", 0.6f },
                                 { "matOn", 1 }, { "gateLen", 0.6f }, { "matCrush", 0.9f }, { "master", 4.8f } },
               true, { "x.x.xxx.x.x.xx.x", "9999999999999999", "0050090005000909", { 0,0,0,0, 0,0,12,0, 0,0,0,0, 0,0,-12,0 }, "................" } },
@@ -816,8 +840,8 @@ namespace fr
                                      { "subLevel", 0.5f },
                                      { "cutoff", 500 }, { "reso", 0.5f }, { "fEnv", 0.8f }, { "fD", 0.09f }, { "fKey", 0.4f },
                                      { "aD", 0.18f }, { "aS", 0.0f }, { "aR", 0.05f },
-                                     { "tube", 0.55f }, { "clipMode", 1 }, { "clipDrive", 0.45f },
-                                     { "pump", 0.35f }, { "master", 1.1f } } },
+                                     { "tube", 0.55f }, { "clipMode", 0 }, { "clipDrive", 0.4f },
+                                     { "pump", 0.35f }, { "master", 2.0f } } },
 
             // ---------------- LEAD
             { "Screaming Lead", { { "o1Wave", 0 }, { "o1Oct", 2 }, { "o1Drift", 0.35f }, { "o1Level", 0.8f },

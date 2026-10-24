@@ -45,15 +45,17 @@ public:
     void mouseDrag (const juce::MouseEvent&) override;
     void mouseUp (const juce::MouseEvent&) override;
 
-    /** Quale pagina di 16 step mostrare e in che modalita' di modifica. */
-    void setView (int firstStepToShow, EditMode mode);
+    /** Da quale step (anche frazionario: il rack scorre in orizzontale) e in che modalita' di modifica. */
+    void setView (float firstStepToShow, EditMode mode);
 
     /** Chiamato dal timer della schermata: aggiorna playhead, lampeggio, cambi esterni. */
     void refresh (int currentStep);
     void setPlayTick (int tick);
 
-    /** Posizione della colonna visibile i (0..15), in coordinate locali della riga. */
-    juce::Rectangle<float> getPadBounds (int column) const;
+    /** Posizione dello step (assoluto, 0..47) in coordinate locali della riga (puo' essere fuori vista). */
+    juce::Rectangle<float> getStepBounds (int step) const;
+    /** Distanza media tra due step, in pixel (per convertire lo scorrimento del dito in step). */
+    float getStepPitch() const;
 
     /** Larghezza della parte sinistra (LED, volume, nome), uguale per tutte le righe. */
     float getHeaderWidth() const;
@@ -69,6 +71,11 @@ public:
     std::function<void (int channel, int command)> onCommand;      // vedi Command
     std::function<void (float deltaY, bool started)> onScrollDrag;  // trascinamento verticale sul nome
     std::function<void()> onLongPress;                               // per la vibrazione
+    /** Trascinamento orizzontale sugli step (pattern piu' lungo dello schermo): scorre il pattern.
+        fase 0 = inizio, 1 = movimento, 2 = fine; dx in pixel dall'inizio. */
+    std::function<void (float dx, int phase)> onScrollSteps;
+    /** Il pattern e' piu' lungo di quanto si vede: il trascinamento orizzontale scorre invece di "dipingere". */
+    bool scrollable = false;
 
     /** Nome da mostrare sotto quello dello strumento: kit o campione. */
     static juce::String getSoundLabel (SequencerEngine&, int channel);
@@ -84,7 +91,8 @@ private:
     int pressedStep = 0, savedVelocity = 0, savedProbability = 100, savedRatchet = 1;
     juce::Colour getColour() const  { return juce::Colour (engine.getChannel (channel).colour.load()); }
     juce::Rectangle<float> getPadsArea() const;
-    int columnAt (juce::Point<float>) const;
+    int stepAt (juce::Point<float>) const;
+    bool isStepVisible (int step) const;
     void applyVerticalValueAt (juce::Point<float>);
 
     SequencerEngine& engine;
@@ -93,7 +101,9 @@ private:
     juce::Slider volumeKnob;
     juce::Rectangle<float> muteArea, nameArea, menuArea;
 
-    int      firstStep = 0;
+    float    firstStep = 0.0f;
+    bool     hScrolling = false;
+    juce::Point<float> pressPos;
     int      visibleSteps = 16;
     bool     compact = false;
     EditMode mode = EditMode::step;

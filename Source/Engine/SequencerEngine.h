@@ -38,7 +38,7 @@
 class SequencerEngine : public juce::AudioIODeviceCallback
 {
 public:
-    static constexpr int maxSteps         = 32;
+    static constexpr int maxSteps         = 48;    // lunghezza massima di un pattern (3 battute)
     static constexpr int maxChannels      = 32;    // canali del channel rack (strumenti)
     static constexpr int defaultChannels  = 7;     // progetto nuovo: 6 strumenti di batteria + il synth BassForge
     static constexpr int numDrumTypes     = 6;     // strumenti della batteria sintetizzata (vedi SoundLibrary)
@@ -154,23 +154,23 @@ public:
         std::array<Row, maxChannels> ratchet;       // 1..4 colpi nello step
         std::atomic<int> length { 16 };
 
-        // Note del piano roll, impacchettate in 32 bit (0 = slot vuoto):
-        // inizio 9 bit | durata 9 bit | altezza 7 bit | velocity 7 bit
-        std::array<std::array<std::atomic<uint32_t>, maxNotes>, maxChannels> notes;
+        // Note del piano roll, impacchettate in 64 bit (0 = slot vuoto):
+        // inizio 12 bit | durata 12 bit | altezza 7 bit | velocity 7 bit
+        std::array<std::array<std::atomic<uint64_t>, maxNotes>, maxChannels> notes;
         std::array<std::atomic<int>, maxChannels> noteCount;   // se > 0 il canale usa il piano roll, non gli step
     };
 
-    static uint32_t packNote (const NoteData& n)
+    static uint64_t packNote (const NoteData& n)
     {
-        return (uint32_t) (juce::jlimit (0, 511, n.start)) << 23
-             | (uint32_t) (juce::jlimit (1, 511, n.length)) << 14
-             | (uint32_t) (juce::jlimit (0, 127, n.pitch)) << 7
-             | (uint32_t) (juce::jlimit (1, 127, n.velocity));
+        return (uint64_t) (juce::jlimit (0, 4095, n.start)) << 26
+             | (uint64_t) (juce::jlimit (1, 4095, n.length)) << 14
+             | (uint64_t) (juce::jlimit (0, 127, n.pitch)) << 7
+             | (uint64_t) (juce::jlimit (1, 127, n.velocity));
     }
 
-    static NoteData unpackNote (uint32_t v)
+    static NoteData unpackNote (uint64_t v)
     {
-        return { (int) (v >> 23) & 511, (int) (v >> 14) & 511, (int) (v >> 7) & 127, (int) v & 127 };
+        return { (int) (v >> 26) & 4095, (int) (v >> 14) & 4095, (int) (v >> 7) & 127, (int) v & 127 };
     }
 
     /** Un pattern piazzato nella playlist: traccia, battuta d'inizio, quale pattern. */
@@ -819,7 +819,7 @@ public:
     const Pattern& current() const              { return patterns[(size_t) currentPattern.load()]; }
 
     int getPatternLength() const                { return current().length.load(); }
-    void setPatternLength (int len)             { current().length.store (len > 16 ? 32 : 16); }
+    void setPatternLength (int len)             { current().length.store (juce::jlimit (1, maxSteps, len)); }
 
     int getStepVelocity (int channel, int step) const      { return current().velocity[(size_t) channel][(size_t) step].load(); }
     void setStepVelocity (int channel, int step, int v)    { current().velocity[(size_t) channel][(size_t) step].store ((uint8_t) juce::jlimit (0, 127, v)); }
@@ -1438,7 +1438,7 @@ private:
         struct PatternRows
         {
             uint8_t velocity[maxSteps], probability[maxSteps], ratchet[maxSteps];
-            uint32_t notes[maxNotes];
+            uint64_t notes[maxNotes];
             int noteCount;
         };
         std::vector<PatternRows> rows;   // solo i pattern che contengono qualcosa (vedi patternDataLimit)
@@ -2480,7 +2480,7 @@ private:
             for (auto& slot : pattern.notes[(size_t) c])
             {
                 const auto v = slot.load();
-                if (v == 0 || (int) (v >> 23) != tick)
+                if (v == 0 || (int) ((v >> 26) & 4095) != tick)
                     continue;
 
                 const auto n = unpackNote (v);
@@ -2628,7 +2628,7 @@ private:
 
     // Stato condiviso UI <-> audio
     std::array<Channel, maxChannels> channels;
-    std::unique_ptr<Pattern[]> patterns { new Pattern[(size_t) numPatterns] };   // sullo heap: sono ~3.5 MB
+    std::unique_ptr<Pattern[]> patterns { new Pattern[(size_t) numPatterns] };   // sullo heap: sono ~7 MB
     std::array<juce::String, numPatterns> patternNames;                        // solo UI
     std::atomic<int>    numActiveChannels { defaultChannels };
     std::atomic<int>    structureVersion { 0 };

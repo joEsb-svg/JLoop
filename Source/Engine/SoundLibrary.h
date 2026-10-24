@@ -70,23 +70,23 @@ namespace SoundLibrary
                 out (withClick (tone (1.0f, 165, 48, 0.050f, 0.27f), 0.4f, 0.002f), 7.0f, 0.82f),   // Techno: distorta, "rumble"
                 out (withClick (tone (1.0f, 180, 52, 0.030f, 0.20f), 0.3f, 0.003f), 3.0f, 0.95f),   // Progressive: morbida e piena
             },
-            // ---------------------------------------------------------------- SNARE
+            // ---------------------------------------------------------------- SNARE (code corte: niente effetto riverbero)
             {
-                out (withNoise (tone (0.70f, 255, 185, 0.020f, 0.055f), 0.85f, 0.13f, 1800), 1.6f, 1.0f),
-                out (withNoise (tone (0.80f, 220, 180, 0.020f, 0.080f), 1.00f, 0.20f, 1200, 4000, 0.5f), 2.2f, 1.0f),
+                out (withNoise (tone (0.70f, 255, 185, 0.020f, 0.055f), 0.85f, 0.09f, 1800), 1.6f, 1.0f),
+                out (withNoise (tone (0.80f, 220, 180, 0.020f, 0.080f), 1.00f, 0.12f, 1200, 4000, 0.5f), 2.2f, 1.0f),
                 out (withNoise (tone (0.90f, 330, 230, 0.010f, 0.040f), 0.90f, 0.09f, 2500), 3.0f, 0.9f),
-                out (withNoise (tone (1.00f, 260, 170, 0.020f, 0.090f), 1.10f, 0.28f, 900),  3.5f, 0.85f),
+                out (withNoise (tone (1.00f, 260, 170, 0.020f, 0.090f), 1.10f, 0.13f, 900),  3.5f, 0.85f),
                 out (withNoise (tone (0.50f, 300, 200, 0.010f, 0.030f), 0.90f, 0.07f, 3000), 1.8f, 1.0f),
-                out (withNoise (tone (0.60f, 240, 190, 0.020f, 0.050f), 0.90f, 0.16f, 2000, 6000, 0.7f), 1.5f, 1.0f),
+                out (withNoise (tone (0.60f, 240, 190, 0.020f, 0.050f), 0.90f, 0.10f, 2000, 6000, 0.7f), 1.5f, 1.0f),
             },
             // ---------------------------------------------------------------- CLAP
             {
                 out (withClap (withNoise ({}, 1.0f, 0.11f, 0, 1150, 1.4f), 3, 0.010f, 0.0045f), 3.2f, 1.0f),
-                out (withClap (withNoise ({}, 1.0f, 0.18f, 0, 1500, 1.0f), 4, 0.012f, 0.0050f), 2.6f, 1.0f),
+                out (withClap (withNoise ({}, 1.0f, 0.12f, 0, 1500, 1.0f), 4, 0.012f, 0.0050f), 2.6f, 1.0f),
                 out (withClap (withNoise ({}, 1.0f, 0.07f, 0, 1800, 1.2f), 3, 0.007f, 0.0040f), 3.5f, 1.0f),
-                out (withClap (withNoise ({}, 1.0f, 0.30f, 0, 1000, 1.6f), 4, 0.014f, 0.0050f), 4.0f, 0.9f),
-                out (withClap (withNoise ({}, 1.0f, 0.14f, 0, 1300, 2.0f), 3, 0.009f, 0.0040f), 3.5f, 1.0f),
-                out (withClap (withNoise ({}, 1.0f, 0.22f, 0, 2200, 0.9f), 3, 0.011f, 0.0050f), 3.0f, 1.0f),
+                out (withClap (withNoise ({}, 1.0f, 0.15f, 0, 1000, 1.6f), 4, 0.014f, 0.0050f), 4.0f, 0.9f),
+                out (withClap (withNoise ({}, 1.0f, 0.10f, 0, 1300, 2.0f), 3, 0.009f, 0.0040f), 3.5f, 1.0f),
+                out (withClap (withNoise ({}, 1.0f, 0.13f, 0, 2200, 0.9f), 3, 0.011f, 0.0050f), 3.0f, 1.0f),
             },
             // ---------------------------------------------------------------- HI-HAT (chiuso)
             {

@@ -225,7 +225,10 @@ namespace df
             set (padId (p, "Pan"), pad.pan);
             set (padId (p, "Cutoff"), pad.cutoff);
             set (padId (p, "Choke"), (float) pad.choke);
-            set (padId (p, "Reverb"), pad.reverb * 0.5f);   // poco riverbero: i colpi restano asciutti e definiti
+            // Rullanti e clap completamente asciutti (il riverbero si aggiunge dal mixer se serve); gli altri appena un po'
+            const auto label = juce::String (juce::CharPointer_UTF8 (pad.label)).toLowerCase();
+            const bool dry = label.contains ("snare") || label.contains ("clap") || label.contains ("mani") || label.contains ("schiocco") || label.contains ("rim");
+            set (padId (p, "Reverb"), dry ? 0.0f : pad.reverb * 0.5f);
             apvts.state.setProperty ("sample" + juce::String (p), SampleStore::libraryName (pad.sample), nullptr);
             apvts.state.setProperty ("name" + juce::String (p), juce::String (juce::CharPointer_UTF8 (pad.label)), nullptr);
         }
