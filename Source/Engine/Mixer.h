@@ -34,7 +34,7 @@ namespace mixer
     //==========================================================================
     // Tipi di effetto e i loro parametri
 
-    enum FxType { none = 0, compressor, saturation, filter, delay, reverb, chorus, bitcrusher, sidechain, stereo, numFxTypes };
+    enum FxType { none = 0, compressor, saturation, filter, delay, reverb, chorus, bitcrusher, sidechain, stereo, ott, glitch, numFxTypes };
 
     enum class Unit { percent, dB, ms, hz, ratio, choice, track, bits, times };
 
@@ -104,6 +104,16 @@ namespace mixer
                 { "Soglia", -48.0f, 0.0f, -30.0f, Unit::dB } }} },
             { "stereo", "Stereo", "Allarga o stringe l'immagine stereo", 1, {{
                 { "Ampiezza", 0.0f, 2.0f, 1.0f, Unit::percent } }} },
+            { "ott", "OTT", "Compressore multibanda aggressivo: bassi e lead grossi e in faccia", 5, {{
+                { "Profondita'", 0.0f, 1.0f, 0.6f, Unit::percent },
+                { "Tempo", 0.0f, 1.0f, 0.5f, Unit::percent },
+                { "Su (upward)", 0.0f, 1.0f, 1.0f, Unit::percent },
+                { "Giu' (downward)", 0.0f, 1.0f, 1.0f, Unit::percent },
+                { "Uscita", -12.0f, 12.0f, 0.0f, Unit::dB } }} },
+            { "glitch", "Glitch", "Ripetizioni, tape stop e reverse a tempo, disegnati su una griglia", 3, {{
+                { "Mix", 0.0f, 1.0f, 1.0f, Unit::percent },
+                { "Step 1-8", 0.0f, 16777215.0f, 0.0f, Unit::times },
+                { "Step 9-16", 0.0f, 16777215.0f, 0.0f, Unit::times } }} },
         }};
         return infos[(size_t) juce::jlimit (0, numFxTypes - 1, type)];
     }
@@ -160,6 +170,8 @@ namespace mixer
     struct Context
     {
         double sampleRate = 48000.0, bpm = 120.0;
+        double ppq = 0.0;              // posizione (in quarti) all'inizio del blocco
+        bool playing = false;
         const float* keyL = nullptr;   // sidechain: l'ingresso della traccia sorgente
         const float* keyR = nullptr;
     };
@@ -614,6 +626,277 @@ namespace mixer
         }
     };
 
+    //==========================================================================
+    /**
+        OTT: compressore multibanda "su e giu'" (stile Xfer OTT). Tre bande (88 Hz / 2.5 kHz):
+        i suoni forti vengono abbassati (downward), quelli deboli alzati (upward): tutto diventa denso e in faccia.
+        Profondita' = quanto del suono compresso si mescola all'originale.
+    */
+    class Ott : public Effect
+    {
+    public:
+        void prepare (double sampleRate) override
+        {
+            sr = sampleRate;
+            for (auto* f : { &lowSplit, &highSplit, &lowAllpass })
+            {
+                f->prepare ({ sr, 4096, 2 });
+                f->setType (juce::dsp::LinkwitzRileyFilterType::lowpass);
+            }
+            lowSplit.setCutoffFrequency (88.0f);
+            highSplit.setCutoffFrequency (2500.0f);
+            lowAllpass.setCutoffFrequency (2500.0f);
+            reset();
+        }
+
+        void reset() override
+        {
+            lowSplit.reset(); highSplit.reset(); lowAllpass.reset();
+            env.fill (0.0f);
+            gainDb.fill (0.0f);
+        }
+
+        void process (float* L, float* R, int n, const float* p, const Context&) override
+        {
+            const float depth = p[0], timeScale = 0.15f + 0.85f * p[1], up = p[2], down = p[3];
+            const float out = juce::Decibels::decibelsToGain (p[4]);
+            if (depth <= 0.001f)
+            {
+                if (std::abs (p[4]) > 0.01f) for (int i = 0; i < n; ++i) { L[i] *= out; R[i] *= out; }
+                return;
+            }
+
+            // Tempi, soglie e guadagni per banda (basso, medio, alto), presi dai valori classici dell'OTT
+            static constexpr float attMs[3] { 47.8f, 22.4f, 13.5f }, relMs[3] { 282.0f, 132.0f, 67.0f };
+            static constexpr float downThr[3] { -33.8f, -30.2f, -35.5f }, upThr[3] { -40.8f, -41.8f, -40.8f };
+            static constexpr float makeupDb[3] { 18.0f, 16.0f, 18.0f };   // come i guadagni di banda dell'OTT: il suono compresso torna su
+            float att[3], rel[3];
+            for (int b = 0; b < 3; ++b)
+            {
+                att[b] = (float) std::exp (-1.0 / (attMs[b] * timeScale * 0.001 * sr));
+                rel[b] = (float) std::exp (-1.0 / (relMs[b] * timeScale * 0.001 * sr));
+            }
+            const float downSlope = (1.0f - 1.0f / 66.7f) * down;   // sopra la soglia: quasi un limiter
+            const float upSlope = (1.0f - 1.0f / 4.17f) * up;       // sotto la soglia: alza i dettagli
+
+            for (int i = 0; i < n; ++i)
+            {
+                float band[3][2];
+                for (int ch = 0; ch < 2; ++ch)
+                {
+                    const float x = ch == 0 ? L[i] : R[i];
+                    float lo, rest, mid, hi, loA, loB;
+                    lowSplit.processSample (ch, x, lo, rest);
+                    highSplit.processSample (ch, rest, mid, hi);
+                    lowAllpass.processSample (ch, lo, loA, loB);   // stessa fase delle altre bande
+                    band[0][ch] = loA + loB;
+                    band[1][ch] = mid;
+                    band[2][ch] = hi;
+                }
+
+                float yl = 0.0f, yr = 0.0f;
+                for (int b = 0; b < 3; ++b)
+                {
+                    const float level = juce::jmax (std::abs (band[b][0]), std::abs (band[b][1]));
+                    env[(size_t) b] = level > env[(size_t) b] ? att[b] * env[(size_t) b] + (1.0f - att[b]) * level
+                                                              : rel[b] * env[(size_t) b] + (1.0f - rel[b]) * level;
+                    if ((i & 3) == 0)   // guadagno ricalcolato ogni 4 campioni (log/exp costano)
+                    {
+                        const float db = juce::Decibels::gainToDecibels (env[(size_t) b], -120.0f);
+                        float g = 0.0f;
+                        if (db > downThr[b])
+                            g = -(db - downThr[b]) * downSlope;
+                        else if (db < upThr[b] && db > -78.0f)
+                        {
+                            // l'aumento si spegne nel silenzio (sotto -60 dB): niente fruscio alzato
+                            const float fade = juce::jlimit (0.0f, 1.0f, (db + 78.0f) / 18.0f);
+                            g = juce::jmin (24.0f, (upThr[b] - db) * upSlope) * fade;
+                        }
+                        gainDb[(size_t) b] = juce::Decibels::decibelsToGain (g + makeupDb[b]);
+                    }
+                    yl += band[b][0] * gainDb[(size_t) b];
+                    yr += band[b][1] * gainDb[(size_t) b];
+                }
+                L[i] = (L[i] + depth * (yl - L[i])) * out;
+                R[i] = (R[i] + depth * (yr - R[i])) * out;
+            }
+        }
+
+    private:
+        double sr = 48000.0;
+        juce::dsp::LinkwitzRileyFilter<float> lowSplit, highSplit, lowAllpass;
+        std::array<float, 3> env {}, gainDb { 1.0f, 1.0f, 1.0f };
+    };
+
+    //==========================================================================
+    /**
+        Glitch (stile Gross Beat): una griglia di 16 step (una battuta) e per ogni step un effetto:
+        0 normale, 1 ripeti 1/8, 2 ripeti 1/16, 3 ripeti 1/32, 4 tape stop, 5 reverse, 6 muto, 7 rallenta.
+        Step consecutivi con lo stesso effetto formano un unico gesto (es. 4 step "ripeti 1/32" = una rullata
+        che ripete l'inizio del primo step). Funziona a tempo, mentre il progetto suona.
+        La griglia sta in due parametri: 8 step x 3 bit ciascuno.
+    */
+    namespace glitchGrid
+    {
+        enum Mode { normal = 0, repeat8, repeat16, repeat32, tapeStop, reverse, mute, halfSpeed, numModes };
+        inline int get (const float* p, int step)
+        {
+            const auto code = (uint32_t) juce::jlimit (0.0f, 16777215.0f, p[step < 8 ? 1 : 2]);
+            return (int) ((code >> (3 * (step % 8))) & 7u);
+        }
+        inline void set (float* p, int step, int mode)
+        {
+            auto code = (uint32_t) juce::jlimit (0.0f, 16777215.0f, p[step < 8 ? 1 : 2]);
+            const uint32_t shift = (uint32_t) (3 * (step % 8));
+            code = (code & ~(7u << shift)) | ((uint32_t) (mode & 7) << shift);
+            p[step < 8 ? 1 : 2] = (float) code;
+        }
+        inline const char* name (int mode)
+        {
+            static const char* names[] { "Normale", "Ripeti 1/8", "Ripeti 1/16", "Ripeti 1/32", "Tape stop", "Reverse", "Muto", "Rallenta" };
+            return names[juce::jlimit (0, 7, mode)];
+        }
+        inline const char* shortName (int mode)
+        {
+            static const char* names[] { "", "1/8", "1/16", "1/32", "STOP", "REV", "MUTO", "1/2x" };
+            return names[juce::jlimit (0, 7, mode)];
+        }
+    }
+
+    class Glitch : public Effect
+    {
+    public:
+        void prepare (double sampleRate) override
+        {
+            sr = sampleRate;
+            const size_t size = (size_t) (sr * 8.0);
+            buf[0].assign (size, 0.0f);
+            buf[1].assign (size, 0.0f);
+            reset();
+        }
+
+        void reset() override
+        {
+            for (auto& b : buf) std::fill (b.begin(), b.end(), 0.0f);
+            writePos = 0; runStart = 0; runMode = 0; runStep = -1; sampleInRun = 0; wet = 0.0f;
+        }
+
+        void process (float* L, float* R, int n, const float* p, const Context& ctx) override
+        {
+            if (buf[0].empty())
+                return;
+            const int size = (int) buf[0].size();
+            const double beatsPerSample = ctx.bpm / 60.0 / sr;
+            const double samplesPerStep = sr * 60.0 / ctx.bpm / 4.0;
+            const float mix = p[0];
+            const float fadeStep = (float) (1.0 / (0.002 * sr));    // 2 ms
+
+            for (int i = 0; i < n; ++i)
+            {
+                buf[0][(size_t) writePos] = L[i];
+                buf[1][(size_t) writePos] = R[i];
+
+                int mode = glitchGrid::normal;
+                if (ctx.playing && ctx.ppq >= 0.0)
+                {
+                    const double beat = ctx.ppq + beatsPerSample * i;
+                    const double inBar = std::fmod (beat, 4.0);
+                    const int step = juce::jlimit (0, 15, (int) (inBar * 4.0));
+                    mode = glitchGrid::get (p, step);
+
+                    // Nuovo "gesto": lo step precedente aveva un effetto diverso (o si e' ricominciato)
+                    const bool newRun = mode != runMode || step < runStep || step >= runStep + runLength;
+                    if (newRun)
+                    {
+                        runMode = mode;
+                        runStep = step;
+                        runStart = writePos;
+                        sampleInRun = 0;
+                        runLength = 1;
+                        while (step + runLength < 16 && glitchGrid::get (p, step + runLength) == mode)
+                            ++runLength;
+                        runSamples = samplesPerStep * runLength;
+                    }
+                }
+                else
+                {
+                    runMode = glitchGrid::normal;
+                    runStep = -1;
+                }
+
+                // Lettura dal registro secondo l'effetto
+                float wl = L[i], wr = R[i], env = 1.0f;
+                const double t = (double) sampleInRun;
+                double readOffset = 0.0;    // campioni da runStart (puo' essere negativo: reverse)
+                bool useBuffer = true;
+                switch (runMode)
+                {
+                    case glitchGrid::repeat8:
+                    case glitchGrid::repeat16:
+                    case glitchGrid::repeat32:
+                    {
+                        const double len = samplesPerStep * (runMode == glitchGrid::repeat8 ? 2.0 : runMode == glitchGrid::repeat16 ? 1.0 : 0.5);
+                        const double pos = std::fmod (t, len);
+                        readOffset = pos;
+                        // piccola sfumatura a inizio e fine di ogni ripetizione: niente click
+                        const double edge = 0.0015 * sr;
+                        env = (float) juce::jmin (1.0, juce::jmin (pos / edge, (len - pos) / edge));
+                        break;
+                    }
+                    case glitchGrid::tapeStop:
+                    {
+                        const double L0 = juce::jmax (1.0, runSamples);
+                        const double tt = juce::jmin (t, L0);
+                        readOffset = tt - tt * tt / (2.0 * L0);        // velocita' da 1 a 0
+                        env = (float) juce::jlimit (0.0, 1.0, (L0 - t) / (0.01 * sr));
+                        break;
+                    }
+                    case glitchGrid::reverse:
+                        readOffset = -1.0 - t;                         // quello appena suonato, al contrario
+                        env = (float) juce::jmin (1.0, juce::jmin (t / (0.003 * sr), (runSamples - t) / (0.003 * sr)));
+                        break;
+                    case glitchGrid::halfSpeed:
+                        readOffset = t * 0.5;
+                        break;
+                    case glitchGrid::mute:
+                        wl = wr = 0.0f;
+                        useBuffer = false;
+                        break;
+                    default:
+                        useBuffer = false;
+                        break;
+                }
+
+                if (useBuffer)
+                {
+                    double pos = (double) runStart + readOffset;
+                    pos -= std::floor (pos / size) * size;
+                    const int i0 = (int) pos % size, i1 = (i0 + 1) % size;
+                    const float f = (float) (pos - std::floor (pos));
+                    wl = (buf[0][(size_t) i0] + f * (buf[0][(size_t) i1] - buf[0][(size_t) i0])) * env;
+                    wr = (buf[1][(size_t) i0] + f * (buf[1][(size_t) i1] - buf[1][(size_t) i0])) * env;
+                }
+
+                // Passaggio morbido tra suono normale ed effetto
+                const float target = runMode == glitchGrid::normal ? 0.0f : mix;
+                wet += juce::jlimit (-fadeStep, fadeStep, target - wet);
+                L[i] += wet * (wl - L[i]);
+                R[i] += wet * (wr - R[i]);
+
+                writePos = (writePos + 1) % size;
+                ++sampleInRun;
+            }
+        }
+
+    private:
+        double sr = 48000.0;
+        std::array<std::vector<float>, 2> buf;
+        int writePos = 0, runStart = 0, runMode = 0, runStep = -1, runLength = 1;
+        long sampleInRun = 0;
+        double runSamples = 1.0;
+        float wet = 0.0f;
+    };
+
     inline std::unique_ptr<Effect> createEffect (int type)
     {
         switch (type)
@@ -627,6 +910,8 @@ namespace mixer
             case bitcrusher: return std::make_unique<Bitcrusher>();
             case sidechain:  return std::make_unique<Sidechain>();
             case stereo:     return std::make_unique<Stereo>();
+            case ott:        return std::make_unique<Ott>();
+            case glitch:     return std::make_unique<Glitch>();
             default:         return nullptr;
         }
     }

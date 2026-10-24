@@ -194,7 +194,7 @@ private:
     int spectrumCounter = 0;
     juce::String getKitChipText() const;
     bool hasDrumSynthChannels() const;
-    SegmentedControl modeSwitch  { { "STEP", "VEL", "PROB", "ROLL" } };
+    SegmentedControl modeSwitch  { { "STEP", "VEL", "PROB", "ROLL", "PITCH", "PAN" } };
     IconButton undoButton { IconButton::Icon::undo }, redoButton { IconButton::Icon::redo },
                metroButton { IconButton::Icon::metronome };
     ChannelEditor editor { engine };

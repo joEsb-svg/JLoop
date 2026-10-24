@@ -515,7 +515,7 @@ void MainComponent::layoutRack (juce::Rectangle<int> full, bool portrait)
     };
 
     const bool tight = ! portrait && bar.getWidth() < 900;   // telefono in orizzontale
-    modeSwitch.setBounds (bar.removeFromLeft (juce::jmin (portrait ? 200 : (tight ? 184 : 240), bar.getWidth() - 110)).reduced (0, 1));
+    modeSwitch.setBounds (bar.removeFromLeft (juce::jmin (portrait ? 250 : (tight ? 252 : 330), bar.getWidth() - 110)).reduced (0, 1));
     bar.removeFromLeft (6);
     lengthChip.setBounds (bar.removeFromLeft (tight ? 70 : 84).reduced (0, 1));
     bar.removeFromLeft (6);
@@ -1633,6 +1633,18 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
         }
     }
 
+    if (args.contains ("--glitch-demo"))   // test: OTT e Glitch sulla traccia 1
+    {
+        engine.setTrackEffect (1, 0, mixer::glitch);
+        engine.setTrackEffect (1, 1, mixer::ott);
+        float p[mixer::maxParams] { 1.0f, 0.0f, 0.0f, 0, 0, 0 };
+        const char* grid = "....66..33..r.ss";
+        for (int s = 0; s < 16; ++s)
+            mixer::glitchGrid::set (p, s, grid[s] == '6' ? 2 : grid[s] == '3' ? 3 : grid[s] == 'r' ? 5 : grid[s] == 's' ? 4 : 0);
+        engine.getTrack (1).slots[0].params[1].store (p[1]);
+        engine.getTrack (1).slots[0].params[2].store (p[2]);
+    }
+
     if (args.contains ("--mixer-demo"))   // test: qualche effetto nel mixer
     {
         engine.setTrackEffect (1, 0, mixer::compressor);
@@ -1793,7 +1805,7 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
 
     if (const int i = args.indexOf ("--mode"); i >= 0)
     {
-        modeSwitch.setSelected (juce::jlimit (0, 3, args[i + 1].getIntValue()));
+        modeSwitch.setSelected (juce::jlimit (0, 5, args[i + 1].getIntValue()));
         updateViews();
     }
 }

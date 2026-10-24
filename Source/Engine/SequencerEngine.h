@@ -152,6 +152,8 @@ public:
         std::array<Row, maxChannels> velocity;      // 0 = spento, 1..127
         std::array<Row, maxChannels> probability;   // 0..100 %
         std::array<Row, maxChannels> ratchet;       // 1..4 colpi nello step
+        std::array<Row, maxChannels> semis;         // altezza dello step in semitoni (int8: -24..24, 0 = naturale)
+        std::array<Row, maxChannels> panStep;       // pan dello step (int8: -64..64, 0 = quello del canale)
         std::atomic<int> length { 16 };
 
         // Note del piano roll, impacchettate in 64 bit (0 = slot vuoto):
@@ -831,11 +833,19 @@ public:
     int getStepRatchet (int channel, int step) const       { return current().ratchet[(size_t) channel][(size_t) step].load(); }
     void setStepRatchet (int channel, int step, int r)     { current().ratchet[(size_t) channel][(size_t) step].store ((uint8_t) juce::jlimit (1, maxRatchet, r)); }
 
+    /** Altezza dello step in semitoni (-24..24) e pan dello step (-64..64, si somma a quello del canale). */
+    int getStepPitch (int channel, int step) const         { return (int8_t) current().semis[(size_t) channel][(size_t) step].load(); }
+    void setStepPitch (int channel, int step, int semi)    { current().semis[(size_t) channel][(size_t) step].store ((uint8_t) (int8_t) juce::jlimit (-24, 24, semi)); }
+    int getStepPan (int channel, int step) const           { return (int8_t) current().panStep[(size_t) channel][(size_t) step].load(); }
+    void setStepPan (int channel, int step, int pan)       { current().panStep[(size_t) channel][(size_t) step].store ((uint8_t) (int8_t) juce::jlimit (-64, 64, pan)); }
+
     void clearStep (Pattern& p, int c, int s)
     {
         p.velocity[(size_t) c][(size_t) s].store (0);
         p.probability[(size_t) c][(size_t) s].store (100);
         p.ratchet[(size_t) c][(size_t) s].store (1);
+        p.semis[(size_t) c][(size_t) s].store (0);
+        p.panStep[(size_t) c][(size_t) s].store (0);
     }
 
     void clearPattern (int index)
@@ -858,6 +868,8 @@ public:
         dst.velocity[(size_t) dstC][(size_t) dstS].store (src.velocity[(size_t) srcC][(size_t) srcS].load());
         dst.probability[(size_t) dstC][(size_t) dstS].store (src.probability[(size_t) srcC][(size_t) srcS].load());
         dst.ratchet[(size_t) dstC][(size_t) dstS].store (src.ratchet[(size_t) srcC][(size_t) srcS].load());
+        dst.semis[(size_t) dstC][(size_t) dstS].store (src.semis[(size_t) srcC][(size_t) srcS].load());
+        dst.panStep[(size_t) dstC][(size_t) dstS].store (src.panStep[(size_t) srcC][(size_t) srcS].load());
     }
 
     void copyPattern (int from, int to)
@@ -959,6 +971,14 @@ public:
     /** Posizione di riproduzione in tick dall'inizio del pattern (-1 se fermo). */
     int getCurrentTick() const          { return playing.load() ? currentTick.load() : -1; }
 
+    /** Sedicesimo della battuta che sta suonando (0..15), per la griglia del Glitch; -1 se fermo. */
+    int getPlayStepInBar() const
+    {
+        if (! playing.load()) return -1;
+        const int s = songMode.load() ? currentSongStep.load() : currentStep.load();
+        return s < 0 ? -1 : s % stepsPerBar;
+    }
+
     //==============================================================================
     // Strumenti per una riga del pattern corrente
 
@@ -967,7 +987,7 @@ public:
     {
         auto& p = current();
         const int len = p.length.load();
-        Pattern::Row v, pr, r;
+        Pattern::Row v, pr, r, se, pa;
 
         for (int s = 0; s < len; ++s)
         {
@@ -975,6 +995,8 @@ public:
             v[(size_t) s].store (p.velocity[(size_t) channel][(size_t) from].load());
             pr[(size_t) s].store (p.probability[(size_t) channel][(size_t) from].load());
             r[(size_t) s].store (p.ratchet[(size_t) channel][(size_t) from].load());
+            se[(size_t) s].store (p.semis[(size_t) channel][(size_t) from].load());
+            pa[(size_t) s].store (p.panStep[(size_t) channel][(size_t) from].load());
         }
 
         for (int s = 0; s < len; ++s)
@@ -982,6 +1004,8 @@ public:
             p.velocity[(size_t) channel][(size_t) s].store (v[(size_t) s].load());
             p.probability[(size_t) channel][(size_t) s].store (pr[(size_t) s].load());
             p.ratchet[(size_t) channel][(size_t) s].store (r[(size_t) s].load());
+            p.semis[(size_t) channel][(size_t) s].store (se[(size_t) s].load());
+            p.panStep[(size_t) channel][(size_t) s].store (pa[(size_t) s].load());
         }
     }
 
@@ -1002,6 +1026,8 @@ public:
             swap (p.velocity[(size_t) channel]);
             swap (p.probability[(size_t) channel]);
             swap (p.ratchet[(size_t) channel]);
+            swap (p.semis[(size_t) channel]);
+            swap (p.panStep[(size_t) channel]);
         }
     }
 
@@ -1387,9 +1413,8 @@ public:
             auto& ch = channels[(size_t) c];
             const bool silent = ch.muted.load() || (anySolo && ! ch.solo.load());
             const float g = silent ? 0.0f : ch.volume.load();
-            const float angle = (ch.pan.load() + 1.0f) * juce::MathConstants<float>::pi * 0.25f;
-            gainL[(size_t) c] = g * std::cos (angle) * juce::MathConstants<float>::sqrt2;
-            gainR[(size_t) c] = g * std::sin (angle) * juce::MathConstants<float>::sqrt2;
+            gainBase[(size_t) c] = g;
+            updateChannelPanGain (c);
             sendRev[(size_t) c] = g * ch.reverb.load();
             sendDel[(size_t) c] = g * ch.delay.load();
             humanizeAmt[(size_t) c] = ch.humanize.load();
@@ -1437,7 +1462,7 @@ private:
 
         struct PatternRows
         {
-            uint8_t velocity[maxSteps], probability[maxSteps], ratchet[maxSteps];
+            uint8_t velocity[maxSteps], probability[maxSteps], ratchet[maxSteps], semis[maxSteps], panStep[maxSteps];
             uint64_t notes[maxNotes];
             int noteCount;
         };
@@ -1456,7 +1481,8 @@ private:
                     return p + 1;
                 for (int s = 0; s < maxSteps; ++s)
                     if (pat.velocity[(size_t) ch][(size_t) s].load() != 0 || pat.probability[(size_t) ch][(size_t) s].load() != 100
-                        || pat.ratchet[(size_t) ch][(size_t) s].load() != 1)
+                        || pat.ratchet[(size_t) ch][(size_t) s].load() != 1 || pat.semis[(size_t) ch][(size_t) s].load() != 0
+                        || pat.panStep[(size_t) ch][(size_t) s].load() != 0)
                         return p + 1;
             }
         }
@@ -1490,6 +1516,8 @@ private:
                 r.velocity[s]    = pat.velocity[(size_t) c][(size_t) s].load();
                 r.probability[s] = pat.probability[(size_t) c][(size_t) s].load();
                 r.ratchet[s]     = pat.ratchet[(size_t) c][(size_t) s].load();
+                r.semis[s]       = pat.semis[(size_t) c][(size_t) s].load();
+                r.panStep[s]     = pat.panStep[(size_t) c][(size_t) s].load();
             }
             for (int n = 0; n < maxNotes; ++n)
                 r.notes[n] = pat.notes[(size_t) c][(size_t) n].load();
@@ -1524,6 +1552,8 @@ private:
                 pat.velocity[(size_t) c][(size_t) s].store (r.velocity[s]);
                 pat.probability[(size_t) c][(size_t) s].store (r.probability[s]);
                 pat.ratchet[(size_t) c][(size_t) s].store (r.ratchet[s]);
+                pat.semis[(size_t) c][(size_t) s].store (r.semis[s]);
+                pat.panStep[(size_t) c][(size_t) s].store (r.panStep[s]);
             }
             for (int n = 0; n < maxNotes; ++n)
                 pat.notes[(size_t) c][(size_t) n].store (r.notes[n]);
@@ -1691,6 +1721,17 @@ private:
             if (trackFed[(size_t) t])
                 clearTrack (t, n);
 
+        // Posizione (in quarti) all'inizio del blocco, al campione: serve agli effetti a tempo (Glitch)
+        chunkPlaying = isOn && (inSong ? songStep >= 0 : stepIndex >= 0);
+        if (chunkPlaying)
+        {
+            const double tickLen = juce::jmax (1.0, currentStepLength / ticksPerStep);
+            const int stepPos = inSong ? songStep : stepIndex;
+            const int lastTick = stepPos * ticksPerStep + (tickInStep + ticksPerStep - 1) % ticksPerStep;
+            const double elapsed = juce::jlimit (0.0, tickLen, tickLen - samplesUntilNextTick);
+            chunkBeat = ((double) lastTick + elapsed / tickLen) / (4.0 * ticksPerStep);
+        }
+
         // Tipo dei canali letto una volta per blocco (non a ogni campione: sui telefoni le letture atomiche costano)
         std::array<bool, maxChannels> sampleChannel {};
         for (int c = 0; c < numActive; ++c)
@@ -1722,7 +1763,7 @@ private:
                     auto& r = ratchets[(size_t) c];
                     if (r.remaining > 0 && --r.countdown <= 0)
                     {
-                        triggerChannel (c, r.velocity, humanizeAmt[(size_t) c] * 0.5f, -1, juce::jmax (1, ticksPerStep / maxRatchet));
+                        triggerChannel (c, r.velocity, humanizeAmt[(size_t) c] * 0.5f, -1, juce::jmax (1, ticksPerStep / maxRatchet), false, r.semis);
                         r.velocity *= 0.85f;
                         r.countdown = r.interval;
                         --r.remaining;
@@ -1821,7 +1862,7 @@ private:
 
             auto& ch = channels[(size_t) c];
             const float g   = gainL[(size_t) c] == 0.0f && gainR[(size_t) c] == 0.0f ? 0.0f : ch.volume.load();
-            const float pan = ch.pan.load();
+            const float pan = juce::jlimit (-1.0f, 1.0f, ch.pan.load() + stepPanNow[(size_t) c]);
             const float gl  = g * juce::jmin (1.0f, 1.0f - pan);   // bilanciamento stereo
             const float gr  = g * juce::jmin (1.0f, 1.0f + pan);
             const float sr2 = g * ch.reverb.load() * 0.5f;
@@ -2109,6 +2150,8 @@ private:
         mixer::Context ctx;
         ctx.sampleRate = sr;
         ctx.bpm = bpm.load();
+        ctx.ppq = chunkBeat;
+        ctx.playing = chunkPlaying;
         for (auto& s : tr.slots)
         {
             if (s.effect == nullptr || s.bypass.load())
@@ -2360,13 +2403,21 @@ private:
 
             const float v = (float) vel / 127.0f;
             const int count = juce::jlimit (1, maxRatchet, (int) pattern.ratchet[(size_t) c][(size_t) stepIndex].load());
-            triggerChannel (c, v, humanizeAmt[(size_t) c], -1, ticksPerStep / count);
+            const float semi = (float) (int8_t) pattern.semis[(size_t) c][(size_t) stepIndex].load();
+            const float stepPan = (float) (int8_t) pattern.panStep[(size_t) c][(size_t) stepIndex].load() / 64.0f;
+            if (stepPan != stepPanNow[(size_t) c])
+            {
+                stepPanNow[(size_t) c] = stepPan;
+                updateChannelPanGain (c);
+            }
+            triggerChannel (c, v, humanizeAmt[(size_t) c], -1, ticksPerStep / count, false, semi);
 
             auto& r = ratchets[(size_t) c];
             r.remaining = count - 1;
             r.interval = juce::jmax (1, (int) (stepLength / count));
             r.countdown = r.interval;
             r.velocity = v * 0.85f;
+            r.semis = semi;
         }
     }
 
@@ -2572,11 +2623,11 @@ private:
         @param lengthTicks  durata della nota (per synth e campioni "tenuti")
         @param fromNote     true per le note del piano roll e le anteprime con altezza
     */
-    void triggerChannel (int c, float velocity, float humanize, int midiNote, int lengthTicks, bool fromNote = false)
+    void triggerChannel (int c, float velocity, float humanize, int midiNote, int lengthTicks, bool fromNote = false, float stepSemis = 0.0f)
     {
         if (instruments[(size_t) c] != nullptr)
         {
-            instNoteOn (c, midiNote < 0 ? channels[(size_t) c].stepNote.load() : midiNote, velocity, lengthTicks);
+            instNoteOn (c, midiNote < 0 ? juce::jlimit (0, 127, channels[(size_t) c].stepNote.load() + juce::roundToInt (stepSemis)) : midiNote, velocity, lengthTicks);
             return;
         }
         if (channels[(size_t) c].type.load() == synth)
@@ -2589,7 +2640,7 @@ private:
         {
             // Campione: le note sono relative alla nota a cui e' registrato. Gli step suonano il campione
             // intero; le note del piano roll degli strumenti "tenuti" sfumano alla loro fine.
-            const float semis = midiNote < 0 ? 0.0f : (float) (midiNote - sample->rootNote);
+            const float semis = midiNote < 0 ? stepSemis : (float) (midiNote - sample->rootNote);
             const int gate = (fromNote && midiNote >= 0 && sample->gated && lengthTicks > 0) ? lengthTicks : -1;
             smp.trigger (velocity, semis, gate, humanize, rng.nextFloat() * 2.0f - 1.0f, rng.nextFloat() * 2.0f - 1.0f, ! fromNote);
         }
@@ -2601,7 +2652,7 @@ private:
                     if (o != c && channels[(size_t) o].drumType.load() == openHatType && channels[(size_t) o].type.load() == drumOrSample)
                         voices[(size_t) o].choke();
 
-            voices[(size_t) c].trigger (velocity, humanize, midiNote < 0 ? 0.0f : (float) (midiNote - rootNote));
+            voices[(size_t) c].trigger (velocity, humanize, midiNote < 0 ? stepSemis : (float) (midiNote - rootNote));
         }
 
         ch.activity.store (velocity);
@@ -2661,7 +2712,17 @@ private:
     std::atomic<int> browserPreview { 0 }, browserDrumType { 0 }, browserKit { 0 };
 
     // Stato usato SOLO dal thread audio
-    struct RatchetState { int remaining = 0, interval = 1, countdown = 0; float velocity = 0.0f; };
+    struct RatchetState { int remaining = 0, interval = 1, countdown = 0; float velocity = 0.0f, semis = 0.0f; };
+    std::array<float, maxChannels> gainBase {}, stepPanNow {};   // pan dell'ultimo step suonato (si somma a quello del canale)
+
+    /** Guadagni sinistra/destra di un canale: volume, pan del canale e pan dell'ultimo step. */
+    void updateChannelPanGain (int c) noexcept
+    {
+        const float pan = juce::jlimit (-1.0f, 1.0f, channels[(size_t) c].pan.load() + stepPanNow[(size_t) c]);
+        const float angle = (pan + 1.0f) * juce::MathConstants<float>::pi * 0.25f;
+        gainL[(size_t) c] = gainBase[(size_t) c] * std::cos (angle) * juce::MathConstants<float>::sqrt2;
+        gainR[(size_t) c] = gainBase[(size_t) c] * std::sin (angle) * juce::MathConstants<float>::sqrt2;
+    }
 
     std::array<DrumVoice, maxChannels>    voices;
     std::array<SamplerPool, maxChannels>  samplers;
@@ -2737,6 +2798,8 @@ private:
     juce::AbstractFifo liveFifo { 256 };
     std::array<LiveEvent, 256> liveEvents {};
     double samplesUntilNextTick = 0.0;
+    double chunkBeat = 0.0;
+    bool chunkPlaying = false;
     double currentStepLength    = 1.0;
 
     std::array<float, chunk> mixL {}, mixR {}, revL {}, revR {}, delIn {};

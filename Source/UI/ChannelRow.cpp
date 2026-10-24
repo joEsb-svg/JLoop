@@ -227,6 +227,48 @@ void ChannelRow::paint (juce::Graphics& g)
         const auto off = (step / 4) % 2 == 0 ? Theme::stepOffA : Theme::stepOffB;
         const auto chColour = getColour().withMultipliedSaturation (muted ? 0.3f : 1.0f).withMultipliedAlpha (muted ? 0.5f : 1.0f);
 
+        if (mode == EditMode::pitch || mode == EditMode::pan)
+        {
+            // Altezza (barra dal centro in su/giu') o pan (barra dal centro a sinistra/destra)
+            Theme::drawSunken (g, pad, off.darker (0.35f), 4.0f);
+            if (vel > 0)
+            {
+                auto inner = pad.reduced (4.0f);
+                const auto c1 = mode == EditMode::pitch ? chColour : chColour.interpolatedWith (Theme::cyan, 0.4f);
+                juce::String label;
+                if (mode == EditMode::pitch)
+                {
+                    const int semi = engine.getStepPitch (channel, step);
+                    const float amount = (float) semi / 24.0f, mid = inner.getCentreY();
+                    g.setColour (Theme::raisedHi);
+                    g.fillRect (inner.getX(), mid - 0.5f, inner.getWidth(), 1.0f);
+                    auto bar = amount >= 0.0f ? juce::Rectangle<float> (inner.getX(), mid - inner.getHeight() * 0.5f * amount, inner.getWidth(), inner.getHeight() * 0.5f * amount)
+                                              : juce::Rectangle<float> (inner.getX(), mid, inner.getWidth(), inner.getHeight() * 0.5f * -amount);
+                    g.setColour (c1.withAlpha (0.85f));
+                    g.fillRoundedRectangle (bar.withHeight (juce::jmax (2.0f, bar.getHeight())), 2.0f);
+                    label = semi == 0 ? juce::String ("0") : (semi > 0 ? "+" : "") + juce::String (semi);
+                }
+                else
+                {
+                    const int pan = engine.getStepPan (channel, step);
+                    const float amount = (float) pan / 64.0f, mid = inner.getCentreX();
+                    g.setColour (Theme::raisedHi);
+                    g.fillRect (mid - 0.5f, inner.getY(), 1.0f, inner.getHeight());
+                    auto bar = amount >= 0.0f ? juce::Rectangle<float> (mid, inner.getY(), inner.getWidth() * 0.5f * amount, inner.getHeight())
+                                              : juce::Rectangle<float> (mid + inner.getWidth() * 0.5f * amount, inner.getY(), inner.getWidth() * 0.5f * -amount, inner.getHeight());
+                    g.setColour (c1.withAlpha (0.85f));
+                    g.fillRoundedRectangle (bar.withWidth (juce::jmax (2.0f, bar.getWidth())), 2.0f);
+                    label = pan == 0 ? juce::String ("C") : (pan < 0 ? "L" : "R") + juce::String (std::abs (juce::roundToInt (pan * 100.0f / 64.0f)));
+                }
+                g.setColour (Theme::textBright);
+                g.setFont (Theme::font (juce::jlimit (9.0f, 13.0f, pad.getWidth() * 0.3f), true));
+                g.drawText (label, pad, juce::Justification::centred, false);
+            }
+            if (isCurrent)
+                Theme::drawActiveGlow (g, pad, 4.0f, Theme::cyan);
+            continue;
+        }
+
         if (mode == EditMode::velocity || mode == EditMode::probability)
         {
             // Barra verticale: velocity o probabilita', col colore del canale
@@ -357,6 +399,25 @@ void ChannelRow::mouseDown (const juce::MouseEvent& e)
             applyVerticalValueAt (e.position);
             return;
 
+        case EditMode::pitch:
+        case EditMode::pan:
+            valueDragStep = -1;
+            if (! engine.isStepOn (channel, step))
+                return;
+            if (e.getNumberOfClicks() >= 2)   // doppio tocco: torna al valore naturale
+            {
+                if (mode == EditMode::pitch) engine.setStepPitch (channel, step, 0);
+                else                         engine.setStepPan (channel, step, 0);
+                repaint();
+                return;
+            }
+            valueDragStep = step;
+            valueDragStart = mode == EditMode::pitch ? engine.getStepPitch (channel, step) : engine.getStepPan (channel, step);
+            if (mode == EditMode::pan)
+                applyStepValue (e);
+            repaint();
+            return;
+
         case EditMode::ratchet:
             if (engine.isStepOn (channel, step))
                 engine.setStepRatchet (channel, step, engine.getStepRatchet (channel, step) % SequencerEngine::maxRatchet + 1);
@@ -399,6 +460,12 @@ void ChannelRow::mouseDrag (const juce::MouseEvent& e)
 
         if (nameDragging && onScrollDrag)
             onScrollDrag ((float) e.getDistanceFromDragStartY(), false);
+        return;
+    }
+
+    if ((mode == EditMode::pitch || mode == EditMode::pan) && valueDragStep >= 0)
+    {
+        applyStepValue (e);
         return;
     }
 
@@ -528,6 +595,36 @@ void ChannelRow::showFillPanel (int step)
     top->addAndMakeVisible (overlay);
     overlay->setBounds (top->getLocalBounds());
     overlay->toFront (true);
+}
+
+void ChannelRow::applyStepValue (const juce::MouseEvent& e)
+{
+    const int step = valueDragStep;
+    if (step < 0)
+        return;
+    if (mode == EditMode::pitch)
+    {
+        // Relativo: un semitono ogni 7 pixel (preciso anche su pad piccoli)
+        const int semi = valueDragStart - juce::roundToInt ((float) e.getDistanceFromDragStartY() / 7.0f);
+        if (semi != engine.getStepPitch (channel, step))
+        {
+            engine.setStepPitch (channel, step, semi);
+            if (onTap) onTap();
+        }
+    }
+    else
+    {
+        // Assoluto: posizione del dito dentro lo step (bordo sinistro = tutto a sinistra)
+        const auto pad = getStepBounds (step).reduced (4.0f, 0.0f);
+        const float rel = juce::jlimit (-1.0f, 1.0f, (e.position.x - pad.getCentreX()) / (pad.getWidth() * 0.5f));
+        const int pan = juce::roundToInt (rel * 64.0f / 8.0f) * 8;   // a scatti (L100, L88 ... C ... R100)
+        if (pan != engine.getStepPan (channel, step))
+        {
+            engine.setStepPan (channel, step, pan);
+            if (onTap) onTap();
+        }
+    }
+    repaint (getStepBounds (step).toNearestInt().expanded (3));
 }
 
 void ChannelRow::applyVerticalValueAt (juce::Point<float> p)
@@ -741,6 +838,8 @@ void ChannelRow::showRowMenu()
                                     clipboard.velocity[s]    = (uint8_t) e.getStepVelocity (c, s);
                                     clipboard.probability[s] = (uint8_t) e.getStepProbability (c, s);
                                     clipboard.ratchet[s]     = (uint8_t) e.getStepRatchet (c, s);
+                                    clipboard.semis[s]       = (int8_t) e.getStepPitch (c, s);
+                                    clipboard.pan[s]         = (int8_t) e.getStepPan (c, s);
                                 }
                                 clipboard.valid = true;
                             }
@@ -751,6 +850,8 @@ void ChannelRow::showRowMenu()
                                     e.setStepVelocity (c, s, clipboard.velocity[s]);
                                     e.setStepProbability (c, s, clipboard.probability[s]);
                                     e.setStepRatchet (c, s, clipboard.ratchet[s]);
+                                    e.setStepPitch (c, s, clipboard.semis[s]);
+                                    e.setStepPan (c, s, clipboard.pan[s]);
                                 }
                             }
                             else if (result == 7)   { e.clearRow (c); e.setNotes (c, {}); }

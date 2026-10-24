@@ -19,12 +19,14 @@
     - VEL:  trascina in verticale per la forza (velocity)
     - PROB: trascina in verticale per la probabilita' che lo step suoni
     - ROLL: tocca per ripetere il colpo 1, 2, 3 o 4 volte nello step (ratchet)
+    - PITCH: trascina in su/giu' su uno step acceso per cambiarne l'altezza (semitoni); doppio tocco = 0
+    - PAN:  tocca a sinistra/destra dentro lo step per spostarlo nello stereo; doppio tocco = centro
 */
 class ChannelRow : public juce::Component,
                    private juce::Timer
 {
 public:
-    enum class EditMode { step, velocity, probability, ratchet };
+    enum class EditMode { step, velocity, probability, ratchet, pitch, pan };
 
     /** Comandi del menu che gestisce la schermata principale. */
     enum Command
@@ -94,6 +96,7 @@ private:
     int stepAt (juce::Point<float>) const;
     bool isStepVisible (int step) const;
     void applyVerticalValueAt (juce::Point<float>);
+    void applyStepValue (const juce::MouseEvent&);
 
     SequencerEngine& engine;
     const int channel;
@@ -111,6 +114,7 @@ private:
     float    flash = 0.0f;
     bool     paintValue = true;
     int      lastColumn = -1;
+    int      valueDragStep = -1, valueDragStart = 0;   // PITCH / PAN: lo step che si sta modificando
     bool     pressOnName = false, nameDragging = false, longPressDone = false;
     juce::uint64 shownLook = 0;
     int      shownKit = -1;
@@ -126,6 +130,7 @@ private:
     {
         bool valid = false;
         uint8_t velocity[SequencerEngine::maxSteps] {}, probability[SequencerEngine::maxSteps] {}, ratchet[SequencerEngine::maxSteps] {};
+        int8_t semis[SequencerEngine::maxSteps] {}, pan[SequencerEngine::maxSteps] {};
     };
     static RowClipboard clipboard;
 

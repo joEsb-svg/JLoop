@@ -14,7 +14,13 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.35)
+## Stato attuale (v0.36)
+
+**Novita' della 0.36**
+- Channel rack: modalita' PITCH (altezza per step, trascina su/giu') e PAN (tocca a sinistra/destra nello step)
+- Piano roll: le note fantasma mostrano anche i colpi della batteria (colonne) e i synth suonati a step
+- Mixer: OTT (compressore multibanda su/giu', stile complextro)
+- Mixer: Glitch con griglia di 16 step (ripeti 1/8-1/16-1/32, tape stop, reverse, muto, rallenta) e figure pronte
 
 **0.35.1**: French Roulette non continua a suonare dopo lo stop (preset con retrig sulla matrice);
 le finestrelle (riempimento degli step, pannelli musicali) si aprono anche con la grafica GPU attiva

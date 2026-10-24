@@ -154,12 +154,20 @@ namespace ProjectIO
                 continue;
             }
 
-            juce::Array<juce::var> rows, probs, ratchets;
+            juce::Array<juce::var> rows, probs, ratchets, semis, pans;
+            bool anySemis = false, anyPan = false;
             for (int c = 0; c < numChannels; ++c)
             {
                 rows.add (encodeRow (pat.velocity[(size_t) c]));
                 probs.add (encodeRow (pat.probability[(size_t) c]));
                 ratchets.add (encodeRow (pat.ratchet[(size_t) c]));
+                semis.add (encodeRow (pat.semis[(size_t) c]));
+                pans.add (encodeRow (pat.panStep[(size_t) c]));
+                for (int s = 0; s < SequencerEngine::maxSteps; ++s)
+                {
+                    anySemis = anySemis || pat.semis[(size_t) c][(size_t) s].load() != 0;
+                    anyPan = anyPan || pat.panStep[(size_t) c][(size_t) s].load() != 0;
+                }
             }
 
             // Note del piano roll: per canale una lista di [inizio, durata, altezza, velocity] in tick
@@ -179,6 +187,8 @@ namespace ProjectIO
             o->setProperty ("steps", rows);
             o->setProperty ("probability", probs);
             o->setProperty ("ratchet", ratchets);
+            if (anySemis) o->setProperty ("stepPitch", semis);   // altezza e pan per step (solo se usati)
+            if (anyPan)   o->setProperty ("stepPan", pans);
             patterns.add (juce::var (o));
         }
         root->setProperty ("patterns", patterns);
@@ -383,6 +393,8 @@ namespace ProjectIO
                 readRows ("steps",       pat.velocity,    0, 127);
                 readRows ("probability", pat.probability, 0, 100);   // assenti nei file vecchi: restano al 100%
                 readRows ("ratchet",     pat.ratchet,     1, SequencerEngine::maxRatchet);
+                readRows ("stepPitch",   pat.semis,       0, 255);   // int8 salvati come byte
+                readRows ("stepPan",     pat.panStep,     0, 255);
 
                 if (auto* notes = o.getProperty ("notes", {}).getArray())
                 {

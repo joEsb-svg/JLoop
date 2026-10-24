@@ -170,9 +170,43 @@ public:
         if (ghostNotes)
             for (int other = 0; other < engine.getNumChannels(); ++other)
             {
-                if (other == channel || ! engine.hasNotes (other) || isDrumKit (other))
+                if (other == channel)
                     continue;
-                const auto ghostColour = juce::Colour (engine.getChannel (other).colour.load());
+                const auto otherColour = juce::Colour (engine.getChannel (other).colour.load());
+
+                // Batteria a step (e kit di DrumForge): i colpi come colonne leggere, per vedere il ritmo
+                if (! engine.hasNotes (other) || isDrumKit (other))
+                {
+                    const bool synthSteps = engine.isSynth (other) && ! isDrumKit (other) && ! engine.hasNotes (other);
+                    for (int s = 0; s < engine.getPatternLength(); ++s)
+                    {
+                        if (! engine.isStepOn (other, s) && ! (isDrumKit (other) && engine.hasNotes (other)))
+                            continue;
+                        if (synthSteps)
+                        {
+                            // synth a step: una nota fantasma all'altezza che suona lo step
+                            SequencerEngine::NoteData n { s * SequencerEngine::ticksPerStep, SequencerEngine::ticksPerStep,
+                                                          juce::jlimit (0, 127, engine.getChannel (other).stepNote.load() + engine.getStepPitch (other, s)), 100 };
+                            auto r = noteBounds (n);
+                            g.setColour (otherColour.withAlpha (0.22f));
+                            g.fillRoundedRectangle (r, 2.0f);
+                            g.setColour (otherColour.withAlpha (0.6f));
+                            g.drawRoundedRectangle (r.reduced (0.5f), 2.0f, 1.0f);
+                            continue;
+                        }
+                        if (! engine.isStepOn (other, s))
+                            continue;
+                        const float x0 = xForTick (s * SequencerEngine::ticksPerStep), x1 = xForTick ((s + 1) * SequencerEngine::ticksPerStep);
+                        auto col = juce::Rectangle<float> (x0, (float) grid.getY(), x1 - x0, (float) grid.getHeight()).getIntersection (grid.toFloat());
+                        g.setColour (otherColour.withAlpha (0.045f));
+                        g.fillRect (col);
+                        g.setColour (otherColour.withAlpha (0.55f));
+                        g.fillRect (col.withHeight (3.0f).translated (0.0f, (float) (other % 4) * 4.0f));
+                    }
+                    if (! engine.hasNotes (other) || isDrumKit (other))
+                        continue;
+                }
+                const auto ghostColour = otherColour;
                 for (auto& n : engine.getNotes (other))
                 {
                     auto r = noteBounds (n);

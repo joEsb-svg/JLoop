@@ -222,6 +222,191 @@ private:
 };
 
 //==============================================================================
+/**
+    Griglia dell'effetto Glitch: 16 step (una battuta). Scegli un effetto dalla tavolozza
+    (Ripeti 1/8, 1/16, 1/32, Tape stop, Reverse, Muto, Rallenta) e tocca/trascina sugli step per "dipingerlo";
+    toccando uno step che ha gia' quell'effetto lo si riporta a normale.
+*/
+class GlitchGridView : public juce::Component,
+                       private juce::Timer
+{
+public:
+    GlitchGridView (SequencerEngine& e, int trackIndex, int slotIndex) : engine (e), track (trackIndex), slot (slotIndex)
+    {
+        startTimerHz (20);
+    }
+
+    std::function<void()> onChanged;
+
+    void paint (juce::Graphics& g) override
+    {
+        // Tavolozza
+        for (int m = 1; m < mixer::glitchGrid::numModes; ++m)
+        {
+            auto b = brushBounds (m);
+            const bool on = m == brush;
+            Theme::drawRaised (g, b, on ? modeColour (m).withAlpha (0.9f) : Theme::raised, 5.0f);
+            g.setColour (on ? Theme::bg : modeColour (m));
+            g.setFont (Theme::font (juce::jlimit (9.0f, 12.0f, b.getHeight() * 0.42f), true));
+            g.drawFittedText (mixer::glitchGrid::name (m), b.toNearestInt().reduced (2, 0), juce::Justification::centred, 2, 0.7f);
+        }
+        auto pb = presetBounds();
+        Theme::drawRaised (g, pb, Theme::raisedHi, 5.0f);
+        g.setColour (Theme::accent);
+        g.setFont (Theme::font (11.0f, true));
+        g.drawFittedText ("Pronti " + juce::String (juce::CharPointer_UTF8 ("\xe2\x96\xbe")), pb.toNearestInt(), juce::Justification::centred, 1);
+
+        // Griglia
+        float params[mixer::maxParams];
+        readParams (params);
+        for (int s = 0; s < 16; ++s)
+        {
+            auto cell = stepBounds (s);
+            const int mode = mixer::glitchGrid::get (params, s);
+            const auto off = (s / 4) % 2 == 0 ? Theme::stepOffA : Theme::stepOffB;
+            if (mode == 0)
+                Theme::drawSunken (g, cell, off, 4.0f);
+            else
+            {
+                const auto col = modeColour (mode);
+                g.setColour (col.withAlpha (0.25f));
+                g.fillRoundedRectangle (cell.expanded (1.5f), 5.0f);
+                g.setGradientFill (juce::ColourGradient (col.brighter (0.4f), cell.getX(), cell.getY(), col.darker (0.3f), cell.getX(), cell.getBottom(), false));
+                g.fillRoundedRectangle (cell, 4.0f);
+                g.setColour (Theme::bg.withAlpha (0.9f));
+                g.setFont (Theme::font (juce::jlimit (8.0f, 12.0f, cell.getWidth() * 0.28f), true));
+                g.drawFittedText (mixer::glitchGrid::shortName (mode), cell.toNearestInt().reduced (1, 0), juce::Justification::centred, 2, 0.6f);
+            }
+            if (s == playing)
+                Theme::drawActiveGlow (g, cell, 4.0f, Theme::cyan);
+        }
+    }
+
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        for (int m = 1; m < mixer::glitchGrid::numModes; ++m)
+            if (brushBounds (m).contains (e.position)) { brush = m; repaint(); return; }
+        if (presetBounds().contains (e.position)) { showPresets(); return; }
+
+        const int s = stepAt (e.position);
+        if (s < 0) return;
+        float params[mixer::maxParams];
+        readParams (params);
+        paintValue = mixer::glitchGrid::get (params, s) == brush ? 0 : brush;
+        lastStep = -1;
+        paintStep (s);
+    }
+
+    void mouseDrag (const juce::MouseEvent& e) override
+    {
+        if (const int s = stepAt (e.position); s >= 0 && s != lastStep)
+            paintStep (s);
+    }
+
+    void mouseUp (const juce::MouseEvent&) override    { if (lastStep >= 0 && onChanged) onChanged(); lastStep = -1; }
+
+private:
+    juce::Colour modeColour (int m) const
+    {
+        static const juce::uint32 cols[] { 0xff808080, 0xff4fe3ff, 0xff3fb8ff, 0xff7d8bff, 0xffff6b5b, 0xffb07cff, 0xff707a84, 0xff7dffb0 };
+        return juce::Colour (cols[juce::jlimit (0, 7, m)]);
+    }
+
+    juce::Rectangle<float> paletteArea() const  { return getLocalBounds().toFloat().removeFromTop (juce::jlimit (30.0f, 44.0f, (float) getHeight() * 0.32f)); }
+    juce::Rectangle<float> brushBounds (int m) const
+    {
+        auto r = paletteArea().withTrimmedRight (86.0f);
+        const float w = r.getWidth() / 7.0f;
+        return { r.getX() + w * (float) (m - 1), r.getY(), w - 4.0f, r.getHeight() - 4.0f };
+    }
+    juce::Rectangle<float> presetBounds() const { auto r = paletteArea(); return r.removeFromRight (82.0f).withTrimmedBottom (4.0f); }
+    juce::Rectangle<float> gridArea() const     { return getLocalBounds().toFloat().withTrimmedTop (paletteArea().getHeight() + 4.0f); }
+    juce::Rectangle<float> stepBounds (int s) const
+    {
+        auto r = gridArea();
+        const float group = 6.0f, gap = 2.0f;
+        const float w = (r.getWidth() - group * 3.0f - gap * 12.0f) / 16.0f;
+        const float x = r.getX() + (float) s * w + (float) (s / 4) * group + (float) (s - s / 4) * gap;
+        return { x, r.getY(), w, juce::jmin (r.getHeight(), 90.0f) };
+    }
+    int stepAt (juce::Point<float> p) const
+    {
+        for (int s = 0; s < 16; ++s)
+            if (stepBounds (s).expanded (1.5f, 6.0f).contains (p)) return s;
+        return -1;
+    }
+
+    void readParams (float* params) const
+    {
+        auto& sl = engine.getTrack (track).slots[(size_t) slot];
+        for (int p = 0; p < mixer::maxParams; ++p) params[p] = sl.params[(size_t) p].load();
+    }
+
+    void paintStep (int s)
+    {
+        auto& sl = engine.getTrack (track).slots[(size_t) slot];
+        float params[mixer::maxParams];
+        readParams (params);
+        mixer::glitchGrid::set (params, s, paintValue);
+        sl.params[1].store (params[1]);
+        sl.params[2].store (params[2]);
+        lastStep = s;
+        repaint();
+    }
+
+    void setGrid (const char* pattern)   // 16 caratteri: . normale, 8/6/3 ripeti, s stop, r reverse, m muto, h rallenta
+    {
+        auto& sl = engine.getTrack (track).slots[(size_t) slot];
+        float params[mixer::maxParams];
+        readParams (params);
+        for (int s = 0; s < 16; ++s)
+        {
+            const char ch = pattern[s];
+            const int m = ch == '8' ? 1 : ch == '6' ? 2 : ch == '3' ? 3 : ch == 's' ? 4 : ch == 'r' ? 5 : ch == 'm' ? 6 : ch == 'h' ? 7 : 0;
+            mixer::glitchGrid::set (params, s, m);
+        }
+        sl.params[1].store (params[1]);
+        sl.params[2].store (params[2]);
+        repaint();
+        if (onChanged) onChanged();
+    }
+
+    void showPresets()
+    {
+        struct P { const char* name; const char* grid; };
+        static const P presets[] {
+            { "Rullata finale (1/32)",          "............3333" },
+            { "Stutter crescente",              "........88663333" },
+            { "Tape stop finale",               "............ssss" },
+            { "Reverse a meta'",                "........rrrr...." },
+            { "Gate trance (muto in levare)",   ".m.m.m.m.m.m.m.m" },
+            { "Rallenta l'ultimo quarto",       "............hhhh" },
+            { "Fill fidget",                    "....66..33..r.ss" },
+            { "Svuota la griglia",              "................" },
+        };
+        juce::PopupMenu m;
+        for (int i = 0; i < (int) std::size (presets); ++i)
+            m.addItem (i + 1, presets[i].name);
+        juce::Component::SafePointer<GlitchGridView> safe (this);
+        m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this), [safe] (int r)
+        {
+            if (safe != nullptr && r > 0)
+                safe->setGrid (presets[r - 1].grid);
+        });
+    }
+
+    void timerCallback() override
+    {
+        const int step = engine.isPlaying() ? engine.getPlayStepInBar() : -1;
+        if (step != playing) { playing = step; repaint(); }
+    }
+
+    SequencerEngine& engine;
+    const int track, slot;
+    int brush = 3, paintValue = 3, lastStep = -1, playing = -1;
+};
+
+//==============================================================================
 /** Effetti ed EQ di una traccia: 6 slot in fila, e le manopole dello slot scelto. */
 class TrackEffectsView : public juce::Component
 {
@@ -555,8 +740,11 @@ private:
         shownType = slot.type.load();
         const auto& inf = mixer::info (shownType);
 
+        glitchView.reset();
         for (int p = 0; p < inf.numParams; ++p)
         {
+            if (shownType == mixer::glitch && p > 0)
+                break;   // la griglia sostituisce i parametri 2 e 3
             const auto& def = inf.params[(size_t) p];
             if (def.unit == mixer::Unit::choice || def.unit == mixer::Unit::track)
             {
@@ -580,6 +768,13 @@ private:
             paramIndex.push_back (p);
         }
 
+        if (shownType == mixer::glitch)
+        {
+            glitchView = std::make_unique<GlitchGridView> (engine, track, selectedSlot);
+            glitchView->onChanged = [this] { if (onChanged) onChanged(); };
+            addAndMakeVisible (*glitchView);
+        }
+
         for (auto* row : slotRows)
             row->refresh();
         layoutParams();
@@ -591,6 +786,14 @@ private:
         const int n = (int) paramIndex.size();
         if (n == 0 || paramsArea.isEmpty())
             return;
+        if (glitchView != nullptr)
+        {
+            auto area = paramsArea;
+            if (auto* k = paramKnobs[0])
+                k->setBounds (area.removeFromLeft (juce::jmin (96, area.getWidth() / 5)).withSizeKeepingCentre (juce::jmin (96, area.getWidth() / 5), juce::jmin (120, area.getHeight())));
+            glitchView->setBounds (area.reduced (4, 0));
+            return;
+        }
         const int cols = paramsArea.getWidth() >= paramsArea.getHeight() * 2 ? n : juce::jmin (n, 3);
         const int rows = (n + cols - 1) / cols;
         const int w = paramsArea.getWidth() / cols, h = juce::jmin (120, paramsArea.getHeight() / rows);
@@ -615,6 +818,7 @@ private:
     juce::OwnedArray<ChoiceParam> paramButtons;
     std::vector<int> paramIndex;
     juce::OwnedArray<SlotRow> slotRows;
+    std::unique_ptr<GlitchGridView> glitchView;
     juce::Rectangle<float> eqCaption, slotsCaption, paramsCaption, detailArea;
     juce::Rectangle<int> paramsArea;
 };
