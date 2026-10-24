@@ -100,7 +100,7 @@ def cpp_string(s):
 # ---------------------------------------------------------------- libreria unica, per tipo di strumento
 DRUM_CATS = ["Kick", "Rullanti", "Clap e schiocchi", "Hi-hat chiusi", "Hi-hat aperti", "Piatti", "Tom", "Percussioni"]
 INSTR_CATS = ["Bassi", "Synth e stab", "Pad e atmosfere", "Pianoforti e tastiere", "Chitarre", "Archi", "Fiati e ottoni",
-              "Percussioni melodiche", "Voci", "FX"]
+              "Percussioni melodiche", "Voci", "FX", "Loop"]
 
 
 def classify(s):

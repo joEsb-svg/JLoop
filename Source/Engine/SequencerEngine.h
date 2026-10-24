@@ -91,6 +91,21 @@ public:
 
     //==============================================================================
     /** Impostazioni di un canale (valgono per tutti i pattern). */
+    /**
+        Canale "congelato": l'audio dello strumento gia' calcolato, un giro per ogni pattern in cui suona.
+        Mentre suona si legge da qui e lo strumento non lavora (niente CPU). Vale solo con lo stesso
+        tempo, swing, frequenza di campionamento e lunghezza dei pattern: se cambiano, torna lo strumento vero.
+        Posseduto dalla UI (MainComponent); il thread audio lo legge soltanto.
+    */
+    struct FrozenAudio
+    {
+        double bpm = 120.0, sampleRate = 48000.0;
+        float swing = 0.0f;
+        std::vector<juce::AudioBuffer<float>> loops;   // per pattern (vuoto = il canale li' non suona)
+        std::vector<int> lengths;                       // lunghezza (step) di ogni pattern quando e' stato congelato
+        std::vector<double> loopSamples;
+    };
+
     struct Channel
     {
         std::atomic<float> volume   { 0.8f };
@@ -103,6 +118,7 @@ public:
 
         // Strumento (synth) del canale: un AudioProcessor posseduto dalla UI (Instruments::Host)
         std::atomic<juce::AudioProcessor*> instrument { nullptr };
+        std::atomic<const FrozenAudio*> frozen { nullptr };   // canale congelato (vedi FrozenAudio)
         std::atomic<int> stepNote { synthStepNote };   // nota suonata dagli step (DrumForge: 36, il primo pad)
         std::atomic<int> mixerTrack { 0 };             // traccia del mixer: 0 = Master, 1..32 = insert
 
@@ -272,6 +288,7 @@ public:
         ch.solo.store (false);
         ch.type.store (drumOrSample);
         ch.drumType.store (0);
+        ch.frozen.store (nullptr);
         ch.colour.store (0xff8aa0b8);
         ch.name = "Canale";
         ch.customName = false;
@@ -1455,6 +1472,7 @@ private:
         juce::uint32 colour;
         const SampleData* sample;
         juce::AudioProcessor* instrument;
+        const FrozenAudio* frozen;
         juce::String name, sampleName, instrumentKind, pendingState;
         int instrumentId, stepNote, mixerTrack, arpMode, arpRate, arpOctaves;
         bool arpOn;
@@ -1500,6 +1518,7 @@ private:
         out.kit = ch.kit.load(); out.colour = ch.colour.load(); out.sample = ch.sample.load();
         out.name = ch.name; out.sampleName = ch.sampleName;
         out.instrument = ch.instrument.load(); out.instrumentKind = ch.instrumentKind;
+        out.frozen = ch.frozen.load();
         out.instrumentId = ch.instrumentId; out.pendingState = ch.pendingState;
         out.stepNote = ch.stepNote.load();
         out.mixerTrack = ch.mixerTrack.load();
@@ -1536,6 +1555,7 @@ private:
         ch.kit.store (in.kit); ch.colour.store (in.colour); ch.sample.store (in.sample);
         ch.name = in.name; ch.sampleName = in.sampleName;
         ch.instrument.store (in.instrument); ch.instrumentKind = in.instrumentKind;
+        ch.frozen.store (in.frozen);
         ch.instrumentId = in.instrumentId; ch.pendingState = in.pendingState;
         ch.stepNote.store (in.stepNote);
         ch.mixerTrack.store (in.mixerTrack);
@@ -1723,13 +1743,31 @@ private:
 
         // Posizione (in quarti) all'inizio del blocco, al campione: serve agli effetti a tempo (Glitch)
         chunkPlaying = isOn && (inSong ? songStep >= 0 : stepIndex >= 0);
+        frozenPlaying = chunkPlaying;
         if (chunkPlaying)
         {
             const double tickLen = juce::jmax (1.0, currentStepLength / ticksPerStep);
             const int stepPos = inSong ? songStep : stepIndex;
-            const int lastTick = stepPos * ticksPerStep + (tickInStep + ticksPerStep - 1) % ticksPerStep;
+            const int tickIdx = (tickInStep + ticksPerStep - 1) % ticksPerStep;
+            const int lastTick = stepPos * ticksPerStep + tickIdx;
             const double elapsed = juce::jlimit (0.0, tickLen, tickLen - samplesUntilNextTick);
             chunkBeat = ((double) lastTick + elapsed / tickLen) / (4.0 * ticksPerStep);
+            frozenStep = stepIndex;
+            frozenElapsed = tickIdx * tickLen + elapsed;
+            numFrozenClips = inSong ? numActiveClips : 0;
+            for (int i = 0; i < numFrozenClips; ++i)
+                frozenClips[(size_t) i] = activeClips[(size_t) i];
+        }
+        else if (isOn && ! inSong && samplesUntilNextTick <= 0.0)
+        {
+            frozenPlaying = true;          // il primo step parte all'inizio di questo blocco
+            frozenStep = 0;
+            frozenElapsed = 0.0;
+        }
+        for (int c = 0; c < numActive; ++c)
+        {
+            const auto* fz = channels[(size_t) c].frozen.load();
+            validFrozen[(size_t) c] = fz != nullptr && frozenIsValid (*fz, sr) ? fz : nullptr;
         }
 
         // Tipo dei canali letto una volta per blocco (non a ogni campione: sui telefoni le letture atomiche costano)
@@ -1847,6 +1885,16 @@ private:
             juce::AudioBuffer<float> view (instBuffer.getArrayOfWritePointers(), 2, n);
             view.clear();
 
+            // Canale congelato: si legge l'audio gia' calcolato, lo strumento non lavora
+            if (const auto* fz = validFrozen[(size_t) c])
+            {
+                midi.clear();
+                playFrozen (*fz, view, n, sr);
+                if (captureChannel == c) captureBlock (view, n);
+                mixInstrumentChannel (c, view, n);
+                continue;
+            }
+
             // Strumento fermo (nessuna nota in arrivo e uscita silenziosa da un po'): non si calcola.
             // Uno strumento acceso ma muto costava quasi quanto uno che suona.
             auto& idle = instIdleSamples[(size_t) c];
@@ -1860,28 +1908,8 @@ private:
                 idle = outPeak > 1.0e-5f ? 0 : juce::jmin (idle + n, 1 << 28);
             }
 
-            auto& ch = channels[(size_t) c];
-            const float g   = gainL[(size_t) c] == 0.0f && gainR[(size_t) c] == 0.0f ? 0.0f : ch.volume.load();
-            const float pan = juce::jlimit (-1.0f, 1.0f, ch.pan.load() + stepPanNow[(size_t) c]);
-            const float gl  = g * juce::jmin (1.0f, 1.0f - pan);   // bilanciamento stereo
-            const float gr  = g * juce::jmin (1.0f, 1.0f + pan);
-            const float sr2 = g * ch.reverb.load() * 0.5f;
-            const float sd2 = g * ch.delay.load() * 0.5f;
-            const float* sl = view.getReadPointer (0);
-            const float* sr_ = view.getReadPointer (1);
-            const int t = trackOf[(size_t) c];
-            float* outL = tL (t);
-            float* outR = tR (t);
-            float* outRev = tRev (t);
-            float* outDel = tDel (t);
-
-            for (int s = 0; s < n; ++s)
-            {
-                outL[s] += sl[s] * gl;
-                outR[s] += sr_[s] * gr;
-                outRev[s] += (sl[s] + sr_[s]) * sr2;
-                outDel[s] += (sl[s] + sr_[s]) * sd2;
-            }
+            if (captureChannel == c) captureBlock (view, n);
+            mixInstrumentChannel (c, view, n);
         }
 
         // Mixer: EQ ed effetti di ogni traccia, poi tutto nel Master
@@ -2251,6 +2279,94 @@ private:
             revR[(size_t) s] = revL[(size_t) s];
             delIn[(size_t) s] += mDel[s];
         }
+    }
+
+    /** Somma l'uscita di uno strumento (gia' in "view") nella sua traccia del mixer: volume, pan, mandate. */
+    void mixInstrumentChannel (int c, juce::AudioBuffer<float>& view, int n) noexcept
+    {
+        auto& ch = channels[(size_t) c];
+        const float g   = gainL[(size_t) c] == 0.0f && gainR[(size_t) c] == 0.0f ? 0.0f : ch.volume.load();
+        const float pan = juce::jlimit (-1.0f, 1.0f, ch.pan.load() + stepPanNow[(size_t) c]);
+        const float gl  = g * juce::jmin (1.0f, 1.0f - pan);   // bilanciamento stereo
+        const float gr  = g * juce::jmin (1.0f, 1.0f + pan);
+        const float sr2 = g * ch.reverb.load() * 0.5f;
+        const float sd2 = g * ch.delay.load() * 0.5f;
+        const float* sl = view.getReadPointer (0);
+        const float* sr_ = view.getReadPointer (1);
+        const int t = trackOf[(size_t) c];
+        float* outL = tL (t);
+        float* outR = tR (t);
+        float* outRev = tRev (t);
+        float* outDel = tDel (t);
+
+        for (int s = 0; s < n; ++s)
+        {
+            outL[s] += sl[s] * gl;
+            outR[s] += sr_[s] * gr;
+            outRev[s] += (sl[s] + sr_[s]) * sr2;
+            outDel[s] += (sl[s] + sr_[s]) * sd2;
+        }
+    }
+
+    bool frozenIsValid (const FrozenAudio& fz, double sr) const noexcept
+    {
+        if (std::abs (fz.bpm - (double) bpm.load()) > 1.0e-6 || std::abs (fz.swing - swing.load()) > 1.0e-6f || std::abs (fz.sampleRate - sr) > 0.5)
+            return false;
+        for (size_t p = 0; p < fz.lengths.size(); ++p)
+            if (fz.loops[p].getNumSamples() > 0 && fz.lengths[p] != patterns[p].length.load())
+                return false;
+        return true;
+    }
+
+    /** Inizio dello step k nel giro, in campioni (con lo swing: gli step pari durano di piu'). */
+    static double stepStartSamples (int k, double samplesPerStep, double swingAmount) noexcept
+    {
+        return (double) (k - (k & 1)) * samplesPerStep + ((k & 1) != 0 ? samplesPerStep * (1.0 + swingAmount) : 0.0);
+    }
+
+    void playFrozen (const FrozenAudio& fz, juce::AudioBuffer<float>& view, int n, double sr) noexcept
+    {
+        if (! frozenPlaying)
+            return;
+        const double sps = sr * 60.0 / bpm.load() / 4.0, sw = (double) swing.load() / 3.0;
+        auto addLoop = [&] (int pattern, int step)
+        {
+            if (pattern < 0 || pattern >= (int) fz.loops.size()) return;
+            const auto& loop = fz.loops[(size_t) pattern];
+            const int len = loop.getNumSamples();
+            if (len <= 0) return;
+            double pos = stepStartSamples (step, sps, sw) + frozenElapsed;
+            int idx = (int) std::fmod (std::floor (pos), (double) len);
+            for (int ch = 0; ch < 2; ++ch)
+            {
+                auto* dst = view.getWritePointer (ch);
+                const auto* src = loop.getReadPointer (juce::jmin (ch, loop.getNumChannels() - 1));
+                int k = idx;
+                for (int s = 0; s < n; ++s)
+                {
+                    dst[s] += src[k];
+                    if (++k >= len) k = 0;
+                }
+            }
+        };
+        if (inSong)
+            for (int i = 0; i < numFrozenClips; ++i)    // le clip com'erano all'inizio del blocco
+                addLoop (frozenClips[(size_t) i].pattern, frozenClips[(size_t) i].localStep);
+        else
+            addLoop (playingPattern.load(), frozenStep);
+    }
+
+    void captureBlock (const juce::AudioBuffer<float>& view, int n) noexcept
+    {
+        if (captureTarget == nullptr)
+        {
+            captureWrite += n;
+            return;
+        }
+        for (int s = 0; s < n; ++s, ++captureWrite)
+            if (captureWrite >= 0 && captureWrite < captureTarget->getNumSamples())
+                for (int ch = 0; ch < 2; ++ch)
+                    captureTarget->setSample (ch, (int) captureWrite, view.getSample (ch, s));
     }
 
     /** Limiter con 1.5 ms di "anticipo": vede arrivare i picchi e abbassa il volume prima che passino. */
@@ -2627,6 +2743,11 @@ private:
     {
         if (instruments[(size_t) c] != nullptr)
         {
+            if (const auto* fz = channels[(size_t) c].frozen.load(); fz != nullptr && fz == validFrozen[(size_t) c])
+            {
+                channels[(size_t) c].activity.store (velocity);   // congelato: suona l'audio pronto, lo strumento riposa
+                return;
+            }
             instNoteOn (c, midiNote < 0 ? juce::jlimit (0, 127, channels[(size_t) c].stepNote.load() + juce::roundToInt (stepSemis)) : midiNote, velocity, lengthTicks);
             return;
         }
@@ -2800,6 +2921,36 @@ private:
     double samplesUntilNextTick = 0.0;
     double chunkBeat = 0.0;
     bool chunkPlaying = false;
+
+    // Canali congelati: posizione nel giro all'inizio del blocco
+    bool frozenPlaying = false;
+    std::array<const FrozenAudio*, maxChannels> validFrozen {};
+    std::array<ActiveClip, 64> frozenClips {};
+    int numFrozenClips = 0;
+    int frozenStep = 0;
+    double frozenElapsed = 0.0;
+
+public:
+    /** Il canale e' congelato e l'audio congelato vale (stesso tempo, swing, lunghezze). */
+    bool isFrozenValid (int c) const
+    {
+        const auto* fz = channels[(size_t) c].frozen.load();
+        return fz != nullptr && frozenIsValid (*fz, preparedRate.load() > 0.0 ? preparedRate.load() : fz->sampleRate);
+    }
+
+    /** Solo per il congelamento (motore offline): copia l'uscita grezza dello strumento del canale. */
+    void setCapture (int channel, juce::AudioBuffer<float>* target, juce::int64 startAt)
+    {
+        captureChannel = channel;
+        captureTarget = target;
+        captureWrite = -startAt;
+    }
+    double getPreparedRate() const  { return preparedRate.load(); }
+
+private:
+    int captureChannel = -1;
+    juce::AudioBuffer<float>* captureTarget = nullptr;
+    juce::int64 captureWrite = 0;
     double currentStepLength    = 1.0;
 
     std::array<float, chunk> mixL {}, mixR {}, revL {}, revR {}, delIn {};

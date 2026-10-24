@@ -342,6 +342,23 @@ void ChannelRow::paint (juce::Graphics& g)
     }
 }
 
+void ChannelRow::paintOverChildren (juce::Graphics& g)
+{
+    // Canale congelato: velo azzurro "di ghiaccio" sugli step
+    if (engine.getChannel (channel).frozen.load() == nullptr)
+        return;
+    const bool valid = engine.isFrozenValid (channel);
+    auto area = getPadsArea();
+    g.setColour (juce::Colour (0xff9fdcff).withAlpha (valid ? 0.16f : 0.08f));
+    g.fillRoundedRectangle (area, 4.0f);
+    g.setColour (juce::Colour (0xff9fdcff).withAlpha (0.7f));
+    g.drawRoundedRectangle (area.reduced (0.5f), 4.0f, 1.0f);
+    g.setFont (Theme::font (juce::jlimit (10.0f, 14.0f, area.getHeight() * 0.3f), true));
+    g.setColour (juce::Colours::white.withAlpha (0.9f));
+    g.drawText (juce::String (juce::CharPointer_UTF8 ("\xe2\x9d\x84  ")) + (valid ? "CONGELATO" : "DA RICONGELARE (tempo o lunghezza cambiati)"),
+                area.reduced (8.0f, 0.0f), juce::Justification::centredRight, false);
+}
+
 //==============================================================================
 void ChannelRow::mouseDown (const juce::MouseEvent& e)
 {
@@ -370,6 +387,13 @@ void ChannelRow::mouseDown (const juce::MouseEvent& e)
         nameDragging = false;
         longPressDone = false;
         startTimer (450);
+        return;
+    }
+
+    // Canale congelato: per modificarlo bisogna prima scongelarlo
+    if (engine.getChannel (channel).frozen.load() != nullptr && getPadsArea().contains (e.position))
+    {
+        if (onCommand) onCommand (channel, askUnfreeze);
         return;
     }
 
@@ -787,6 +811,10 @@ void ChannelRow::showRowMenu()
     menu.addItem (editSound, synth ? "Apri " + juce::String (info != nullptr ? info->name : "il synth") + "..."
                                    : juce::String ("Modifica suono e mix..."));
     menu.addItem (openPianoRoll, "Piano roll...");
+    if (synth)
+        menu.addItem (chan.frozen.load() != nullptr ? (int) unfreeze : (int) freeze,
+                      chan.frozen.load() != nullptr ? juce::String (juce::CharPointer_UTF8 ("Scongela  \xe2\x9d\x84"))
+                                                    : juce::String (juce::CharPointer_UTF8 ("Congela traccia (meno CPU)  \xe2\x9d\x84")));
     menu.addSeparator();
     menu.addItem (15, "Muto", true, chan.muted.load());
     menu.addItem (solo, "Solo (ascolta solo questo)", true, chan.solo.load());

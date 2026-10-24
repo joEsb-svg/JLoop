@@ -708,3 +708,42 @@ def _():
 @sound("x_vox_aah", "Vox Aah", INSTR, "Voci", root=60, gated=True, release=0.15, colour=VOX_COL)
 def _():
     return polish(chorus(vox(["a"], 1.5, mtof(60), 506), 7, 0.6, 0.4, seed=507), "vox")
+
+
+# ============================================================================ LOOP (per lo Slicer: si tagliano sui colpi)
+LOOP_COL = 0xffe8c35a
+BEAT_128 = 60.0 / 128.0
+
+
+def _place(out, x, at, gain=1.0):
+    i = int(at * SR)
+    n = min(len(x), len(out) - i)
+    if n > 0:
+        out[i:i + n] += x[:n] * gain
+
+
+@sound("x_loop_vox_phrase", "Loop voce (128 BPM)", INSTR, "Loop", root=60, colour=LOOP_COL)
+def _():
+    # Una frase "hey - oh - yeah - uh - ah-oh - hey" in una battuta: da tagliare e rimescolare (vocal chop fidget)
+    out = np.zeros(int(4 * BEAT_128 * SR))
+    parts = [(0.0, ["e", "i"], 0.30, 60, 0.12), (0.75, ["o"], 0.26, 63, 0.25), (1.5, ["i", "a"], 0.42, 60, 0.2),
+             (2.5, ["u"], 0.22, 67, 0.25), (3.0, ["a", "o"], 0.22, 65, 0.1), (3.5, ["e", "i"], 0.2, 63, 0.1)]
+    for k, (beat, vowels, d, note, glide) in enumerate(parts):
+        _place(out, vox(vowels, d, mtof(note), 600 + k, glide), beat * BEAT_128)
+    return polish(out, "vox")
+
+
+@sound("x_loop_break", "Loop batteria electro (128 BPM)", INSTR, "Loop", root=60, colour=LOOP_COL)
+def _():
+    # Una battuta di batteria electro: kick, snare, clap, hi-hat (si taglia in 16 colpi)
+    from registry import SOUNDS
+    by_id = {s["id"]: s for s in SOUNDS}
+    kick, snare, hat, clap = (np.asarray(by_id[i]["fn"](), dtype=float) for i in ("x_kick_complextro", "x_snare_complextro", "x_hat_electro", "x_clap_electro"))
+    out = np.zeros(int(4 * BEAT_128 * SR))
+    st = BEAT_128 / 4
+    for s, (k, sn, h) in enumerate(zip("x..x..x...x.x...", "....x.......x..x", "x.xxx.x.x.xxx.x.")):
+        if k == "x": _place(out, kick, s * st, 0.9)
+        if sn == "x": _place(out, snare, s * st, 0.8 if s != 15 else 0.45)
+        if h == "x": _place(out, hat, s * st, 0.45 if s % 2 else 0.6)
+    _place(out, clap, 12 * st, 0.5)
+    return soft_limit(out * (0.9 / max(1e-6, np.max(np.abs(out)))), 0.95)

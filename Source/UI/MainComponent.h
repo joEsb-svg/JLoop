@@ -3,6 +3,7 @@
 #include <JuceHeader.h>
 #include "../Engine/SequencerEngine.h"
 #include "../Engine/RenderAhead.h"
+#include "../Engine/Freeze.h"
 #include "DawLookAndFeel.h"
 #include "Widgets.h"
 #include "ChannelRow.h"
@@ -200,6 +201,17 @@ private:
     ChannelEditor editor { engine };
     PianoRoll pianoRoll { engine };
     PatternLengthChip lengthChip;
+
+    // Congela traccia
+    std::unique_ptr<ChannelFreezer> freezer;
+    int freezingInstrumentId = 0;
+    std::vector<std::unique_ptr<SequencerEngine::FrozenAudio>> frozenStore;
+    juce::Label freezeStatus;
+    void startFreeze (int channel);
+    void unfreezeChannel (int channel);
+    void checkFreezer();
+    void askUnfreeze (int channel, std::function<void()> then);
+    void collectFrozen();
     BeatWatermark beatWatermark;
     float scrollPos = 0.0f, scrollTarget = 0.0f, scrollDragStart = 0.0f;   // primo step visibile (il rack scorre in orizzontale)
     bool scrollDragging = false;

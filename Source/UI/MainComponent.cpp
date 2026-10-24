@@ -234,6 +234,12 @@ MainComponent::MainComponent()
         return rows.isEmpty() ? juce::Rectangle<float>() : rows.getFirst()->getStepBounds (s);
     };
     addAndMakeVisible (beatWatermark);
+    freezeStatus.setJustificationType (juce::Justification::centred);
+    freezeStatus.setColour (juce::Label::backgroundColourId, juce::Colour (0xee0e2a3a));
+    freezeStatus.setColour (juce::Label::textColourId, juce::Colour (0xffcfeeff));
+    freezeStatus.setColour (juce::Label::outlineColourId, juce::Colour (0xff9fdcff));
+    freezeStatus.setFont (Theme::font (14.0f, true));
+    addChildComponent (freezeStatus);
 
     // --- Ripristina l'ultima sessione
     projectName = untitled;
@@ -300,6 +306,9 @@ MainComponent::~MainComponent()
     saveSession();
     deviceManager.removeMidiInputDeviceCallback ({}, this);
     deviceManager.removeAudioCallback (&renderAhead);
+    freezer.reset();
+    for (int ch = 0; ch < SequencerEngine::maxChannels; ++ch)
+        engine.getChannel (ch).frozen.store (nullptr);   // l'audio congelato sparisce prima del motore
     deviceManager.closeAudioDevice();
     juce::LookAndFeel::setDefaultLookAndFeel (nullptr);
     setLookAndFeel (nullptr);
@@ -580,6 +589,7 @@ void MainComponent::layoutRack (juce::Rectangle<int> full, bool portrait)
 
     ruler.setBounds (rack.getX(), rulerArea.getY(), w, rulerArea.getHeight());
     beatWatermark.setBounds (rack.getX(), rack.getY(), w, rack.getHeight());
+    freezeStatus.setBounds (juce::Rectangle<int> (juce::jmin (360, getWidth() - 20), 34).withCentre ({ getWidth() / 2, rack.getY() + 30 }));
     editor.setBounds (rack.withTop (rulerArea.getY()).expanded (2, 2));
     pianoRoll.setBounds (full);   // il piano roll copre tutto il channel rack, barra compresa
     browser.setBounds (full);
@@ -718,6 +728,7 @@ juce::String MainComponent::getKitLabel() const
 //==============================================================================
 void MainComponent::timerCallback()
 {
+    checkFreezer();
     // Rapporto prestazioni: aggiornamenti dello schermo arrivati in ritardo (la grafica non ce la fa)
     {
         const double nowMs = juce::Time::getMillisecondCounterHiRes();
@@ -1346,6 +1357,11 @@ void MainComponent::openSynthPanel (int channel)
 {
     if (! engine.isSynth (channel))
         return;
+    if (engine.getChannel (channel).frozen.load() != nullptr)
+    {
+        askUnfreeze (channel, [this, channel] { openSynthPanel (channel); });
+        return;
+    }
 
     instruments->resolve();
     editor.setVisible (false);
@@ -1369,6 +1385,11 @@ void MainComponent::openSynthPanel (int channel)
 
 void MainComponent::openPianoRoll (int channel)
 {
+    if (channel >= 0 && channel < engine.getNumChannels() && engine.getChannel (channel).frozen.load() != nullptr)
+    {
+        askUnfreeze (channel, [this, channel] { openPianoRoll (channel); });
+        return;
+    }
     livePanel.setVisible (false);
     editor.setVisible (false);
     playlist.setVisible (false);
@@ -1396,6 +1417,101 @@ void MainComponent::openEditor (int channel)
     editor.setChannel (channel);
     editor.setVisible (true);
     editor.toFront (false);
+}
+
+//==============================================================================
+// Congela traccia
+
+void MainComponent::startFreeze (int channel)
+{
+    if (freezer != nullptr)
+    {
+        showMessage ("Congela traccia", "Sto gia' congelando un canale: aspetta che finisca.");
+        return;
+    }
+    if (! engine.isSynth (channel) || engine.getInstrument (channel) == nullptr)
+        return;
+
+    freezer = std::make_unique<ChannelFreezer> (ProjectIO::toJson (engine), sampleStore, channel, engine.getPreparedRate());
+    if (! freezer->hasAnything())
+    {
+        freezer.reset();
+        showMessage ("Congela traccia", "Questo canale non suona in nessun pattern: non c'e' niente da congelare.");
+        return;
+    }
+    freezingInstrumentId = engine.getChannel (channel).instrumentId;
+    freezer->startThread (juce::Thread::Priority::low);
+    freezeStatus.setText (juce::String (juce::CharPointer_UTF8 ("\xe2\x9d\x84  Congelo \"")) + engine.getChannel (channel).name + "\"...", juce::dontSendNotification);
+    freezeStatus.setVisible (true);
+    freezeStatus.toFront (false);
+}
+
+void MainComponent::checkFreezer()
+{
+    if (freezer == nullptr)
+        return;
+    const int c = freezer->getChannel();
+    freezeStatus.setText (juce::String (juce::CharPointer_UTF8 ("\xe2\x9d\x84  Congelo \"")) + (c < engine.getNumChannels() ? engine.getChannel (c).name : juce::String())
+                          + "\"  " + juce::String (juce::roundToInt (freezer->getProgress() * 100.0f)) + "%", juce::dontSendNotification);
+    if (! freezer->isFinished())
+        return;
+
+    auto result = freezer->takeResult();
+    const bool cancelled = freezer->wasCancelled();
+    freezer.reset();
+    freezeStatus.setVisible (false);
+
+    // Il canale potrebbe essere stato spostato o cambiato nel frattempo: si cerca lo stesso strumento
+    int target = -1;
+    for (int i = 0; i < engine.getNumChannels(); ++i)
+        if (engine.getChannel (i).instrumentId == freezingInstrumentId && engine.isSynth (i))
+            target = i;
+    if (cancelled || result == nullptr || target < 0)
+        return;
+
+    engine.getChannel (target).frozen.store (result.get());
+    frozenStore.push_back (std::move (result));
+    collectFrozen();
+    Haptics::tick (this);
+    if (auto* row = rows[target]) row->repaint();
+}
+
+void MainComponent::unfreezeChannel (int channel)
+{
+    if (channel < 0 || channel >= engine.getNumChannels())
+        return;
+    engine.getChannel (channel).frozen.store (nullptr);
+    collectFrozen();
+    if (auto* row = rows[channel]) row->repaint();
+}
+
+/** Libera l'audio congelato che nessun canale usa piu' (scongelato, undo, progetto nuovo). */
+void MainComponent::collectFrozen()
+{
+    engine.waitForAudioBlock();
+    frozenStore.erase (std::remove_if (frozenStore.begin(), frozenStore.end(), [this] (const auto& f)
+    {
+        for (int c = 0; c < SequencerEngine::maxChannels; ++c)
+            if (engine.getChannel (c).frozen.load() == f.get())
+                return false;
+        return true;
+    }), frozenStore.end());
+}
+
+void MainComponent::askUnfreeze (int channel, std::function<void()> then)
+{
+    juce::Component::SafePointer<MainComponent> safe (this);
+    auto options = juce::MessageBoxOptions::makeOptionsOkCancel (juce::MessageBoxIconType::QuestionIcon, "Canale congelato",
+                        "\"" + engine.getChannel (channel).name + "\" e' congelato: suona l'audio gia' pronto e non consuma CPU.\n"
+                        "Per modificarlo va scongelato (potrai ricongelarlo dal menu del canale).",
+                        "Scongela", "Annulla", this);
+    juce::AlertWindow::showAsync (options, [safe, channel, then] (int r)
+    {
+        if (safe == nullptr || r != 1)
+            return;
+        safe->unfreezeChannel (channel);
+        if (then) then();
+    });
 }
 
 void MainComponent::tapTempo()
@@ -1759,6 +1875,13 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
                 juce::Timer::callAfterDelay (900, [safe, makeEvent] { if (safe != nullptr) safe->mouseUp (makeEvent (false)); });
             });
         }
+
+    if (const int i = args.indexOf ("--freeze"); i >= 0)       // test: congela un canale synth (con qualche step)
+    {
+        const int ch = args[i + 1].getIntValue();
+        for (int s : { 0, 3, 6, 10, 14 }) engine.setStepVelocity (ch, s, 100);
+        startFreeze (ch);
+    }
 
     if (const int i = args.indexOf ("--rowmenu"); i >= 0)       // test: menu del canale
         if (auto* row = rows[args[i + 1].getIntValue()])
@@ -2532,6 +2655,18 @@ void MainComponent::handleChannelCommand (int channel, int command)
 
         case ChannelRow::openPianoRoll:
             openPianoRoll (channel);
+            break;
+
+        case ChannelRow::freeze:
+            startFreeze (channel);
+            break;
+
+        case ChannelRow::unfreeze:
+            unfreezeChannel (channel);
+            break;
+
+        case ChannelRow::askUnfreeze:
+            askUnfreeze (channel, {});
             break;
 
         case ChannelRow::openMixer:

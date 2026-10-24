@@ -14,7 +14,15 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.36)
+## Stato attuale (v0.37)
+
+**Novita' della 0.37**
+- Congela traccia: dal menu di un canale synth, "Congela traccia". L'audio di ogni pattern viene calcolato
+  una volta e lo strumento smette di consumare CPU (identico al campione, anche con swing e playlist);
+  per modificarlo si scongela. Se cambi tempo o swing torna da solo lo strumento vero.
+- Slicer: nuovo strumento che taglia un loop o una voce sui colpi (o in 4/8/16 parti), un pezzo per tasto
+  dal C3. Dal channel rack, con PITCH, ogni step sceglie il suo pezzo (vocal chop fidget con gli step)
+- Libreria: categoria "Loop" con un loop di voce e un loop di batteria electro (128 BPM) da tagliare
 
 **Novita' della 0.36**
 - Channel rack: modalita' PITCH (altezza per step, trascina su/giu') e PAN (tocca a sinistra/destra nello step)

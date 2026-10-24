@@ -317,6 +317,8 @@ namespace LibraryIndex
         { "fx_zap", "Zap", "Strumenti", "FX", "fx_zap_ogg", 60, false, 0.150f, 0xff52d0c0u },
         { "fx_vinyl", "Fruscio vinile", "Strumenti", "FX", "fx_vinyl_ogg", 60, false, 0.150f, 0xff8b7d6bu },
         { "fx_tape_stop", "Tape stop", "Strumenti", "FX", "fx_tape_stop_ogg", 60, false, 0.150f, 0xff9c8a6cu },
+        { "x_loop_vox_phrase", "Loop voce (128 BPM)", "Strumenti", "Loop", "x_loop_vox_phrase_ogg", 60, false, 0.150f, 0xffe8c35au },
+        { "x_loop_break", "Loop batteria electro (128 BPM)", "Strumenti", "Loop", "x_loop_break_ogg", 60, false, 0.150f, 0xffe8c35au },
     };
 
     inline constexpr int numEntries = (int) (sizeof (entries) / sizeof (entries[0]));
