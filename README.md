@@ -14,7 +14,15 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.33)
+## Stato attuale (v0.34)
+
+**Novita' della 0.34: FRENCH ROULETTE**
+- Nuovo synth per bassi choppati, lead distorti e arpeggi lo-fi (electro francese 2007-2012)
+- OSC 1 analogico (saw/square/pulse, PWM, drift), OSC 2 digitale con 8 wavetable (FM, formanti, bit...), SUB con drive
+- Filtro ladder 24 dB con risonanza aggressiva, PUMP (sidechain a tempo), CRUNCH (valvola, bitcrusher, clip soft/hard)
+- STEP MATRIX a 16 step: gate, cutoff, crush e pitch con glide per step, a tempo col progetto; RANDOM CHOP
+- 14 preset: Choppy Bass, Roulette Growl, Fidget Chop, Rack Saw Bass, Yoi Brostep, Bitcrush Sub, Electro Stab Bass,
+  Screaming Lead, Neon Zap Lead, Lo-Fi Square Lead, Granular Arp, 8-Bit Roulette, Filter Disco Chords, Pump Chord Stab
 
 **0.33.1**: corretto il mixer (i nomi dei canali sparivano toccando lo schermo)
 

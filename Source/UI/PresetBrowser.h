@@ -195,8 +195,8 @@ private:
         if (n == "init")                                                         return "Base";
         if (has ({ "pad" }))                                                     return "Pad";
         if (has ({ "lead" }))                                                    return "Lead";
-        if (has ({ "bass", "basso", "sub", "reese", "wobble", "growl" }))       return "Bassi";
-        if (has ({ "pluck", "arpeggio", "arp", "mallet" }))                     return "Pluck e arpeggi";
+        if (has ({ "bass", "basso", "sub", "reese", "wobble", "growl", "chop", "brostep", "yoi" })) return "Bassi";
+        if (has ({ "pluck", "arpeggio", "arp", "mallet", "8-bit" }))            return "Pluck e arpeggi";
         if (has ({ "piano", "organ", "clav", "rhodes", "wurli", "ep " }))      return "Tastiere";
         if (has ({ "campan", "bell", "glock", "marimba", "vibra", "kalimba", "steel", "metall" })) return "Campane e mallet";
         if (has ({ "brass", "stab", "accordi", "chord", "poly", "organo" }))   return "Stab e accordi";

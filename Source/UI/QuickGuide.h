@@ -23,7 +23,8 @@ public:
             { "Il channel rack", "Ogni riga e' un suono. Tocca le caselle per accendere i colpi e premi Play. "
                                  "Tieni premuta una casella per riempire la riga con un ritmo pronto (4/4, ottavi, trap...)." },
             { "Suoni e strumenti", "Tocca il nome di un canale per cambiare suono o aprire lo strumento: BassForge, PolyForge, "
-                                   "FMForge e la drum machine DrumForge, ognuno con tanti preset. Il + aggiunge un canale." },
+                                   "FMForge, French Roulette (bassi choppati con step matrix) e la drum machine DrumForge, ognuno con tanti preset. "
+                                   "Il + aggiunge un canale." },
             { "Il piano roll", "Per melodie e accordi. Scegli una scala (le note giuste si illuminano), disegna accordi con un tocco "
                                "o usa una progressione pronta. Nel pannello dello strumento, Arp accende l'arpeggiatore." },
             { "Pattern e playlist", "Fino a 99 pattern per progetto. Nella playlist li metti in fila per costruire la canzone; "
