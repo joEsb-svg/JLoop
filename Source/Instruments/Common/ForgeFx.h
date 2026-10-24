@@ -105,7 +105,8 @@ namespace forge
             const int size = (int) buf.size();
             float idx = (float) chorusPos - delaySamples;
             while (idx < 0) idx += (float) size;
-            const int i0 = (int) idx;
+            // (in virgola mobile -0.0000001 + size puo' dare esattamente size: fuori dal buffer)
+            const int i0 = juce::jlimit (0, size - 1, (int) idx);
             const float fr = idx - (float) i0;
             return buf[(size_t) i0] + fr * (buf[(size_t) ((i0 + 1) % size)] - buf[(size_t) i0]);
         }

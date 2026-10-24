@@ -16,6 +16,9 @@ Gli aggiornamenti si installano sopra la versione precedente.
 
 ## Stato attuale (v0.37)
 
+**0.37.1**: corretto un errore nel chorus di PolyForge, FMForge e French Roulette che ogni tanto faceva
+esplodere il volume (lettura fuori dal buffer)
+
 **Novita' della 0.37**
 - Congela traccia: dal menu di un canale synth, "Congela traccia". L'audio di ogni pattern viene calcolato
   una volta e lo strumento smette di consumare CPU (identico al campione, anche con swing e playlist);
