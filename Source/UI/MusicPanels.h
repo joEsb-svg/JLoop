@@ -29,7 +29,7 @@ public:
     static CenteredOverlay* show (juce::Component& anyComponent, std::unique_ptr<juce::Component> content,
                                   std::function<int (int)> heightFor, int maxWidth = 620)
     {
-        auto* top = anyComponent.getTopLevelComponent();
+        auto* top = overlayHost (anyComponent);
         if (top == nullptr)
             return nullptr;
         auto* overlay = new CenteredOverlay (std::move (content), std::move (heightFor), maxWidth);

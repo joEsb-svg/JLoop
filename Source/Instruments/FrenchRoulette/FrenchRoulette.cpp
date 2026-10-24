@@ -338,7 +338,7 @@ namespace fr
 
         amp.set (sr, p.aA, p.aD, p.aS, p.aR);
         fenv.set (sr, p.fA, p.fD, p.fS, p.fR);
-        if (m.retrigAmp)    amp.noteOn();
+        if (m.retrigAmp && ! isReleasing()) amp.noteOn();   // dopo il note-off la matrice non deve far ripartire la nota
         if (m.retrigFilter) fenv.noteOn();
 
         pitch = glideCoef > 0.0f ? targetPitch + (pitch - targetPitch) * glideCoef : targetPitch;

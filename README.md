@@ -16,6 +16,9 @@ Gli aggiornamenti si installano sopra la versione precedente.
 
 ## Stato attuale (v0.35)
 
+**0.35.1**: French Roulette non continua a suonare dopo lo stop (preset con retrig sulla matrice);
+le finestrelle (riempimento degli step, pannelli musicali) si aprono anche con la grafica GPU attiva
+
 **Novita' della 0.35**
 - Lunghezza del pattern libera da 1 a 48 step (frecce o griglia), al posto di 16/32
 - Il channel rack scorre in orizzontale (dito sugli step o sul righello); mentre si scorre compaiono

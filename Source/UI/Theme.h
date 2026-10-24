@@ -7,6 +7,20 @@
     Stile: grigi scuri e freddi, contrasti bassi, un solo colore d'accento (arancio)
     usato con parsimonia, angoli quasi squadrati. Come una DAW da studio.
 */
+/**
+    Dove aprire una finestrella sopra tutto: il componente piu' esterno disegnato con la GPU (OpenGL) se c'e',
+    altrimenti quello piu' esterno della finestra. Su Android un componente fuori da quello con OpenGL
+    resta NASCOSTO sotto la superficie OpenGL ma riceve i tocchi: l'app sembra bloccata.
+*/
+inline juce::Component* overlayHost (juce::Component& any)
+{
+    juce::Component* best = nullptr;
+    for (auto* c = &any; c != nullptr; c = c->getParentComponent())
+        if (juce::OpenGLContext::getContextAttachedTo (*c) != nullptr)
+            best = c;
+    return best != nullptr ? best : any.getTopLevelComponent();
+}
+
 namespace Theme
 {
     // Superfici (dalla piu' profonda alla piu' in rilievo)

@@ -1727,6 +1727,27 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
         if (auto* row = rows[args[i + 1].getIntValue()])
             row->showFillPanelForTest (args[i + 2].getIntValue());
 
+    if (const int i = args.indexOf ("--longpress"); i >= 0 && args.size() > i + 2)   // test: pressione lunga su uno step (canale, step)
+        if (auto* row = rows[args[i + 1].getIntValue()])
+        {
+            const int s = args[i + 2].getIntValue();
+            juce::Component::SafePointer<ChannelRow> safe (row);
+            auto makeEvent = [safe, s] (bool down)
+            {
+                auto src = juce::Desktop::getInstance().getMainMouseSource();
+                const auto pos = safe->getStepBounds (s).getCentre();
+                const auto now = juce::Time::getCurrentTime();
+                return juce::MouseEvent (src, pos, down ? juce::ModifierKeys::leftButtonModifier : juce::ModifierKeys(), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                         safe.getComponent(), safe.getComponent(), now, pos, now, 1, false);
+            };
+            juce::Timer::callAfterDelay (1500, [safe, makeEvent]
+            {
+                if (safe == nullptr) return;
+                safe->mouseDown (makeEvent (true));
+                juce::Timer::callAfterDelay (900, [safe, makeEvent] { if (safe != nullptr) safe->mouseUp (makeEvent (false)); });
+            });
+        }
+
     if (const int i = args.indexOf ("--rowmenu"); i >= 0)       // test: menu del canale
         if (auto* row = rows[args[i + 1].getIntValue()])
             row->showRowMenu();

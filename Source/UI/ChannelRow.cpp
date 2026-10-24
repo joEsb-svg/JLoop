@@ -516,7 +516,7 @@ void ChannelRow::timerCallback()
 
 void ChannelRow::showFillPanel (int step)
 {
-    auto* top = getTopLevelComponent();
+    auto* top = overlayHost (*this);
     if (top == nullptr)
         return;
 
