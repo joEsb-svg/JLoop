@@ -14,7 +14,10 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.37)
+## Stato attuale (v0.38)
+
+**Novita' della 0.38**: due effetti nuovi nel mixer: "Distorsione trash" (medi e alti sporchi, basso pulito)
+e "Filtro a vocali" (a-e-i-o-u con LFO a tempo: yoi, wow, talking bass)
 
 **0.37.1**: corretto un errore nel chorus di PolyForge, FMForge e French Roulette che ogni tanto faceva
 esplodere il volume (lettura fuori dal buffer)

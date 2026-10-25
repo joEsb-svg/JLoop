@@ -204,7 +204,7 @@ private:
 
     // Congela traccia
     std::unique_ptr<ChannelFreezer> freezer;
-    int freezingInstrumentId = 0;
+    int freezingInstrumentId = 0, resamplePattern = -1;   // resamplePattern >= 0: il risultato va in uno Slicer
     std::vector<std::unique_ptr<SequencerEngine::FrozenAudio>> frozenStore;
     juce::Label freezeStatus;
     void startFreeze (int channel);

@@ -1469,6 +1469,55 @@ void MainComponent::checkFreezer()
     if (cancelled || result == nullptr || target < 0)
         return;
 
+    // Ricampiona: il giro del pattern diventa un campione, caricato in un canale Slicer nuovo
+    if (resamplePattern >= 0)
+    {
+        const int pat = std::exchange (resamplePattern, -1);
+        const auto& loop = result->loops[(size_t) pat];
+        if (loop.getNumSamples() == 0)
+        {
+            showMessage ("Ricampiona", "Il canale non suona nel pattern selezionato.");
+            return;
+        }
+        auto tmp = juce::File::getSpecialLocation (juce::File::tempDirectory)
+                       .getChildFile (juce::File::createLegalFileName ("Ricampionato " + engine.getChannel (target).name + " " + juce::Time::getCurrentTime().formatted ("%H%M%S") + ".wav"));
+        {
+            juce::AudioBuffer<float> mono (1, loop.getNumSamples());
+            mono.copyFrom (0, 0, loop, 0, 0, loop.getNumSamples());
+            mono.addFrom (0, 0, loop, 1, 0, loop.getNumSamples());
+            mono.applyGain (0.5f);
+            if (const float pk = mono.getMagnitude (0, mono.getNumSamples()); pk > 0.0001f) mono.applyGain (0.89f / pk);
+            tmp.deleteFile();
+            std::unique_ptr<juce::OutputStream> os = std::make_unique<juce::FileOutputStream> (tmp);
+            juce::WavAudioFormat wav;
+            if (auto w = wav.createWriterFor (os, juce::AudioFormatWriterOptions{}.withSampleRate (result->sampleRate).withNumChannels (1).withBitsPerSample (24)))
+                w->writeFromAudioSampleBuffer (mono, 0, mono.getNumSamples());
+        }
+        juce::String error;
+        const auto name = sampleStore.importFromUrl (juce::URL (tmp), error);
+        tmp.deleteFile();
+        if (name.isEmpty()) { showMessage ("Ricampiona", error); return; }
+
+        if (auto* info = Instruments::find ("slicer"))
+        {
+            SoundChoice sc;
+            sc.kind = SoundChoice::instrument;
+            sc.id = info->id; sc.name = info->name; sc.colour = info->colour;
+            applySoundChoice (-1, sc);
+            instruments->resolve();
+            const int slicerCh = engine.getNumChannels() - 1;
+            if (auto* sl = dynamic_cast<SlicerAudioProcessor*> (engine.getInstrument (slicerCh)))
+            {
+                sl->getPresets().set ("mode", 3.0f);   // 16 parti: un pezzo per sedicesimo
+                sl->setSample (name);
+                engine.getChannel (slicerCh).name = "Slice " + engine.getChannel (target).name;
+                engine.getChannel (slicerCh).customName = true;
+                openSynthPanel (slicerCh);
+            }
+        }
+        return;
+    }
+
     engine.getChannel (target).frozen.store (result.get());
     frozenStore.push_back (std::move (result));
     collectFrozen();
@@ -2663,6 +2712,11 @@ void MainComponent::handleChannelCommand (int channel, int command)
 
         case ChannelRow::unfreeze:
             unfreezeChannel (channel);
+            break;
+
+        case ChannelRow::resample:
+            startFreeze (channel);
+            if (freezer != nullptr) resamplePattern = engine.getCurrentPattern();
             break;
 
         case ChannelRow::askUnfreeze:

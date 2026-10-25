@@ -815,6 +815,8 @@ void ChannelRow::showRowMenu()
         menu.addItem (chan.frozen.load() != nullptr ? (int) unfreeze : (int) freeze,
                       chan.frozen.load() != nullptr ? juce::String (juce::CharPointer_UTF8 ("Scongela  \xe2\x9d\x84"))
                                                     : juce::String (juce::CharPointer_UTF8 ("Congela traccia (meno CPU)  \xe2\x9d\x84")));
+    if (synth)
+        menu.addItem (resample, "Ricampiona nello Slicer (taglia il pattern)");
     menu.addSeparator();
     menu.addItem (15, "Muto", true, chan.muted.load());
     menu.addItem (solo, "Solo (ascolta solo questo)", true, chan.solo.load());

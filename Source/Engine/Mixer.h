@@ -34,7 +34,7 @@ namespace mixer
     //==========================================================================
     // Tipi di effetto e i loro parametri
 
-    enum FxType { none = 0, compressor, saturation, filter, delay, reverb, chorus, bitcrusher, sidechain, stereo, ott, glitch, numFxTypes };
+    enum FxType { none = 0, compressor, saturation, filter, delay, reverb, chorus, bitcrusher, sidechain, stereo, ott, glitch, trash, vowel, numFxTypes };
 
     enum class Unit { percent, dB, ms, hz, ratio, choice, track, bits, times };
 
@@ -114,6 +114,18 @@ namespace mixer
                 { "Mix", 0.0f, 1.0f, 1.0f, Unit::percent },
                 { "Step 1-8", 0.0f, 16777215.0f, 0.0f, Unit::times },
                 { "Step 9-16", 0.0f, 16777215.0f, 0.0f, Unit::times } }} },
+            { "trash", "Distorsione trash", "Sporca e grossa (stile complextro): distorce i medi e gli alti, il basso resta pulito", 5, {{
+                { "Drive", 0.0f, 1.0f, 0.5f, Unit::percent },
+                { "Tono", 500.0f, 16000.0f, 6000.0f, Unit::hz, 3000.0f },
+                { "Basso pulito", 0.0f, 1.0f, 0.8f, Unit::percent },
+                { "Mix", 0.0f, 1.0f, 1.0f, Unit::percent },
+                { "Uscita", -18.0f, 6.0f, -3.0f, Unit::dB } }} },
+            { "vowel", "Filtro a vocali", "Fa \"parlare\" il suono (a-e-i-o-u), anche a tempo: yoi, wow, talking bass", 5, {{
+                { "Vocale", 0.0f, 4.0f, 0.0f, Unit::percent },
+                { "LFO", 0.0f, 1.0f, 0.5f, Unit::percent },
+                { "Tempo LFO", 0.0f, 4.0f, 2.0f, Unit::choice, 0.0f, "1/1|1/2|1/4|1/8|1/16" },
+                { "Risonanza", 0.0f, 1.0f, 0.5f, Unit::percent },
+                { "Mix", 0.0f, 1.0f, 1.0f, Unit::percent } }} },
         }};
         return infos[(size_t) juce::jlimit (0, numFxTypes - 1, type)];
     }
@@ -897,6 +909,108 @@ namespace mixer
         float wet = 0.0f;
     };
 
+    //==========================================================================
+    /** Distorsione "trash": il basso (sotto 150 Hz) resta quasi pulito, medi e alti vengono saturati forte. */
+    class Trash : public Effect
+    {
+    public:
+        void prepare (double sampleRate) override
+        {
+            sr = sampleRate;
+            split.prepare ({ sr, 4096, 2 });
+            split.setType (juce::dsp::LinkwitzRileyFilterType::lowpass);
+            split.setCutoffFrequency (150.0f);
+            reset();
+        }
+        void reset() override   { split.reset(); lp[0] = lp[1] = 0.0f; }
+
+        void process (float* L, float* R, int n, const float* p, const Context&) override
+        {
+            const float drive = 1.0f + p[0] * p[0] * 40.0f, clean = p[2], mix = p[3];
+            const float out = juce::Decibels::decibelsToGain (p[4]);
+            const float a = 1.0f - std::exp (-juce::MathConstants<float>::twoPi * p[1] / (float) sr);
+            const float norm = 1.0f / std::tanh (juce::jmin (drive, 3.0f));
+            for (int i = 0; i < n; ++i)
+                for (int ch = 0; ch < 2; ++ch)
+                {
+                    float& x = ch == 0 ? L[i] : R[i];
+                    float lo, hi;
+                    split.processSample (ch, x, lo, hi);
+                    // asimmetria leggera: armoniche pari, suono "sporco"
+                    float d = std::tanh (hi * drive + 0.15f * p[0]) - std::tanh (0.15f * p[0]);
+                    d = d * norm * 0.6f;
+                    lp[ch] += a * (d - lp[ch]);                      // tono: toglie la "sabbia" in cima
+                    const float lowPart = lo * clean + std::tanh (lo * drive * 0.5f) * 0.5f * (1.0f - clean);
+                    const float wet = lowPart + lp[ch];
+                    x = (x + mix * (wet - x)) * out;
+                }
+        }
+
+    private:
+        double sr = 48000.0;
+        juce::dsp::LinkwitzRileyFilter<float> split;
+        float lp[2] {};
+    };
+
+    //==========================================================================
+    /** Filtro a vocali: due formanti (F1, F2) che passano da a-e-i-o-u, mossi da un LFO a tempo. */
+    class Vowel : public Effect
+    {
+    public:
+        void prepare (double sampleRate) override   { sr = sampleRate; reset(); }
+        void reset() override                        { for (auto& f : bands) f = {}; phase = 0.0; }
+
+        void process (float* L, float* R, int n, const float* p, const Context& ctx) override
+        {
+            static constexpr float F1[5] { 800.0f, 450.0f, 300.0f, 450.0f, 330.0f };   // a e i o u
+            static constexpr float F2[5] { 1150.0f, 1900.0f, 2300.0f, 800.0f, 700.0f };
+            static constexpr double beatsPer[5] { 4.0, 2.0, 1.0, 0.5, 0.25 };
+            const double beats = beatsPer[juce::jlimit (0, 4, juce::roundToInt (p[2]))];
+            const float q = 2.0f + p[3] * 14.0f, mix = p[4];
+            for (int start = 0; start < n; start += 16)
+            {
+                const int m = juce::jmin (16, n - start);
+                // LFO: a tempo col progetto quando suona, libero quando e' fermo
+                double ph;
+                if (ctx.playing) ph = std::fmod ((ctx.ppq + ctx.bpm / 60.0 * start / sr) / beats, 1.0);
+                else { phase = std::fmod (phase + ctx.bpm / 60.0 / beats * m / sr, 1.0); ph = phase; }
+                const float lfo = 0.5f - 0.5f * std::cos ((float) ph * juce::MathConstants<float>::twoPi);
+                const float v = juce::jlimit (0.0f, 4.0f, p[0] + p[1] * 4.0f * lfo);
+                const int i0 = juce::jmin (3, (int) v);
+                const float f = v - (float) i0;
+                const float f1 = F1[i0] + f * (F1[i0 + 1] - F1[i0]), f2 = F2[i0] + f * (F2[i0 + 1] - F2[i0]);
+                for (int b = 0; b < 2; ++b)
+                {
+                    const float g = std::tan (juce::MathConstants<float>::pi * juce::jmin (b == 0 ? f1 : f2, (float) sr * 0.45f) / (float) sr);
+                    for (auto ch = 0; ch < 2; ++ch) bands[(size_t) (b * 2 + ch)].set (g, 1.0f / q);
+                }
+                for (int i = start; i < start + m; ++i)
+                    for (int ch = 0; ch < 2; ++ch)
+                    {
+                        float& x = ch == 0 ? L[i] : R[i];
+                        const float y = bands[(size_t) ch].bp (x) * 1.6f + bands[(size_t) (2 + ch)].bp (x) * 1.1f;
+                        x += mix * (y * 1.4f - x);
+                    }
+            }
+        }
+
+    private:
+        struct Svf
+        {
+            float g = 0.1f, k = 0.5f, s1 = 0.0f, s2 = 0.0f;
+            void set (float g_, float k_) { g = g_; k = k_; }
+            float bp (float x)
+            {
+                const float a1 = 1.0f / (1.0f + g * (g + k)), a2 = g * a1, a3 = g * a2;
+                const float v3 = x - s2, v1 = a1 * s1 + a2 * v3, v2 = s2 + a2 * s1 + a3 * v3;
+                s1 = 2.0f * v1 - s1; s2 = 2.0f * v2 - s2;
+                return v1 * k;
+            }
+        };
+        double sr = 48000.0, phase = 0.0;
+        std::array<Svf, 4> bands;
+    };
+
     inline std::unique_ptr<Effect> createEffect (int type)
     {
         switch (type)
@@ -912,6 +1026,8 @@ namespace mixer
             case stereo:     return std::make_unique<Stereo>();
             case ott:        return std::make_unique<Ott>();
             case glitch:     return std::make_unique<Glitch>();
+            case trash:      return std::make_unique<Trash>();
+            case vowel:      return std::make_unique<Vowel>();
             default:         return nullptr;
         }
     }
