@@ -16,6 +16,8 @@ Gli aggiornamenti si installano sopra la versione precedente.
 
 ## Stato attuale (v0.38)
 
+**0.38.1**: libreria: rullata build-up, fill di batteria, riser 2 e 4 battute, bassi complextro e fidget a colpo
+
 **Novita' della 0.38**: due effetti nuovi nel mixer: "Distorsione trash" (medi e alti sporchi, basso pulito)
 e "Filtro a vocali" (a-e-i-o-u con LFO a tempo: yoi, wow, talking bass)
 

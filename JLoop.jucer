@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <JUCERPROJECT name="JLoop" projectType="guiapp" bundleIdentifier="com.joesb.dawfl"
-              version="0.38.0" companyName="joEsb" id="DwFl01" useAppConfig="0"
+              version="0.38.1" companyName="joEsb" id="DwFl01" useAppConfig="0"
               addUsingNamespaceToJuceHeader="0" cppLanguageStandard="20" defines="JucePlugin_Name=&quot;BassForge&quot;&#10;JUCE_STRICT_REFCOUNTEDPOINTER=1"
               jucerFormatVersion="1">
   <MAINGROUP id="Mg0001" name="JLoop">
@@ -384,6 +384,12 @@
         <FILE id="Lb0298" name="x_vox_aah.ogg" compile="0" resource="1" file="Resources/Library/x_vox_aah.ogg"/>
         <FILE id="Lb0299" name="x_loop_vox_phrase.ogg" compile="0" resource="1" file="Resources/Library/x_loop_vox_phrase.ogg"/>
         <FILE id="Lb0300" name="x_loop_break.ogg" compile="0" resource="1" file="Resources/Library/x_loop_break.ogg"/>
+        <FILE id="Lb0301" name="x_loop_snare_roll.ogg" compile="0" resource="1" file="Resources/Library/x_loop_snare_roll.ogg"/>
+        <FILE id="Lb0302" name="x_loop_fill.ogg" compile="0" resource="1" file="Resources/Library/x_loop_fill.ogg"/>
+        <FILE id="Lb0303" name="x_fx_riser_4bar.ogg" compile="0" resource="1" file="Resources/Library/x_fx_riser_4bar.ogg"/>
+        <FILE id="Lb0304" name="x_fx_riser_2bar.ogg" compile="0" resource="1" file="Resources/Library/x_fx_riser_2bar.ogg"/>
+        <FILE id="Lb0305" name="x_bass_shot.ogg" compile="0" resource="1" file="Resources/Library/x_bass_shot.ogg"/>
+        <FILE id="Lb0306" name="x_bass_fidget_stab.ogg" compile="0" resource="1" file="Resources/Library/x_bass_fidget_stab.ogg"/>
       </GROUP>
       <FILE id="IcOn01" name="icon.png" compile="0" resource="0" file="Resources/icon.png"/>
       <FILE id="SpLsh1" name="splash_logo.png" compile="0" resource="1" file="Resources/splash_logo.png"/>
@@ -503,7 +509,7 @@
   </MAINGROUP>
   <EXPORTFORMATS>
     <ANDROIDSTUDIO targetFolder="Builds/Android" androidEnableContentSharing="1" androidBluetoothScanNeeded="1" androidBluetoothConnectNeeded="1" smallIcon="IcOn01" bigIcon="IcOn01"
-                   androidVersionCode="42" androidMinimumSDK="24" androidScreenOrientation="landscape"
+                   androidVersionCode="43" androidMinimumSDK="24" androidScreenOrientation="landscape"
                    androidInternetNeeded="0" androidExternalWriteNeeded="0" androidPushNotifications="0"
                    androidReadMediaAudioPermission="0" androidReadMediaImagesPermission="0"
                    androidReadMediaVideoPermission="0">

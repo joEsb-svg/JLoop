@@ -193,6 +193,8 @@ namespace LibraryIndex
         { "x_bass_donk", "Basso Donk (fidget)", "Strumenti", "Bassi", "x_bass_donk_ogg", 36, false, 0.150f, 0xff9a72e0u },
         { "x_bass_sub", "Sub Electro", "Strumenti", "Bassi", "x_bass_sub_ogg", 36, true, 0.080f, 0xff9a72e0u },
         { "x_bass_laser", "Basso Laser", "Strumenti", "Bassi", "x_bass_laser_ogg", 36, true, 0.050f, 0xff9a72e0u },
+        { "x_bass_shot", "Basso Complextro (colpo)", "Strumenti", "Bassi", "x_bass_shot_ogg", 36, false, 0.150f, 0xff9a72e0u },
+        { "x_bass_fidget_stab", "Basso Fidget (stab)", "Strumenti", "Bassi", "x_bass_fidget_stab_ogg", 36, false, 0.150f, 0xff9a72e0u },
         { "bass_finger", "Basso elettrico", "Strumenti", "Bassi", "bass_finger_ogg", 36, true, 0.080f, 0xff8a6bd1u },
         { "bass_pick", "Basso col plettro", "Strumenti", "Bassi", "bass_pick_ogg", 36, true, 0.080f, 0xff7d5fc4u },
         { "bass_slap", "Basso slap", "Strumenti", "Bassi", "bass_slap_ogg", 36, true, 0.060f, 0xff9a72e0u },
@@ -301,6 +303,8 @@ namespace LibraryIndex
         { "x_fx_reverse_snare", "Rullante al contrario", "Strumenti", "FX", "x_fx_reverse_snare_ogg", 60, false, 0.150f, 0xffe36faeu },
         { "x_fx_siren", "Sirena", "Strumenti", "FX", "x_fx_siren_ogg", 60, false, 0.150f, 0xffe36faeu },
         { "x_fx_glitch", "Glitch", "Strumenti", "FX", "x_fx_glitch_ogg", 60, false, 0.150f, 0xffe36faeu },
+        { "x_fx_riser_4bar", "Riser 4 battute (128 BPM)", "Strumenti", "FX", "x_fx_riser_4bar_ogg", 60, false, 0.150f, 0xffe36faeu },
+        { "x_fx_riser_2bar", "Riser 2 battute (128 BPM)", "Strumenti", "FX", "x_fx_riser_2bar_ogg", 60, false, 0.150f, 0xffe36faeu },
         { "edm_riser", "Riser", "Strumenti", "FX", "edm_riser_ogg", 60, false, 0.150f, 0xff9f8cf0u },
         { "edm_impact", "Impatto (drop)", "Strumenti", "FX", "edm_impact_ogg", 60, false, 0.150f, 0xff7d6ad8u },
         { "techno_noise", "Noise hit", "Strumenti", "FX", "techno_noise_ogg", 60, false, 0.150f, 0xff9a9a9au },
@@ -319,6 +323,8 @@ namespace LibraryIndex
         { "fx_tape_stop", "Tape stop", "Strumenti", "FX", "fx_tape_stop_ogg", 60, false, 0.150f, 0xff9c8a6cu },
         { "x_loop_vox_phrase", "Loop voce (128 BPM)", "Strumenti", "Loop", "x_loop_vox_phrase_ogg", 60, false, 0.150f, 0xffe8c35au },
         { "x_loop_break", "Loop batteria electro (128 BPM)", "Strumenti", "Loop", "x_loop_break_ogg", 60, false, 0.150f, 0xffe8c35au },
+        { "x_loop_snare_roll", "Rullata build-up 2 battute (128 BPM)", "Strumenti", "Loop", "x_loop_snare_roll_ogg", 60, false, 0.150f, 0xffe8c35au },
+        { "x_loop_fill", "Fill di batteria 1 battuta (128 BPM)", "Strumenti", "Loop", "x_loop_fill_ogg", 60, false, 0.150f, 0xffe8c35au },
     };
 
     inline constexpr int numEntries = (int) (sizeof (entries) / sizeof (entries[0]));

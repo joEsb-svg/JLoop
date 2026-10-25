@@ -747,3 +747,73 @@ def _():
         if h == "x": _place(out, hat, s * st, 0.45 if s % 2 else 0.6)
     _place(out, clap, 12 * st, 0.5)
     return soft_limit(out * (0.9 / max(1e-6, np.max(np.abs(out)))), 0.95)
+
+
+def _get(sid):
+    from registry import SOUNDS
+    for s in SOUNDS:
+        if s["id"] == sid:
+            return np.asarray(s["fn"](), dtype=float)
+    raise KeyError(sid)
+
+
+@sound("x_loop_snare_roll", "Rullata build-up 2 battute (128 BPM)", INSTR, "Loop", root=60, colour=LOOP_COL)
+def _():
+    # Rullante che accelera: quarti, ottavi, sedicesimi, trentaduesimi; il volume sale
+    snare = _get("x_snare_complextro")[: int(0.12 * SR)]
+    snare = snare * np.linspace(1.0, 0.0, len(snare)) ** 1.5
+    out = np.zeros(int(8 * BEAT_128 * SR))
+    pos, k = 0.0, 0
+    for bar_beats, div in ((2, 1.0), (2, 0.5), (2, 0.25), (2, 0.125)):
+        for i in range(int(bar_beats / div)):
+            g = 0.35 + 0.65 * (pos / 8.0)
+            _place(out, snare, pos * BEAT_128, g)
+            pos += div
+    return soft_limit(out * (0.9 / max(1e-6, np.max(np.abs(out)))), 0.95)
+
+
+@sound("x_loop_fill", "Fill di batteria 1 battuta (128 BPM)", INSTR, "Loop", root=60, colour=LOOP_COL)
+def _():
+    kick, snare, tom, clap = (_get(i) for i in ("x_kick_complextro", "x_snare_complextro", "x_tom_mid", "x_clap_electro"))
+    out = np.zeros(int(4 * BEAT_128 * SR))
+    st = BEAT_128 / 4
+    for s, ch in enumerate("k.s.k.sstt.tsscc"):
+        x = {"k": kick, "s": snare, "t": tom, "c": clap}.get(ch)
+        if x is not None:
+            _place(out, x, s * st, 0.6 + 0.4 * s / 15)
+    return soft_limit(out * (0.9 / max(1e-6, np.max(np.abs(out)))), 0.95)
+
+
+@sound("x_fx_riser_4bar", "Riser 4 battute (128 BPM)", INSTR, "FX", colour=FX_COL)
+def _():
+    d = 16 * BEAT_128; t = tt(d); a = t / d
+    x = svf(noise(d, 431), 300 + 13000 * a ** 2.2, 1.6, mode="bp") * (0.15 + 0.85 * a ** 1.5)
+    f = 80 * 2 ** (4 * a)
+    x = x + 0.25 * (2 * ((phase_of(f) / (2 * np.pi)) % 1) - 1) * a ** 2
+    return polish(fade(x, 0.0, 0.02), "fx")
+
+
+@sound("x_fx_riser_2bar", "Riser 2 battute (128 BPM)", INSTR, "FX", colour=FX_COL)
+def _():
+    d = 8 * BEAT_128; t = tt(d); a = t / d
+    x = svf(noise(d, 433), 500 + 12000 * a ** 2, 1.8, mode="bp") * (0.2 + 0.8 * a)
+    return polish(fade(x, 0.0, 0.02), "fx")
+
+
+@sound("x_bass_shot", "Basso Complextro (colpo)", INSTR, "Bassi", root=36, colour=BASS_COL)
+def _():
+    # Colpo corto e sporco da tagliare/suonare a tasti: saw + square, filtro che si chiude, distorto
+    d = 0.32; t = tt(d); f = mtof(36)
+    x = saw(f, d, seed=3) * 0.6 + square(f * 2.0, d, seed=4) * 0.35
+    x = svf(x, 300 + 4000 * np.exp(-t / 0.06), 0.9)
+    x = drive(x * 2.5, 3.0) * adsr(d, 0.002, 0.25, 0.6, rel_start=d - 0.05, rel=0.04)
+    return polish(x, "bass")
+
+
+@sound("x_bass_fidget_stab", "Basso Fidget (stab)", INSTR, "Bassi", root=36, colour=BASS_COL)
+def _():
+    d = 0.22; t = tt(d); f = mtof(36)
+    x = pulse(f, d, 0.2, seed=5) + 0.5 * saw(f * 1.5, d, seed=6)
+    x = svf(x, 600 + 6000 * np.exp(-t / 0.035), 1.2)
+    x = drive(x * 2.0, 2.5) * adsr(d, 0.001, 0.12, 0.3, rel_start=d - 0.04, rel=0.03)
+    return polish(x, "bass")
