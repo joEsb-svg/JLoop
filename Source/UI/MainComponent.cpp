@@ -1,5 +1,6 @@
-#include "../Instruments/Common/NeonEditor.h"
 #include "MainComponent.h"
+#include "../Instruments/Common/NeonEditor.h"
+#include "RiserPanel.h"
 #include "Theme.h"
 #include "../Engine/ProjectIO.h"
 #include "../Engine/Performance.h"
@@ -951,6 +952,7 @@ void MainComponent::showFileMenu()
     menu.addSeparator();
     menu.addItem (7, "Mixer...");
     menu.addItem (10, "Live (lancia i pattern)...");
+    menu.addItem (13, "Riser automatico...");
     menu.addItem (6, "Esporta audio (WAV / OGG)...");
     menu.addSeparator();
     menu.addSubMenu ("Impostazioni", createSettingsMenu());
@@ -997,6 +999,8 @@ void MainComponent::showFileMenu()
                                 self.shareProject();
                             else if (result == 12)
                                 self.openProjectFile();
+                            else if (result == 13)
+                                self.openRiser();
                             else if (result >= 3000 && result < 4000)
                                 self.loadDemo (result - 3000);
                             else if (result >= 5000 && result < 9000)
@@ -1573,6 +1577,32 @@ void MainComponent::askUnfreeze (int channel, std::function<void()> then)
 //==============================================================================
 // Condivisione dei progetti
 
+void MainComponent::openRiser()
+{
+    auto* top = overlayHost (*this);
+    if (top == nullptr)
+        top = this;
+    auto panel = std::make_unique<RiserPanel> (engine, sampleStore);
+    juce::Component::SafePointer<MainComponent> safe (this);
+    panel->onCreated = [safe] (const riser::Result& r)
+    {
+        if (safe == nullptr) return;
+        auto& self = *safe;
+        self.userTouched.store (true);
+        if (! self.engine.isSongMode() && r.pattern >= 0)
+            self.engine.selectPattern (r.pattern);
+        self.rebuildRows();
+        self.syncControlsFromEngine();
+        self.playlist.refresh();
+        if (r.channel >= 0)
+            self.scrollToChannel (r.channel);
+    };
+    auto* overlay = new RiserOverlay (std::move (panel));   // si cancella da sola quando si chiude
+    top->addAndMakeVisible (overlay);
+    overlay->setBounds (top->getLocalBounds());
+    overlay->toFront (true);
+}
+
 void MainComponent::shareProject()
 {
     // I nomi dei campioni dentro gli strumenti (DrumForge, Slicer) stanno nei loro stati
@@ -1840,6 +1870,8 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
             applySoundChoice (-1, c);
         }
 
+    if (args.contains ("--riser"))   // test: finestra del riser automatico
+        openRiser();
     if (const int i = args.indexOf ("--pattern-length"); i >= 0)   // test: lunghezza del pattern e scorrimento
     {
         engine.setPatternLength (args[i + 1].getIntValue());
@@ -1921,6 +1953,16 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
 
     if (const int i = args.indexOf ("--demo"); i >= 0)   // test: progetto demo (indice)
         loadDemo (args[i + 1].getIntValue());
+    if (const int i = args.indexOf ("--riser-make"); i >= 0 && args.size() > i + 2)   // test: crea un riser (battute, drop)
+    {
+        riser::Options o;
+        o.bars = args[i + 1].getIntValue();
+        o.dropBar = args[i + 2].getIntValue();
+        o.filter = true;
+        const auto r = riser::apply (engine, sampleStore, o);
+        if (r.ok) { rebuildRows(); syncControlsFromEngine(); playlist.refresh(); }
+    }
+
     if (const int i = args.indexOf ("--live"); i >= 0)   // test: modalita' live (pattern da lanciare, -1 = nessuno)
     {
         openLive();

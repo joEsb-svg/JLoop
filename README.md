@@ -14,7 +14,13 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.41)
+## Stato attuale (v0.42)
+
+**Novita' della 0.42**: Riser automatico (menu > "Riser automatico..."). Scegli la durata (1-16 battute)
+e gli ingredienti: rumore che sale, nota che sale (nella tonalita' del progetto), rullata che accelera,
+impatto sul drop, filtro passa-alto sul master. JLoop crea il campione a tempo, un canale "Riser",
+un pattern e lo piazza nella playlist in modo che finisca esattamente sulla battuta del drop
+(proposta in automatico dove entrano piu' strumenti), oppure solo come pattern nuovo.
 
 **Novita' della 0.41**: RoboVox, vocoder (viola). Una voce "parla" attraverso un synth: tieni un accordo
 e la voce lo fa cantare da robot. La voce si sceglie dalla libreria (nuovi "Parlato robotico" e "Parlato numeri"),

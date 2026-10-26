@@ -29,7 +29,7 @@ struct SampleData : public juce::ReferenceCountedObject
 class SampleStore
 {
 public:
-    static constexpr double maxSeconds = 12.0;
+    static constexpr double maxSeconds = 60.0;   // (i riser lunghi a tempo lento arrivano a ~45 s)
 
     SampleStore()   { formats.registerBasicFormats(); }
 

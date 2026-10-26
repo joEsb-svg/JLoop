@@ -211,6 +211,7 @@ private:
     void startFreeze (int channel);
     void shareProject();
     void openProjectFile();
+    void openRiser();
     std::unique_ptr<juce::FileChooser> projectChooser;
     juce::ScopedMessageBox shareBox;
     void unfreezeChannel (int channel);
