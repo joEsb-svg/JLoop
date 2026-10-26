@@ -333,10 +333,10 @@ namespace ProjectIO
                     const auto kind = o.getProperty ("instrument", "bassforge").toString();
                     engine.makeInstrumentChannel (c, kind, kind == "polyforge" ? "PolyForge" : kind == "fmforge" ? "FMForge"
                                                          : kind == "drumforge" ? "DrumForge" : kind == "frenchroulette" ? "French Roulette"
-                                                         : kind == "slicer" ? "Slicer" : "BassForge",
+                                                         : kind == "slicer" ? "Slicer" : kind == "megasaw" ? "MegaSaw" : "BassForge",
                                                   kind == "polyforge" ? 0xffb07cffu : kind == "fmforge" ? 0xff7dffb0u
                                                          : kind == "drumforge" ? 0xffff6b5bu : kind == "frenchroulette" ? 0xffff3a3au
-                                                         : kind == "slicer" ? 0xffe8c35au : SequencerEngine::synthColour);
+                                                         : kind == "slicer" ? 0xffe8c35au : kind == "megasaw" ? 0xffffb020u : SequencerEngine::synthColour);
                     ch.stepNote.store (kind == "drumforge" ? 36 : SequencerEngine::synthStepNote);
                     ch.instrumentId = (int) o.getProperty ("instrumentId", 0);
                     ch.pendingState = o.getProperty ("state", {}).toString();   // lo applica la UI (Instruments::Host)

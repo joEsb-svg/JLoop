@@ -11,6 +11,7 @@
 #include "DrumForge/DrumForge.h"
 #include "FrenchRoulette/FrenchRoulette.h"
 #include "Slicer/Slicer.h"
+#include "MegaSaw/MegaSaw.h"
 
 //==============================================================================
 /**
@@ -38,6 +39,7 @@ namespace Instruments
             { "fmforge",   "FMForge",   "FM: piani elettrici, campane, bassi FM", 0xff7dffb0 },
             { "drumforge", "DrumForge", "Drum machine: 16 pad, kit per genere", 0xffff6b5b },
             { "frenchroulette", "French Roulette", "Bassi choppati, lead distorti, step matrix", 0xffff3a3a },
+            { "megasaw", "MegaSaw", "Supersaw, hoover e reese: lead enormi e bassi rave", 0xffffb020 },
             { "slicer", "Slicer", "Taglia loop e voci sui colpi: un pezzo per tasto (vocal chop)", 0xffe8c35a },
         };
         return infos;
@@ -64,6 +66,7 @@ namespace Instruments
         if (id == "drumforge") return std::make_unique<DrumForgeAudioProcessor>();
         if (id == "frenchroulette") return std::make_unique<FrenchRouletteAudioProcessor>();
         if (id == "slicer") return std::make_unique<SlicerAudioProcessor>();
+        if (id == "megasaw") return std::make_unique<MegaSawAudioProcessor>();
         return std::make_unique<BassForgeAudioProcessor>();
     }
 
@@ -85,6 +88,8 @@ namespace Instruments
             for (int i = 0; i < fr::Presets::numFactory(); ++i) names.add (fr::Presets::factoryName (i));
         else if (dynamic_cast<SlicerAudioProcessor*> (p) != nullptr)
             for (int i = 0; i < slicer::Presets::numFactory(); ++i) names.add (slicer::Presets::factoryName (i));
+        else if (dynamic_cast<MegaSawAudioProcessor*> (p) != nullptr)
+            for (int i = 0; i < ms::Presets::numFactory(); ++i) names.add (ms::Presets::factoryName (i));
         return names;
     }
 
@@ -96,6 +101,7 @@ namespace Instruments
         if (auto* d = dynamic_cast<DrumForgeAudioProcessor*> (p))  d->getPresets().loadFactory (index);
         if (auto* r = dynamic_cast<FrenchRouletteAudioProcessor*> (p))  r->getPresets().loadFactory (index);
         if (auto* sl = dynamic_cast<SlicerAudioProcessor*> (p))  sl->getPresets().loadFactory (index);
+        if (auto* mg = dynamic_cast<MegaSawAudioProcessor*> (p))  mg->getPresets().loadFactory (index);
     }
 
     inline juce::Array<juce::File> userPresets (juce::AudioProcessor* p)
@@ -106,6 +112,7 @@ namespace Instruments
         if (auto* d = dynamic_cast<DrumForgeAudioProcessor*> (p))  return d->getPresets().userPresets();
         if (auto* r = dynamic_cast<FrenchRouletteAudioProcessor*> (p))  return r->getPresets().userPresets();
         if (auto* sl = dynamic_cast<SlicerAudioProcessor*> (p))  return sl->getPresets().userPresets();
+        if (auto* mg = dynamic_cast<MegaSawAudioProcessor*> (p))  return mg->getPresets().userPresets();
         return {};
     }
 
@@ -117,6 +124,7 @@ namespace Instruments
         if (auto* d = dynamic_cast<DrumForgeAudioProcessor*> (p))  d->getPresets().load (file);
         if (auto* r = dynamic_cast<FrenchRouletteAudioProcessor*> (p))  r->getPresets().load (file);
         if (auto* sl = dynamic_cast<SlicerAudioProcessor*> (p))  sl->getPresets().load (file);
+        if (auto* mg = dynamic_cast<MegaSawAudioProcessor*> (p))  mg->getPresets().load (file);
     }
 
     inline bool saveUser (juce::AudioProcessor* p, const juce::String& name)
@@ -127,6 +135,7 @@ namespace Instruments
         if (auto* d = dynamic_cast<DrumForgeAudioProcessor*> (p))  return d->getPresets().save (name);
         if (auto* r = dynamic_cast<FrenchRouletteAudioProcessor*> (p))  return r->getPresets().save (name);
         if (auto* sl = dynamic_cast<SlicerAudioProcessor*> (p))  return sl->getPresets().save (name);
+        if (auto* mg = dynamic_cast<MegaSawAudioProcessor*> (p))  return mg->getPresets().save (name);
         return false;
     }
 
@@ -138,6 +147,7 @@ namespace Instruments
         if (auto* d = dynamic_cast<DrumForgeAudioProcessor*> (p))  return d->getPresets().currentName();
         if (auto* r = dynamic_cast<FrenchRouletteAudioProcessor*> (p))  return r->getPresets().currentName();
         if (auto* sl = dynamic_cast<SlicerAudioProcessor*> (p))  return sl->getPresets().currentName();
+        if (auto* mg = dynamic_cast<MegaSawAudioProcessor*> (p))  return mg->getPresets().currentName();
         return "Synth";
     }
 

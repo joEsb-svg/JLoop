@@ -3,7 +3,6 @@
 namespace frui
 {
     namespace c = colours;
-    static void drawNeon (juce::Graphics&, const juce::String&, juce::Rectangle<float>, float, juce::Justification, juce::Colour);
     juce::Font mono (float size, bool bold);
 
     /** Didascalia fissa stile LCD (es. "TUBE <> BITS" sotto CRUNCH). */
@@ -14,12 +13,12 @@ namespace frui
         void paint (juce::Graphics& g) override
         {
             auto r = getLocalBounds().toFloat().reduced (0.5f);
-            g.setColour (c::lcdBg);
+            g.setColour (frui::lcdBg());
             g.fillRoundedRectangle (r, 4.0f);
             g.setColour (juce::Colours::black);
             g.drawRoundedRectangle (r, 4.0f, 1.0f);
             g.setFont (mono (juce::jlimit (9.0f, 13.0f, r.getHeight() * 0.55f), true));
-            drawNeon (g, text, r, 0.5f, juce::Justification::centred, juce::Colour (0xffff5050));
+            drawNeon (g, text, r, 0.5f, juce::Justification::centred, frui::lcdText());
         }
     private:
         juce::String text;
@@ -36,7 +35,7 @@ namespace frui
     }
 
     /** Testo con lettere distanziate (stile pannello hardware). */
-    static void drawSpaced (juce::Graphics& g, const juce::String& text, juce::Rectangle<float> area, float spacing, juce::Justification just)
+    void drawSpaced (juce::Graphics& g, const juce::String& text, juce::Rectangle<float> area, float spacing, juce::Justification just)
     {
         juce::GlyphArrangement ga;
         ga.addLineOfText (g.getCurrentFont(), text, 0.0f, 0.0f);
@@ -55,7 +54,7 @@ namespace frui
     }
 
     /** Testo rosso "al neon": un alone sotto e il testo sopra. */
-    static void drawNeon (juce::Graphics& g, const juce::String& text, juce::Rectangle<float> area, float spacing, juce::Justification just, juce::Colour colour)
+    void drawNeon (juce::Graphics& g, const juce::String& text, juce::Rectangle<float> area, float spacing, juce::Justification just, juce::Colour colour)
     {
         g.setColour (colour.withAlpha (0.18f));
         for (auto d : { juce::Point<float> (-1.2f, 0.0f), { 1.2f, 0.0f }, { 0.0f, -1.2f }, { 0.0f, 1.2f } })
@@ -69,7 +68,7 @@ namespace frui
     {
         setColour (juce::PopupMenu::backgroundColourId, c::panelTop);
         setColour (juce::PopupMenu::textColourId, c::text);
-        setColour (juce::PopupMenu::highlightedBackgroundColourId, c::red.withAlpha (0.35f));
+        setColour (juce::PopupMenu::highlightedBackgroundColourId, frui::accent().withAlpha (0.35f));
         setColour (juce::PopupMenu::highlightedTextColourId, juce::Colours::white);
     }
 
@@ -99,9 +98,9 @@ namespace frui
         const float from = a0 + (bipolar ? (float) s.valueToProportionOfLength (0.0) : 0.0f) * (a1 - a0);
         juce::Path val;
         val.addCentredArc (centre.x, centre.y, arcR, arcR, 0.0f, juce::jmin (from, ang), juce::jmax (from, ang), true);
-        g.setColour (c::red.withAlpha (0.22f));
+        g.setColour (frui::accent().withAlpha (0.22f));
         g.strokePath (val, juce::PathStrokeType (thick + 5.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        g.setColour (c::red);
+        g.setColour (frui::accent());
         g.strokePath (val, juce::PathStrokeType (thick, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
         const float i0 = br * 0.35f, i1 = br - 2.0f;
@@ -127,7 +126,7 @@ namespace frui
     void LookAndFeel::drawPopupMenuBackground (juce::Graphics& g, int w, int h)
     {
         g.fillAll (c::panelTop);
-        g.setColour (c::red.withAlpha (0.5f));
+        g.setColour (frui::accent().withAlpha (0.5f));
         g.drawRect (0, 0, w, h);
     }
 
@@ -144,7 +143,7 @@ namespace frui
 
         if (showTitle && title.isNotEmpty())
         {
-            g.setColour (c::red);
+            g.setColour (frui::accent());
             g.fillRect (r.getX() + 10.0f, r.getY() + 9.0f, 3.0f, 11.0f);
             g.setColour (c::textDim);
             g.setFont (sans (11.0f));
@@ -277,7 +276,7 @@ namespace frui
     void Lcd::paint (juce::Graphics& g)
     {
         auto r = getLocalBounds().toFloat().reduced (0.5f);
-        g.setColour (c::lcdBg);
+        g.setColour (frui::lcdBg());
         g.fillRoundedRectangle (r, 4.0f);
         g.setColour (juce::Colours::black);
         g.drawRoundedRectangle (r, 4.0f, 1.0f);
@@ -289,11 +288,11 @@ namespace frui
         auto inner = r.reduced (4.0f, 0.0f);
         const float arrowW = juce::jmin (16.0f, inner.getWidth() * 0.15f);
         auto left = inner.removeFromLeft (arrowW), right = inner.removeFromRight (arrowW);
-        g.setColour (c::red.withAlpha (0.7f));
+        g.setColour (frui::accent().withAlpha (0.7f));
         g.drawText (juce::CharPointer_UTF8 ("\xe2\x97\x82"), left, juce::Justification::centred, false);
         g.drawText (juce::CharPointer_UTF8 ("\xe2\x96\xb8"), right, juce::Justification::centred, false);
         g.setFont (mono (fs));
-        drawNeon (g, prefix + text, inner, 0.5f, juce::Justification::centred, juce::Colour (0xffff5050));
+        drawNeon (g, prefix + text, inner, 0.5f, juce::Justification::centred, frui::lcdText());
     }
 
     void Lcd::mouseDown (const juce::MouseEvent& e)
@@ -450,7 +449,7 @@ namespace frui
             else if (lane == 1)
                 drawBar (col.withTop (col.getBottom() - col.getHeight() * get ('c', s)), c::green);
             else if (lane == 2)
-                drawBar (col.withTop (col.getBottom() - col.getHeight() * get ('x', s)), c::red);
+                drawBar (col.withTop (col.getBottom() - col.getHeight() * get ('x', s)), frui::accent());
             else
             {
                 const float v = get ('p', s) / 24.0f, mid = col.getCentreY();
@@ -476,7 +475,7 @@ namespace frui
 
             // Crush
             const float cr = get ('x', s);
-            g.setColour (c::red.withAlpha ((0.15f + 0.85f * cr) * dim));
+            g.setColour (frui::accent().withAlpha ((0.15f + 0.85f * cr) * dim));
             g.fillRoundedRectangle (juce::Rectangle<float> (x, crushRow.getY(), w, crushRow.getHeight()), 1.5f);
         }
 
@@ -566,6 +565,7 @@ namespace frui
 FrenchRouletteEditor::FrenchRouletteEditor (FrenchRouletteAudioProcessor& p)
     : juce::AudioProcessorEditor (&p), proc (p)
 {
+    frui::accentRef() = frui::colours::red;
     setLookAndFeel (&laf);
     auto& apvts = proc.apvts;
 
@@ -757,7 +757,7 @@ void FrenchRouletteEditor::paint (juce::Graphics& g)
 
     g.setFont (frui::mono (juce::jlimit (12.0f, 17.0f, (float) logoArea.getHeight() * 0.55f)));
     frui::drawNeon (g, getWidth() < 640 ? "F.ROULETTE" : "FRENCH ROULETTE", logoArea.toFloat(), getWidth() < 640 ? 0.5f : 3.0f,
-                    juce::Justification::left, c::red);
+                    juce::Justification::left, frui::accent());
 
     // Schede: testo rosso e sottolineatura su quella attiva
     for (int i = 0; i < tabs.size(); ++i)
@@ -769,8 +769,8 @@ void FrenchRouletteEditor::paint (juce::Graphics& g)
         g.setFont (frui::sans (narrowTabs ? 10.0f : juce::jlimit (10.0f, 13.0f, b.getHeight() * 0.42f)));
         if (on)
         {
-            frui::drawNeon (g, tabs[i]->getButtonText(), b, tabSpacing, juce::Justification::centred, c::red);
-            g.setColour (c::red);
+            frui::drawNeon (g, tabs[i]->getButtonText(), b, tabSpacing, juce::Justification::centred, frui::accent());
+            g.setColour (frui::accent());
             g.fillRect (b.getX() + 6.0f, b.getBottom() + 1.0f, b.getWidth() - 12.0f, 2.0f);
         }
         else
@@ -782,9 +782,9 @@ void FrenchRouletteEditor::paint (juce::Graphics& g)
 
     // LED
     auto led = ledArea.toFloat();
-    g.setColour (ledOn ? c::red.withAlpha (0.35f) : juce::Colours::transparentBlack);
+    g.setColour (ledOn ? frui::accent().withAlpha (0.35f) : juce::Colours::transparentBlack);
     g.fillEllipse (led.expanded (3.0f));
-    g.setColour (ledOn ? c::red : c::redDim);
+    g.setColour (ledOn ? frui::accent() : frui::accent().darker (2.0f));
     g.fillEllipse (led);
 
 }

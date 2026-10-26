@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <JUCERPROJECT name="JLoop" projectType="guiapp" bundleIdentifier="com.joesb.dawfl"
-              version="0.38.1" companyName="joEsb" id="DwFl01" useAppConfig="0"
+              version="0.39.0" companyName="joEsb" id="DwFl01" useAppConfig="0"
               addUsingNamespaceToJuceHeader="0" cppLanguageStandard="20" defines="JucePlugin_Name=&quot;BassForge&quot;&#10;JUCE_STRICT_REFCOUNTEDPOINTER=1"
               jucerFormatVersion="1">
   <MAINGROUP id="Mg0001" name="JLoop">
@@ -73,6 +73,12 @@
       <FILE id="FrC001" name="FrenchRoulette.cpp" compile="1" resource="0" file="Source/Instruments/FrenchRoulette/FrenchRoulette.cpp"/>
       <FILE id="FrH002" name="FrenchRouletteEditor.h" compile="0" resource="0" file="Source/Instruments/FrenchRoulette/FrenchRouletteEditor.h"/>
       <FILE id="FrC002" name="FrenchRouletteEditor.cpp" compile="1" resource="0" file="Source/Instruments/FrenchRoulette/FrenchRouletteEditor.cpp"/>
+      <FILE id="NeoH01" name="NeonEditor.h" compile="0" resource="0" file="Source/Instruments/Common/NeonEditor.h"/>
+      <FILE id="NeoC01" name="NeonEditor.cpp" compile="1" resource="0" file="Source/Instruments/Common/NeonEditor.cpp"/>
+      <FILE id="MgsH01" name="MegaSaw.h" compile="0" resource="0" file="Source/Instruments/MegaSaw/MegaSaw.h"/>
+      <FILE id="MgsC01" name="MegaSaw.cpp" compile="1" resource="0" file="Source/Instruments/MegaSaw/MegaSaw.cpp"/>
+      <FILE id="MgsH02" name="MegaSawEditor.h" compile="0" resource="0" file="Source/Instruments/MegaSaw/MegaSawEditor.h"/>
+      <FILE id="MgsC02" name="MegaSawEditor.cpp" compile="1" resource="0" file="Source/Instruments/MegaSaw/MegaSawEditor.cpp"/>
       <FILE id="FmH001" name="FMForge.h" compile="0" resource="0" file="Source/Instruments/FMForge/FMForge.h"/>
       <FILE id="FmC001" name="FMForge.cpp" compile="1" resource="0" file="Source/Instruments/FMForge/FMForge.cpp"/>
       <FILE id="FmH002" name="FMForgeEditor.h" compile="0" resource="0" file="Source/Instruments/FMForge/FMForgeEditor.h"/>
@@ -510,7 +516,7 @@
   </MAINGROUP>
   <EXPORTFORMATS>
     <ANDROIDSTUDIO targetFolder="Builds/Android" androidEnableContentSharing="1" androidBluetoothScanNeeded="1" androidBluetoothConnectNeeded="1" smallIcon="IcOn01" bigIcon="IcOn01"
-                   androidVersionCode="43" androidMinimumSDK="24" androidScreenOrientation="landscape"
+                   androidVersionCode="44" androidMinimumSDK="24" androidScreenOrientation="landscape"
                    androidInternetNeeded="0" androidExternalWriteNeeded="0" androidPushNotifications="0"
                    androidReadMediaAudioPermission="0" androidReadMediaImagesPermission="0"
                    androidReadMediaVideoPermission="0">

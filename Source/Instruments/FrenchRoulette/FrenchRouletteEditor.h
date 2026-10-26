@@ -30,7 +30,16 @@ namespace frui
         const juce::Colour track    { 0xff262b31 };
     }
 
+    /** Colore principale dell'interfaccia (rosso per French Roulette; gli altri synth "neon" lo cambiano). */
+    inline juce::Colour& accentRef()    { static juce::Colour a { 0xffff3030 }; return a; }
+    inline juce::Colour accent()        { return accentRef(); }
+    inline juce::Colour lcdBg()         { return accent().withSaturation (0.75f).withBrightness (0.1f); }
+    inline juce::Colour lcdText()       { return accent().brighter (0.25f); }
+
     juce::Font mono (float size, bool bold = true);
+    /** Testo con lettere distanziate; e la versione "al neon" (con alone). */
+    void drawSpaced (juce::Graphics&, const juce::String&, juce::Rectangle<float>, float spacing, juce::Justification);
+    void drawNeon (juce::Graphics&, const juce::String&, juce::Rectangle<float>, float spacing, juce::Justification, juce::Colour);
     juce::Font sans (float size, bool bold = true);
 
     /** Look & feel: manopole con arco rosso luminoso. */
@@ -81,7 +90,7 @@ namespace frui
     class Segment : public juce::Component
     {
     public:
-        Segment (juce::AudioProcessorValueTreeState&, const juce::String& id, juce::StringArray labels = {}, juce::Colour on = colours::red);
+        Segment (juce::AudioProcessorValueTreeState&, const juce::String& id, juce::StringArray labels = {}, juce::Colour on = accent());
         void paint (juce::Graphics&) override;
         void mouseDown (const juce::MouseEvent&) override;
 

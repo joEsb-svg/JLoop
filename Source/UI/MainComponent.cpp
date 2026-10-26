@@ -1,3 +1,4 @@
+#include "../Instruments/Common/NeonEditor.h"
 #include "MainComponent.h"
 #include "Theme.h"
 #include "../Engine/ProjectIO.h"
@@ -1907,8 +1908,12 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
     {
         openSynthPanel (args[i + 1].getIntValue());
         if (args.size() > i + 2)
+        {
             if (auto* pfEditor = dynamic_cast<ForgeEditorBase*> (synthPanel->getEditorForTest()))
                 pfEditor->showTab (args[i + 2].getIntValue());
+            else if (auto* neon = dynamic_cast<NeonEditor*> (synthPanel->getEditorForTest()))
+                neon->showTab (args[i + 2].getIntValue());
+        }
     }
 
     if (args.contains ("--arp-panel") && synthPanel != nullptr && synthPanel->isVisible())   // test: arpeggiatore

@@ -14,7 +14,14 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.38)
+## Stato attuale (v0.39)
+
+**Novita' della 0.39**
+- MegaSaw: synth nuovo (arancione) per supersaw, hoover e reese. Fino a 9 voci stonate e aperte nello stereo,
+  hoover con onda quadra in PWM e "scoop" di intonazione, reese che batte lento; knob grandi SPESSORE e DRIVE,
+  10 preset (Supersaw Anthem, Hoover Rave, Hoover Dutch, Reese Distorto...)
+- Condividi progetto: dal menu, "Condividi progetto..." crea un file .jloop (progetto + campioni importati)
+  da mandare con WhatsApp, mail, Drive...; chi lo riceve lo apre con "Apri progetto da file..."
 
 **0.38.1**: libreria: rullata build-up, fill di batteria, riser 2 e 4 battute, bassi complextro e fidget a colpo
 
