@@ -733,6 +733,68 @@ def _():
     return polish(out, "vox")
 
 
+# ---------------------------------------------------------------- parlato (per il vocoder RoboVox)
+def _consonant(c, seed, f0):
+    """Consonante breve: s (sibilante), t/k/p (esplosive), m/n (nasali), r (vibrata), d/b (esplosive sonore)."""
+    r = rng(seed)
+    if c == "s":
+        d = 0.09; x = bp(noise(d, seed), 4500, 10000) * 1.4
+        return x * adsr(d, 0.015, 0.02, 0.8, rel_start=d - 0.03, rel=0.03)
+    if c in "tkp":
+        d = 0.035; lo, hi = {"t": (3000, 9000), "k": (1200, 3500), "p": (500, 2500)}[c]
+        x = bp(noise(d, seed), lo, hi) * 1.6
+        return np.concatenate([np.zeros(secs(0.02)), x * np.exp(-tt(d) * 70)])
+    if c in "db":
+        d = 0.03; x = bp(noise(d, seed), 300, 2500) * 0.9
+        return x * np.exp(-tt(d) * 90)
+    if c in "mn":
+        d = 0.06; t = tt(d)
+        src = 2 * ((phase_of(np.full(len(t), f0)) / (2 * np.pi)) % 1) - 1
+        return lp(src, 400) * 0.6 * adsr(d, 0.01, 0.02, 0.9, rel_start=d - 0.02, rel=0.02)
+    if c == "r":
+        d = 0.05; t = tt(d)
+        src = 2 * ((phase_of(np.full(len(t), f0)) / (2 * np.pi)) % 1) - 1
+        return lp(src, 1500) * (0.5 + 0.5 * np.sin(2 * np.pi * 28 * t)) * 0.5
+    return np.zeros(1)
+
+
+def _speak(script, bars, f0_note, seed):
+    """script: (battito, consonante, vocali, durata in battiti, semitoni). Voce parlata monotona a 128 BPM."""
+    out = np.zeros(int(bars * 4 * BEAT_128 * SR))
+    for k, (beat, cons, vowels, dur, semi) in enumerate(script):
+        at = beat * BEAT_128
+        f0 = mtof(f0_note + semi)
+        if cons:
+            c = _consonant(cons, seed + k, f0)
+            _place(out, c, at)
+            at += len(c) / SR * (0.6 if cons in "tkpdb" else 0.8)
+        d = max(0.08, dur * BEAT_128 - 0.03)
+        _place(out, vox(list(vowels), d, f0, seed + 50 + k, min(0.12, d * 0.5)), at, 0.9)
+    return out
+
+
+@sound("x_loop_vox_robot", "Parlato robotico (128 BPM)", INSTR, "Loop", root=60, colour=LOOP_COL)
+def _():
+    # due battute di sillabe a ottavi: "ro bo ti co / e lec tro ni co / mu si ca"
+    sy = [("r", "o", 0), ("b", "o", 0), ("t", "i", 0), ("k", "o", -2), (None, "e", 0), ("", "e", 0), ("t", "o", 2), ("n", "i", 0),
+          ("k", "o", -2), ("m", "u", 0), ("s", "i", 0), ("k", "a", -3), ("s", "ia", 0), (None, "o", 0), ("", "", 0), ("s", "i", 2)]
+    script = [(i * 0.5, c, v, 0.42, st) for i, (c, v, st) in enumerate(sy) if v]
+    return polish(_speak(script, 2, 48, 820), "vox")
+
+
+@sound("x_loop_vox_count", "Parlato numeri (128 BPM)", INSTR, "Loop", root=60, colour=LOOP_COL)
+def _():
+    script = [(0.0, "", "u", 0.4, 0), (0.5, "n", "o", 0.45, -1),
+              (1.0, "d", "u", 0.4, 0), (1.5, "", "e", 0.45, -1),
+              (2.0, "t", "e", 0.9, 1),
+              (3.0, "k", "ua", 0.45, 0), (3.5, "t", "o", 0.45, -2),
+              (4.0, "s", "e", 0.4, 0), (4.5, "", "", 0.1, 0), (4.75, "s", "e", 0.25, 0),
+              (5.0, "s", "e", 0.45, 2), (5.5, "t", "e", 0.45, 0),
+              (6.0, "", "o", 0.4, 0), (6.5, "t", "o", 0.45, -2), (7.0, "n", "o", 0.4, 0), (7.5, "", "e", 0.45, -3)]
+    script = [x for x in script if x[2]]
+    return polish(_speak(script, 2, 50, 860), "vox")
+
+
 @sound("x_loop_break", "Loop batteria electro (128 BPM)", INSTR, "Loop", root=60, colour=LOOP_COL)
 def _():
     # Una battuta di batteria electro: kick, snare, clap, hi-hat (si taglia in 16 colpi)

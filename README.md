@@ -14,7 +14,12 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.40)
+## Stato attuale (v0.41)
+
+**Novita' della 0.41**: RoboVox, vocoder (viola). Una voce "parla" attraverso un synth: tieni un accordo
+e la voce lo fa cantare da robot. La voce si sceglie dalla libreria (nuovi "Parlato robotico" e "Parlato numeri"),
+da un file, oppure si registra col microfono (fino a 10 secondi). 8, 16 o 24 bande, sibilanti, gate,
+knob grandi FORMANTE (voce grossa / da cartone) e MIX; 9 preset (Robot Francese, Coro Robotico, Talkbox Funk...)
 
 **Novita' della 0.40**: WubForge, synth nuovo (verde) per i bassi wobble. Quattro forme di LFO (A, B, C, D)
 da disegnare col dito (doppio tocco = forme pronte), ognuna con la sua velocita' a tempo (1/4, 1/8, 1/8T, 1/16...);

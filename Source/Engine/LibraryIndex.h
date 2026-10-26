@@ -322,6 +322,8 @@ namespace LibraryIndex
         { "fx_vinyl", "Fruscio vinile", "Strumenti", "FX", "fx_vinyl_ogg", 60, false, 0.150f, 0xff8b7d6bu },
         { "fx_tape_stop", "Tape stop", "Strumenti", "FX", "fx_tape_stop_ogg", 60, false, 0.150f, 0xff9c8a6cu },
         { "x_loop_vox_phrase", "Loop voce (128 BPM)", "Strumenti", "Loop", "x_loop_vox_phrase_ogg", 60, false, 0.150f, 0xffe8c35au },
+        { "x_loop_vox_robot", "Parlato robotico (128 BPM)", "Strumenti", "Loop", "x_loop_vox_robot_ogg", 60, false, 0.150f, 0xffe8c35au },
+        { "x_loop_vox_count", "Parlato numeri (128 BPM)", "Strumenti", "Loop", "x_loop_vox_count_ogg", 60, false, 0.150f, 0xffe8c35au },
         { "x_loop_break", "Loop batteria electro (128 BPM)", "Strumenti", "Loop", "x_loop_break_ogg", 60, false, 0.150f, 0xffe8c35au },
         { "x_loop_snare_roll", "Rullata build-up 2 battute (128 BPM)", "Strumenti", "Loop", "x_loop_snare_roll_ogg", 60, false, 0.150f, 0xffe8c35au },
         { "x_loop_fill", "Fill di batteria 1 battuta (128 BPM)", "Strumenti", "Loop", "x_loop_fill_ogg", 60, false, 0.150f, 0xffe8c35au },

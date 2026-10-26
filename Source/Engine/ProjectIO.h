@@ -333,10 +333,10 @@ namespace ProjectIO
                     const auto kind = o.getProperty ("instrument", "bassforge").toString();
                     engine.makeInstrumentChannel (c, kind, kind == "polyforge" ? "PolyForge" : kind == "fmforge" ? "FMForge"
                                                          : kind == "drumforge" ? "DrumForge" : kind == "frenchroulette" ? "French Roulette"
-                                                         : kind == "slicer" ? "Slicer" : kind == "megasaw" ? "MegaSaw" : kind == "wubforge" ? "WubForge" : "BassForge",
+                                                         : kind == "slicer" ? "Slicer" : kind == "megasaw" ? "MegaSaw" : kind == "wubforge" ? "WubForge" : kind == "robovox" ? "RoboVox" : "BassForge",
                                                   kind == "polyforge" ? 0xffb07cffu : kind == "fmforge" ? 0xff7dffb0u
                                                          : kind == "drumforge" ? 0xffff6b5bu : kind == "frenchroulette" ? 0xffff3a3au
-                                                         : kind == "slicer" ? 0xffe8c35au : kind == "megasaw" ? 0xffffb020u : kind == "wubforge" ? 0xff8cff3au : SequencerEngine::synthColour);
+                                                         : kind == "slicer" ? 0xffe8c35au : kind == "megasaw" ? 0xffffb020u : kind == "wubforge" ? 0xff8cff3au : kind == "robovox" ? 0xffc46bffu : SequencerEngine::synthColour);
                     ch.stepNote.store (kind == "drumforge" ? 36 : SequencerEngine::synthStepNote);
                     ch.instrumentId = (int) o.getProperty ("instrumentId", 0);
                     ch.pendingState = o.getProperty ("state", {}).toString();   // lo applica la UI (Instruments::Host)

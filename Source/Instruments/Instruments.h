@@ -13,6 +13,7 @@
 #include "Slicer/Slicer.h"
 #include "MegaSaw/MegaSaw.h"
 #include "WubForge/WubForge.h"
+#include "RoboVox/RoboVox.h"
 
 //==============================================================================
 /**
@@ -42,6 +43,7 @@ namespace Instruments
             { "frenchroulette", "French Roulette", "Bassi choppati, lead distorti, step matrix", 0xffff3a3a },
             { "megasaw", "MegaSaw", "Supersaw, hoover e reese: lead enormi e bassi rave", 0xffffb020 },
             { "wubforge", "WubForge", "Wobble: LFO disegnabili, vocali, growl (dubstep, brostep)", 0xff8cff3a },
+            { "robovox", "RoboVox", "Vocoder: una voce fa cantare i tuoi accordi da robot", 0xffc46bff },
             { "slicer", "Slicer", "Taglia loop e voci sui colpi: un pezzo per tasto (vocal chop)", 0xffe8c35a },
         };
         return infos;
@@ -70,6 +72,7 @@ namespace Instruments
         if (id == "slicer") return std::make_unique<SlicerAudioProcessor>();
         if (id == "megasaw") return std::make_unique<MegaSawAudioProcessor>();
         if (id == "wubforge") return std::make_unique<WubForgeAudioProcessor>();
+        if (id == "robovox") return std::make_unique<RoboVoxAudioProcessor>();
         return std::make_unique<BassForgeAudioProcessor>();
     }
 
@@ -95,6 +98,8 @@ namespace Instruments
             for (int i = 0; i < ms::Presets::numFactory(); ++i) names.add (ms::Presets::factoryName (i));
         else if (dynamic_cast<WubForgeAudioProcessor*> (p) != nullptr)
             for (int i = 0; i < wf::Presets::numFactory(); ++i) names.add (wf::Presets::factoryName (i));
+        else if (dynamic_cast<RoboVoxAudioProcessor*> (p) != nullptr)
+            for (int i = 0; i < rv::Presets::numFactory(); ++i) names.add (rv::Presets::factoryName (i));
         return names;
     }
 
@@ -108,6 +113,7 @@ namespace Instruments
         if (auto* sl = dynamic_cast<SlicerAudioProcessor*> (p))  sl->getPresets().loadFactory (index);
         if (auto* mg = dynamic_cast<MegaSawAudioProcessor*> (p))  mg->getPresets().loadFactory (index);
         if (auto* wb = dynamic_cast<WubForgeAudioProcessor*> (p))  wb->getPresets().loadFactory (index);
+        if (auto* rx = dynamic_cast<RoboVoxAudioProcessor*> (p))  rx->getPresets().loadFactory (index);
     }
 
     inline juce::Array<juce::File> userPresets (juce::AudioProcessor* p)
@@ -120,6 +126,7 @@ namespace Instruments
         if (auto* sl = dynamic_cast<SlicerAudioProcessor*> (p))  return sl->getPresets().userPresets();
         if (auto* mg = dynamic_cast<MegaSawAudioProcessor*> (p))  return mg->getPresets().userPresets();
         if (auto* wb = dynamic_cast<WubForgeAudioProcessor*> (p))  return wb->getPresets().userPresets();
+        if (auto* rx = dynamic_cast<RoboVoxAudioProcessor*> (p))  return rx->getPresets().userPresets();
         return {};
     }
 
@@ -133,6 +140,7 @@ namespace Instruments
         if (auto* sl = dynamic_cast<SlicerAudioProcessor*> (p))  sl->getPresets().load (file);
         if (auto* mg = dynamic_cast<MegaSawAudioProcessor*> (p))  mg->getPresets().load (file);
         if (auto* wb = dynamic_cast<WubForgeAudioProcessor*> (p))  wb->getPresets().load (file);
+        if (auto* rx = dynamic_cast<RoboVoxAudioProcessor*> (p))  rx->getPresets().load (file);
     }
 
     inline bool saveUser (juce::AudioProcessor* p, const juce::String& name)
@@ -145,6 +153,7 @@ namespace Instruments
         if (auto* sl = dynamic_cast<SlicerAudioProcessor*> (p))  return sl->getPresets().save (name);
         if (auto* mg = dynamic_cast<MegaSawAudioProcessor*> (p))  return mg->getPresets().save (name);
         if (auto* wb = dynamic_cast<WubForgeAudioProcessor*> (p))  return wb->getPresets().save (name);
+        if (auto* rx = dynamic_cast<RoboVoxAudioProcessor*> (p))  return rx->getPresets().save (name);
         return false;
     }
 
@@ -158,6 +167,7 @@ namespace Instruments
         if (auto* sl = dynamic_cast<SlicerAudioProcessor*> (p))  return sl->getPresets().currentName();
         if (auto* mg = dynamic_cast<MegaSawAudioProcessor*> (p))  return mg->getPresets().currentName();
         if (auto* wb = dynamic_cast<WubForgeAudioProcessor*> (p))  return wb->getPresets().currentName();
+        if (auto* rx = dynamic_cast<RoboVoxAudioProcessor*> (p))  return rx->getPresets().currentName();
         return "Synth";
     }
 
