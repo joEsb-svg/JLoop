@@ -1,7 +1,7 @@
 #include "FMForgeEditor.h"
 
-namespace col = bf::ui::col;
-static const juce::Colour fmAccent { 0xff7dffb0 };
+static const juce::Colour fmAccent { 0xff5fffc0 };
+static const juce::Colour fmOrange { 0xffff9a3c };
 
 //==============================================================================
 /** Disegno dell'algoritmo: gli operatori come blocchi, chi modula chi, le uscite in basso. */
@@ -24,9 +24,9 @@ public:
     void paint (juce::Graphics& g) override
     {
         auto r = getLocalBounds().toFloat().reduced (2.0f);
-        g.setColour (col::bg);
+        g.setColour (juce::Colour (0xff06090b));
         g.fillRoundedRectangle (r, 6.0f);
-        g.setColour (col::edge);
+        g.setColour (juce::Colours::black);
         g.drawRoundedRectangle (r, 6.0f, 1.0f);
 
         const auto& alg = fm::algorithm ((int) value ("algo"));
@@ -41,7 +41,7 @@ public:
         int maxDepth = 0;
         for (int d : depth) maxDepth = juce::jmax (maxDepth, d);
 
-        auto area = r.reduced (12.0f, 14.0f).withTrimmedBottom (14.0f);
+        auto area = r.reduced (12.0f, 14.0f).withTrimmedBottom (14.0f).withTrimmedTop (10.0f);
         const float boxW = juce::jmin (56.0f, area.getWidth() / 5.0f), boxH = juce::jmin (38.0f, area.getHeight() / (float) (maxDepth + 2));
         const float rowStep = maxDepth > 0 ? (area.getHeight() - boxH) / (float) maxDepth : 0.0f;
 
@@ -82,7 +82,7 @@ public:
         };
 
         // Collegamenti
-        g.setColour (col::textDim);
+        g.setColour (fmAccent.withAlpha (0.5f));
         for (int t = 0; t < fm::numOps; ++t)
             for (int m = 0; m < fm::numOps; ++m)
                 if ((alg.modulators[(size_t) t] >> m) & 1)
@@ -95,10 +95,10 @@ public:
         for (int o = 0; o < fm::numOps; ++o)
             if ((alg.carriers >> o) & 1)
             {
-                g.setColour (col::cyan.withAlpha (0.7f));
+                g.setColour (fmAccent.withAlpha (0.6f));
                 g.drawLine (x[o], box (o).getBottom(), x[o], outY - 2.0f, 1.6f);
             }
-        g.setColour (col::cyan.withAlpha (0.7f));
+        g.setColour (fmAccent.withAlpha (0.6f));
         g.drawLine (area.getX(), outY, area.getRight(), outY, 1.6f);
 
         // Feedback dell'operatore 4
@@ -109,7 +109,7 @@ public:
             loop.startNewSubPath (b.getRight(), b.getCentreY());
             loop.cubicTo (b.getRight() + 16.0f, b.getCentreY(), b.getRight() + 16.0f, b.getY() - 12.0f, b.getCentreX(), b.getY() - 10.0f);
             loop.lineTo (b.getCentreX(), b.getY());
-            g.setColour (col::orange);
+            g.setColour (fmOrange);
             g.strokePath (loop, juce::PathStrokeType (1.5f));
         }
 
@@ -118,26 +118,28 @@ public:
         {
             const auto b = box (o);
             const bool carrier = (alg.carriers >> o) & 1;
-            const auto c = carrier ? col::cyan : col::orange;
+            const auto c = carrier ? fmAccent : fmOrange;
             const float level = value (fm::opId (o, "Level"));
-            g.setColour (col::panelHi);
+            g.setColour (juce::Colour (0xff081210));
             g.fillRoundedRectangle (b, 5.0f);
-            g.setColour (c.withAlpha (0.25f + 0.75f * level));
-            g.drawRoundedRectangle (b, 5.0f, 2.0f);
+            g.setColour (c.withAlpha (0.12f + 0.25f * level));
+            g.drawRoundedRectangle (b.expanded (1.5f), 6.0f, 4.0f);   // alone
+            g.setColour (c.withAlpha (0.35f + 0.65f * level));
+            g.drawRoundedRectangle (b, 5.0f, 1.8f);
             g.fillRect (b.withTrimmedTop (b.getHeight() - 3.0f).withWidth (b.getWidth() * level).reduced (3.0f, 0.0f));
 
-            g.setColour (col::text);
-            g.setFont (juce::Font (juce::FontOptions (juce::jmin (15.0f, boxH * 0.42f), juce::Font::bold)));
+            g.setColour (c);
+            g.setFont (frui::sans (juce::jmin (15.0f, boxH * 0.42f)));
             g.drawText (juce::String (o + 1), b.withTrimmedBottom (b.getHeight() * 0.42f), juce::Justification::centred);
-            g.setColour (col::textDim);
-            g.setFont (juce::Font (juce::FontOptions (juce::jmin (11.0f, boxH * 0.3f))));
+            g.setColour (frui::colours::textDim);
+            g.setFont (frui::mono (juce::jmin (11.0f, boxH * 0.3f), false));
             g.drawText (juce::String (juce::CharPointer_UTF8 ("\xc3\x97")) + fm::ratioNames()[(int) value (fm::opId (o, "Ratio"))],
                         b.withTrimmedTop (b.getHeight() * 0.5f), juce::Justification::centred);
         }
 
-        g.setColour (col::textDim);
-        g.setFont (juce::Font (juce::FontOptions (11.0f)));
-        g.drawText ("azzurro = esce (portante)   arancio = modula", r.reduced (8.0f, 3.0f), juce::Justification::topLeft);
+        g.setColour (frui::colours::textDim);
+        g.setFont (frui::sans (10.0f, false));
+        g.drawText ("verde = suona   arancio = modula", r.reduced (8.0f, 3.0f), juce::Justification::topLeft);
     }
 
 private:
@@ -153,57 +155,58 @@ private:
 
 //==============================================================================
 FMForgeEditor::FMForgeEditor (FMForgeAudioProcessor& p)
-    : ForgeEditorBase (p, p.apvts, "FM", "FORGE", fmAccent, { "ALGO", "OP1", "OP2", "OP3", "OP4", "FX" })
+    : NeonEditor (p, p.apvts, "FMForge", fmAccent, { "ALGO", "OP 1", "OP 2", "OP 3", "OP 4", "FX" },
+                  { "bright", "TIMBRO", "QUANTO FM", {} },
+                  { "tone", "TONO", "BRILLANTEZZA", {} })
 {
     // --- Algoritmo e voce
-    auto& a = addSection (0, "Algoritmo", 2.0f);
-    combo (a, "algo", "Algoritmo");
-    knob (a, "feedback", "Feedback");
-    knob (a, "bright", "Timbro");
-    knob (a, "tone", "Tono");
-    auto view = std::make_unique<AlgorithmView> (p.apvts);
-    algoView = view.get();
-    setView (a, std::move (view), 0.55f);
+    auto& a = section (0, "ALGORITMO", 1.6f, 1);
+    auto v0 = std::make_unique<AlgorithmView> (p.apvts);
+    algoView = v0.get();
+    view (a, std::move (v0), 0.58f);
+    a.viewLeft = true;
+    choice (a, "algo", "ALG ");
+    knob (a, "feedback", "FEEDBACK");
 
-    auto& v = addSection (0, "Voce", 0.6f);
-    combo (v, "mode", "Modo");
-    knob (v, "glide", "Glide");
+    auto& v = section (0, "VOCE", 0.7f, 1);
+    choice (v, "mode");
+    knob (v, "glide", "GLIDE");
 
     // --- Operatori
     for (int o = 0; o < fm::numOps; ++o)
     {
-        auto& op = addSection (1 + o, "Operatore " + juce::String (o + 1), 1.0f);
-        combo (op, fm::opId (o, "Ratio"), "Rapporto");
-        knob (op, fm::opId (o, "Fine"), "Fine");
-        knob (op, fm::opId (o, "Level"), "Livello");
-        knob (op, fm::opId (o, "Vel"), "Velocity");
+        auto& op = section (1 + o, "OPERATORE " + juce::String (o + 1), 0.9f, 3);
+        choice (op, fm::opId (o, "Ratio"), "RAPPORTO x");
+        knob (op, fm::opId (o, "Fine"), "FINE");
+        knob (op, fm::opId (o, "Level"), "LIVELLO");
+        knob (op, fm::opId (o, "Vel"), "VELOCITY");
 
-        auto& e = addSection (1 + o, "Inviluppo operatore " + juce::String (o + 1), 1.6f);
-        knob (e, fm::opId (o, "A"), "Attacco");
-        knob (e, fm::opId (o, "D"), "Decay");
-        knob (e, fm::opId (o, "S"), "Sustain");
-        knob (e, fm::opId (o, "R"), "Rilascio");
-        adsr (e, fm::opId (o, "A"), fm::opId (o, "D"), fm::opId (o, "S"), fm::opId (o, "R"), col::cyan);
+        auto& e = section (1 + o, "INVILUPPO OPERATORE " + juce::String (o + 1), 1.4f, 4);
+        adsr (e, fm::opId (o, "A"), fm::opId (o, "D"), fm::opId (o, "S"), fm::opId (o, "R"));
+        knob (e, fm::opId (o, "A"), "ATTACCO");
+        knob (e, fm::opId (o, "D"), "DECAY");
+        knob (e, fm::opId (o, "S"), "SUSTAIN");
+        knob (e, fm::opId (o, "R"), "RILASCIO");
     }
 
     // --- LFO ed effetti
-    auto& l = addSection (5, "LFO", 1.0f);
-    combo (l, "lfoWave", "Forma");
-    knob (l, "lfoRate", "Velocita'");
-    toggle (l, "lfoSync", "A tempo");
-    combo (l, "lfoDiv", "Divisione");
-    knob (l, "lfoVib", "Vibrato");
-    knob (l, "lfoTrem", "Tremolo");
-    knob (l, "lfoBright", "Timbro");
+    auto& l = section (5, "LFO", 1.0f, 3);
+    choice (l, "lfoWave", "FORMA: ");
+    choice (l, "lfoSync", "A TEMPO");
+    choice (l, "lfoDiv", "DIVISIONE: ");
+    knob (l, "lfoRate", "VELOCITA'");
+    knob (l, "lfoVib", "VIBRATO");
+    knob (l, "lfoTrem", "TREMOLO");
+    knob (l, "lfoBright", "TIMBRO");
 
-    auto& fx = addSection (5, "Effetti", 1.3f);
-    knob (fx, "chorus", "Chorus");
-    knob (fx, "dlyMix", "Delay");
-    combo (fx, "dlyTime", "Tempo");
-    knob (fx, "dlyFb", "Feedback");
-    knob (fx, "revMix", "Riverbero");
-    knob (fx, "revSize", "Stanza");
-    knob (fx, "master", "Volume");
+    auto& fx = section (5, "EFFETTI", 1.2f, 4);
+    choice (fx, "dlyTime", "DELAY ");
+    knob (fx, "chorus", "CHORUS");
+    knob (fx, "dlyMix", "DELAY");
+    knob (fx, "dlyFb", "FEEDBACK");
+    knob (fx, "revMix", "RIVERBERO");
+    knob (fx, "revSize", "STANZA");
+    knob (fx, "master", "VOLUME");
 
     showTab (0);
 }

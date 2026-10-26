@@ -2,6 +2,64 @@
 
 namespace ui = bf::ui;
 
+//==============================================================================
+BassForgeAudioProcessorEditor::MacroKnob::MacroKnob(juce::AudioProcessorValueTreeState& s, int index) : apvts(s), macro(index)
+{
+    slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+    slider.setRotaryParameters(juce::MathConstants<float>::pi * 1.25f, juce::MathConstants<float>::pi * 2.75f, true);
+    slider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    addAndMakeVisible(slider);
+    attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, bf::ids::macro(index), slider);
+    refresh();
+}
+
+void BassForgeAudioProcessorEditor::MacroKnob::refresh()
+{
+    // Dove va questa macro: le connessioni della matrice che partono da lei
+    juce::StringArray dests;
+    for (int i = 0; i < bf::kNumSlots; ++i)
+    {
+        const int src = (int) apvts.getRawParameterValue(bf::ids::slot(i, "src"))->load();
+        const float amt = apvts.getRawParameterValue(bf::ids::slot(i, "amt"))->load();
+        const int dst = (int) apvts.getRawParameterValue(bf::ids::slot(i, "dst"))->load();
+        if (src == bf::SrcMacro1 + macro && std::abs(amt) > 0.001f && dst > bf::DstNone)
+            dests.addIfNotAlreadyThere(juce::String(bf::modDestName(dst)).toUpperCase());
+    }
+    const auto text = dests.isEmpty() ? juce::String("LIBERA (VEDI MOD)")
+                    : juce::String(juce::CharPointer_UTF8("\xe2\x86\x92 ")) + dests[0] + (dests.size() > 1 ? " +" + juce::String(dests.size() - 1) : juce::String());
+    if (text != caption) { caption = text; repaint(); }
+}
+
+void BassForgeAudioProcessorEditor::MacroKnob::resized()
+{
+    auto r = getLocalBounds().reduced(6);
+    captionArea = r.removeFromBottom(juce::jlimit(16, 22, r.getHeight() / 7)).withSizeKeepingCentre(juce::jmin(r.getWidth(), 150), juce::jlimit(16, 22, r.getHeight() / 7));
+    r.removeFromBottom(3);
+    nameArea = r.removeFromBottom(16);
+    slider.setBounds(r);
+}
+
+void BassForgeAudioProcessorEditor::MacroKnob::paint(juce::Graphics& g)
+{
+    auto r = getLocalBounds().toFloat().reduced(1.0f);
+    g.setGradientFill(juce::ColourGradient(juce::Colour(0xff1b1e22), 0.0f, r.getY(), juce::Colour(0xff14171a), 0.0f, r.getBottom(), false));
+    g.fillRoundedRectangle(r, 9.0f);
+    g.setColour(ui::col::edge);
+    g.drawRoundedRectangle(r, 9.0f, 1.0f);
+    g.setColour(ui::col::textDim);
+    g.setFont(ui::spacedFont(11.0f));
+    g.drawText("MACRO " + juce::String(macro + 1), nameArea, juce::Justification::centred, false);
+    auto c = captionArea.toFloat();
+    g.setColour(ui::col::lcdBg);
+    g.fillRoundedRectangle(c, 4.0f);
+    g.setColour(ui::col::edge);
+    g.drawRoundedRectangle(c, 4.0f, 1.0f);
+    g.setFont(ui::monoFont(juce::jlimit(9.0f, 12.0f, c.getHeight() * 0.6f)));
+    ui::drawGlowText(g, caption, captionArea, juce::Justification::centred, ui::col::cyan.brighter(0.2f));
+}
+
+//==============================================================================
+
 BassForgeAudioProcessorEditor::BassForgeAudioProcessorEditor(BassForgeAudioProcessor& p)
     : juce::AudioProcessorEditor(&p), proc(p),
       ring(p.apvts, p.getModMonitor()),
@@ -11,7 +69,8 @@ BassForgeAudioProcessorEditor::BassForgeAudioProcessorEditor(BassForgeAudioProce
       oscPage(p.apvts, ring, p.getWavetables(), p.getModMonitor()),
       filterPage(p.apvts, ring),
       modPage(p.apvts, ring, p.getPerformers()),
-      fxPage(p.apvts, ring)
+      fxPage(p.apvts, ring),
+      macroKnobs { MacroKnob(p.apvts, 0), MacroKnob(p.apvts, 1) }
 {
     setLookAndFeel(&laf);
 
@@ -35,6 +94,7 @@ BassForgeAudioProcessorEditor::BassForgeAudioProcessorEditor(BassForgeAudioProce
     limiterAtt = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(p.apvts, bf::ids::masterLimiter, limiterBtn);
     addAndMakeVisible(limiterBtn);
     addAndMakeVisible(presetBar);
+    for (auto& m : macroKnobs) addChildComponent(m);
 
     pages[0] = &oscPage; pages[1] = &filterPage; pages[2] = &modPage; pages[3] = &fxPage;
     for (auto* pg : pages) addChildComponent(*pg);
@@ -59,6 +119,16 @@ BassForgeAudioProcessorEditor::~BassForgeAudioProcessorEditor()
 void BassForgeAudioProcessorEditor::timerCallback()
 {
     ring.update();
+    if (++refreshCounter >= 15)
+    {
+        refreshCounter = 0;
+        for (auto& m : macroKnobs) if (m.isVisible()) m.refresh();
+    }
+}
+
+bool BassForgeAudioProcessorEditor::macrosShown() const
+{
+    return compact && getWidth() >= 640 && getWidth() > getHeight();
 }
 
 void BassForgeAudioProcessorEditor::showPage(int index)
@@ -110,18 +180,13 @@ void BassForgeAudioProcessorEditor::paint(juce::Graphics& g)
     {
         g.fillAll(ui::col::bg);
         auto head = getLocalBounds().removeFromTop(compactHeaderHeight());
-        g.setGradientFill(juce::ColourGradient(ui::col::panelHi, 0.0f, 0.0f, ui::col::bg, 0.0f, (float) head.getHeight(), false));
+        g.setGradientFill(juce::ColourGradient(juce::Colour(0xff17191c), 0.0f, 0.0f, juce::Colour(0xff101215), 0.0f, (float) head.getHeight(), false));
         g.fillRect(head);
         g.setColour(ui::col::edge);
         g.drawHorizontalLine(head.getBottom() - 1, 0.0f, (float) getWidth());
-        auto logo = head.removeFromTop(38).withWidth(118).translated(10, 0);
-        g.setFont(juce::Font(juce::FontOptions(18.0f, juce::Font::bold)));
-        g.setColour(ui::col::text);
-        g.drawText("BASS", logo, juce::Justification::centredLeft);
-        g.setColour(ui::col::cyan);
-        g.drawText("FORGE", logo.withTrimmedLeft(50), juce::Justification::centredLeft);
-        g.setColour(ui::col::orange);
-        g.fillRoundedRectangle((float) logo.getX(), (float) logo.getBottom() - 8.0f, 106.0f, 2.0f, 1.0f);
+        auto logo = head.removeFromTop(38).withWidth(124).translated(10, 0);
+        g.setFont(juce::Font(juce::FontOptions(16.0f, juce::Font::bold).withKerningFactor(0.18f)));
+        ui::drawGlowText(g, "BASSFORGE", logo, juce::Justification::centredLeft, ui::col::cyan);
         return;
     }
 
@@ -169,10 +234,20 @@ void BassForgeAudioProcessorEditor::resized()
 
         if (presetBar.isVisible())
             presetBar.setBounds(b.removeFromTop(32).reduced(8, 2).withWidth(juce::jmin(500, b.getWidth() - 16)));
+        const bool macros = macrosShown();
+        for (auto& m : macroKnobs) m.setVisible(macros);
+        if (macros)
+        {
+            // colonna a destra: le due macro grandi (come i knob grandi degli altri synth neon)
+            auto side = b.removeFromRight(juce::jlimit(120, 180, b.getWidth() / 6)).reduced(4, 6);
+            macroKnobs[0].setBounds(side.removeFromTop(side.getHeight() / 2).reduced(0, 2));
+            macroKnobs[1].setBounds(side.reduced(0, 2));
+        }
         for (auto* pg : pages) pg->setBounds(b);
         return;
     }
     masterLabel.setVisible(true);
+    for (auto& m : macroKnobs) m.setVisible(false);
 
     auto b = getLocalBounds();
     auto head = b.removeFromTop(getHeight() / 11);

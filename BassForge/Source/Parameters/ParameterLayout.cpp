@@ -193,7 +193,7 @@ Layout createParameterLayout()
     // Default utili: Env2 -> F1 cutoff, LFO1 -> F1 cutoff, Macro1 -> F1 cutoff, Macro2 -> Osc1 WT
     const int defSrc[kNumSlots] = { SrcEnv2, SrcLfo1, SrcMacro1, SrcMacro1 + 1 };
     const int defDst[kNumSlots] = { DstF1Cutoff, DstF1Cutoff, DstF1Cutoff, DstOsc1Wt };
-    const float defAmt[kNumSlots] = { 0.4f };
+    const float defAmt[kNumSlots] = { 0.4f, 0.0f, 0.5f, 0.5f };   // le macro 1 e 2 (a 0 non cambiano il suono) sono gia' collegate
     for (int i = 0; i < kNumSlots; ++i)
     {
         const auto n = "Mod " + juce::String(i + 1) + " ";

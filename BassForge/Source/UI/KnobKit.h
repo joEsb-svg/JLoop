@@ -10,9 +10,11 @@ namespace bf::ui
         ParamKnob(Apvts& apvts, const juce::String& paramId, const juce::String& title,
                   ModRingModel* ring = nullptr, int dest = DstNone, ModMapper mapper = {})
         {
-            name.setText(title, juce::dontSendNotification);
+            name.setText(title.toUpperCase(), juce::dontSendNotification);
             name.setJustificationType(juce::Justification::centred);
             name.setColour(juce::Label::textColourId, col::textDim);
+            name.setFont(spacedFont(10.0f));
+            name.setMinimumHorizontalScale(0.6f);
             name.setInterceptsMouseClicks(false, false);
             addAndMakeVisible(name);
 
@@ -33,11 +35,18 @@ namespace bf::ui
             slider.setBounds(b);
         }
 
+        /** Il riquadro del valore si crea col look & feel di chi lo contiene (quando entra nell'editor). */
+        void parentHierarchyChanged() override
+        {
+            if (&slider.getLookAndFeel() != lastLaf) { lastLaf = &slider.getLookAndFeel(); slider.sendLookAndFeelChange(); }
+        }
+
         ModSlider slider;
 
     private:
         juce::Label name;
         std::unique_ptr<Apvts::SliderAttachment> attachment;
+        juce::LookAndFeel* lastLaf = nullptr;
     };
 
     /** Interruttore a LED collegato a un parametro bool (ButtonAttachment). */
@@ -64,9 +73,10 @@ namespace bf::ui
     public:
         ParamCombo(Apvts& apvts, const juce::String& paramId, const juce::String& title)
         {
-            name.setText(title, juce::dontSendNotification);
+            name.setText(title.toUpperCase(), juce::dontSendNotification);
             name.setJustificationType(juce::Justification::centredLeft);
             name.setColour(juce::Label::textColourId, col::textDim);
+            name.setFont(spacedFont(10.0f));
             name.setInterceptsMouseClicks(false, false);
             addAndMakeVisible(name);
             if (auto* p = dynamic_cast<juce::AudioParameterChoice*>(apvts.getParameter(paramId)))
@@ -119,15 +129,17 @@ namespace bf::ui
         void paint(juce::Graphics& g) override
         {
             auto r = getLocalBounds().toFloat().reduced(1.0f);
-            g.setColour(col::panel);
-            g.fillRoundedRectangle(r, 10.0f);
+            g.setGradientFill(juce::ColourGradient(juce::Colour(0xff1b1e22), 0.0f, r.getY(), juce::Colour(0xff14171a), 0.0f, r.getBottom(), false));
+            g.fillRoundedRectangle(r, 9.0f);
             g.setColour(col::edge);
-            g.drawRoundedRectangle(r, 10.0f, 1.0f);
+            g.drawRoundedRectangle(r, 9.0f, 1.0f);
+            g.setColour(juce::Colours::white.withAlpha(0.04f));
+            g.drawHorizontalLine((int) r.getY() + 1, r.getX() + 8.0f, r.getRight() - 8.0f);
             g.setColour(col::cyan);
-            g.fillRoundedRectangle(r.getX() + 12.0f, r.getY() + 10.0f, 3.0f, 12.0f, 1.5f);
-            g.setColour(col::text);
-            g.setFont(juce::Font(juce::FontOptions(13.0f, juce::Font::bold)));
-            g.drawText(title.toUpperCase(), (int) r.getX() + 20, (int) r.getY() + 6, getWidth() - 40, 20, juce::Justification::centredLeft);
+            g.fillRect(r.getX() + 12.0f, r.getY() + 10.0f, 3.0f, 12.0f);
+            g.setColour(col::textDim);
+            g.setFont(spacedFont(11.0f));
+            g.drawText(title.toUpperCase(), (int) r.getX() + 22, (int) r.getY() + 6, getWidth() - 40, 20, juce::Justification::centredLeft);
         }
 
     private:

@@ -106,6 +106,7 @@ namespace pf
         pct (ids::revMix, "Riverbero", 0.0f);
         pct (ids::revSize, "Stanza", 0.6f);
         flt (ids::master, "Volume", -24.0f, 6.0f, 0.0f, -1.0f, "dB");
+        pct (ids::space, "Spazio", 0.0f);
 
         return { p.begin(), p.end() };
     }
@@ -758,6 +759,12 @@ pf::BlockParams PolyForgeAudioProcessor::readParams()
     p.mode = (int) raw (mode); p.glide = raw (glide);
     p.chorus = raw (chorus); p.dlyMix = raw (dlyMix); p.dlyTime = (int) raw (dlyTime); p.dlyFb = raw (dlyFb);
     p.revMix = raw (revMix); p.revSize = raw (revSize);
+    if (const float sp = raw (space); sp > 0.0f)   // SPAZIO: aggiunge riverbero (anche piu' grande) e un po' di delay
+    {
+        p.revMix = juce::jmin (1.0f, p.revMix + sp * 0.55f);
+        p.revSize = juce::jmin (1.0f, p.revSize + sp * 0.3f);
+        p.dlyMix = juce::jmin (1.0f, p.dlyMix + sp * 0.25f);
+    }
     p.master = juce::Decibels::decibelsToGain (raw (master));
     return p;
 }

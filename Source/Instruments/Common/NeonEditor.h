@@ -31,6 +31,7 @@ protected:
         juce::Component* view = nullptr;
         float viewShare = 0.4f, weight = 1.0f, rowWeight = 1.0f;
         int columns = 0, row = 0;
+        bool viewLeft = false;   // disegno a sinistra dei controlli (invece che sopra)
     };
 
     /** Un pannello nella scheda 'tab'. I pannelli della stessa riga stanno affiancati, le righe una sotto l'altra
@@ -40,6 +41,24 @@ protected:
     void segment (Section&, const juce::String& id, juce::StringArray labels = {});
     void lcd (Section&, const juce::String& id, const juce::String& prefix = {});
     juce::Component& view (Section&, std::unique_ptr<juce::Component>, float share = 0.4f);
+    /** Scelta: segmenti se le voci sono poche e corte, altrimenti display ◂ ▸. */
+    void choice (Section&, const juce::String& id, const juce::String& prefix = {});
+    /** Disegno di un inviluppo ADSR (letto dai parametri), come vista del pannello. */
+    void adsr (Section&, const juce::String& a, const juce::String& d, const juce::String& s, const juce::String& r, float share = 0.4f);
+
+    /** Disegno ADSR a neon. */
+    class AdsrView : public juce::Component
+    {
+    public:
+        AdsrView (juce::AudioProcessorValueTreeState&, juce::StringArray ids);
+        void paint (juce::Graphics&) override;
+        void refresh();
+    private:
+        float value (int i) const;
+        juce::AudioProcessorValueTreeState& apvts;
+        juce::StringArray ids;
+        juce::uint64 shown = 0;
+    };
 
     /** 15 volte al secondo: le viste che dipendono dai parametri si ridisegnano. */
     virtual void refreshViews() {}
@@ -48,7 +67,8 @@ protected:
     juce::Colour accent;
 
 private:
-    void timerCallback() override       { refreshViews(); }
+    void timerCallback() override       { for (auto* a : adsrViews) if (a->isShowing()) a->refresh(); refreshViews(); }
+    std::vector<AdsrView*> adsrViews;
     void layoutSection (Section&);
 
     frui::LookAndFeel laf;

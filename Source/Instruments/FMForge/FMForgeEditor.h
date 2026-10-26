@@ -2,14 +2,14 @@
 
 #include <JuceHeader.h>
 #include "FMForge.h"
-#include "../Common/ForgeEditorBase.h"
+#include "../Common/NeonEditor.h"
 
 //==============================================================================
 /**
-    Interfaccia di FMForge: ALGO (disegno dell'algoritmo, timbro, tono, voce),
-    OP 1..4 (rapporto, livello, velocity, inviluppo), LFO/FX.
+    Interfaccia di FMForge (verde acqua neon): ALGO (disegno dell'algoritmo, feedback, voce),
+    OP 1..4 (rapporto, livello, velocity, inviluppo), LFO/FX; knob grandi TIMBRO e TONO.
 */
-class FMForgeEditor : public ForgeEditorBase
+class FMForgeEditor : public NeonEditor
 {
 public:
     explicit FMForgeEditor (FMForgeAudioProcessor&);

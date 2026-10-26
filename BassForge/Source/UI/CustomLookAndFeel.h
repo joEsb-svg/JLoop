@@ -27,5 +27,6 @@ namespace bf::ui
         juce::Font getPopupMenuFont() override;
         void drawPopupMenuBackground(juce::Graphics&, int w, int h) override;
         juce::Slider::SliderLayout getSliderLayout(juce::Slider&) override;
+        juce::Label* createSliderTextBox(juce::Slider&) override;
     };
 }

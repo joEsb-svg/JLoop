@@ -1,87 +1,86 @@
 #include "PolyForgeEditor.h"
 
 PolyForgeEditor::PolyForgeEditor (PolyForgeAudioProcessor& p)
-    : ForgeEditorBase (p, p.apvts, "POLY", "FORGE", juce::Colour (0xffb07cff), { "OSC", "FILTRO", "ENV", "LFO", "FX" })
+    : NeonEditor (p, p.apvts, "PolyForge", juce::Colour (0xffb07cff), { "OSC", "FILTRO", "ENV", "LFO", "FX" },
+                  { pf::ids::cutoff, "CUTOFF", {}, pf::ids::fltType },
+                  { pf::ids::space, "SPAZIO", "RIVERBERO + DELAY", {} })
 {
     using namespace pf::ids;
-    namespace col = bf::ui::col;
 
     // --- OSC
-    auto& s1 = addSection (0, "Oscillatore 1", 1.2f);
-    combo (s1, osc1Wave, "Onda");
-    knob (s1, osc1Lvl, "Livello");
-    knob (s1, osc1Uni, "Unison");
-    knob (s1, osc1Det, "Detune");
-    knob (s1, osc1Pw, "PW (quadra)");
+    auto& s1 = section (0, "OSCILLATORE 1", 1.0f, 2);
+    choice (s1, osc1Wave);
+    knob (s1, osc1Lvl, "LIVELLO");
+    knob (s1, osc1Uni, "UNISON");
+    knob (s1, osc1Det, "DETUNE");
+    knob (s1, osc1Pw, "PW");
 
-    auto& s2 = addSection (0, "Oscillatore 2", 1.5f);
-    combo (s2, osc2Wave, "Onda");
-    knob (s2, osc2Lvl, "Livello");
-    knob (s2, osc2Semi, "Semitoni");
-    knob (s2, osc2Fine, "Fine");
-    knob (s2, osc2Uni, "Unison");
-    knob (s2, osc2Det, "Detune");
+    auto& s2 = section (0, "OSCILLATORE 2", 1.2f, 3);
+    choice (s2, osc2Wave);
+    knob (s2, osc2Lvl, "LIVELLO");
+    knob (s2, osc2Semi, "SEMITONI");
+    knob (s2, osc2Fine, "FINE");
+    knob (s2, osc2Uni, "UNISON");
+    knob (s2, osc2Det, "DETUNE");
 
-    auto& s3 = addSection (0, "Sub e rumore", 0.75f);
-    knob (s3, subLvl, "Sub");
-    knob (s3, noiseLvl, "Rumore");
-    knob (s3, spread, "Stereo");
+    auto& s3 = section (0, "SUB E RUMORE", 0.6f, 1);
+    knob (s3, subLvl, "SUB");
+    knob (s3, noiseLvl, "RUMORE");
+    knob (s3, spread, "STEREO");
 
     // --- FILTRO
-    auto& f = addSection (1, "Filtro", 1.2f);
-    combo (f, fltType, "Tipo");
-    knob (f, cutoff, "Cutoff");
-    knob (f, reso, "Risonanza");
-    knob (f, fltDrive, "Drive");
-    knob (f, keyTrack, "Keytrack");
-    knob (f, fltVel, "Velocity");
+    auto& f = section (1, "FILTRO", 1.0f, 3);
+    choice (f, fltType, "TIPO: ");
+    knob (f, cutoff, "CUTOFF");
+    knob (f, reso, "RISONANZA");
+    knob (f, fltDrive, "DRIVE");
+    knob (f, keyTrack, "KEYTRACK");
+    knob (f, fltVel, "VELOCITY");
 
-    auto& e = addSection (1, "Inviluppo del filtro", 1.3f);
-    knob (e, fltEnv, "Quantita'");
-    knob (e, fltA, "Attacco");
-    knob (e, fltD, "Decay");
-    knob (e, fltS, "Sustain");
-    knob (e, fltR, "Rilascio");
-    adsr (e, fltA, fltD, fltS, fltR, col::orange);
+    auto& e = section (1, "INVILUPPO DEL FILTRO", 1.2f, 5);
+    adsr (e, fltA, fltD, fltS, fltR);
+    knob (e, fltEnv, "QUANTITA'");
+    knob (e, fltA, "ATTACCO");
+    knob (e, fltD, "DECAY");
+    knob (e, fltS, "SUSTAIN");
+    knob (e, fltR, "RILASCIO");
 
     // --- ENV
-    auto& a = addSection (2, "Volume (ADSR)", 1.6f);
-    knob (a, ampA, "Attacco");
-    knob (a, ampD, "Decay");
-    knob (a, ampS, "Sustain");
-    knob (a, ampR, "Rilascio");
-    knob (a, velSens, "Velocity");
-    adsr (a, ampA, ampD, ampS, ampR, col::cyan);
+    auto& a = section (2, "VOLUME (ADSR)", 1.5f, 5);
+    adsr (a, ampA, ampD, ampS, ampR);
+    knob (a, ampA, "ATTACCO");
+    knob (a, ampD, "DECAY");
+    knob (a, ampS, "SUSTAIN");
+    knob (a, ampR, "RILASCIO");
+    knob (a, velSens, "VELOCITY");
 
-    auto& v = addSection (2, "Voce", 0.6f);
-    combo (v, mode, "Modo");
-    knob (v, glide, "Glide");
+    auto& v = section (2, "VOCE", 0.6f, 1);
+    choice (v, mode);
+    knob (v, glide, "GLIDE");
 
     // --- LFO
-    auto& l = addSection (3, "LFO", 1.0f);
-    combo (l, lfoWave, "Forma");
-    knob (l, lfoRate, "Velocita'");
-    toggle (l, lfoSync, "A tempo");
-    combo (l, lfoDiv, "Divisione");
+    auto& l = section (3, "LFO", 1.0f, 2);
+    choice (l, lfoWave, "FORMA: ");
+    choice (l, lfoSync, "A TEMPO");
+    choice (l, lfoDiv, "DIVISIONE: ");
+    knob (l, lfoRate, "VELOCITA'");
 
-    auto& d = addSection (3, "Cosa muove", 1.0f);
-    knob (d, lfoPitch, "Vibrato");
-    knob (d, lfoCut, "Filtro");
-    knob (d, lfoAmp, "Volume");
+    auto& d = section (3, "COSA MUOVE", 1.0f, 4);
+    knob (d, lfoPitch, "VIBRATO");
+    knob (d, lfoCut, "FILTRO");
+    knob (d, lfoAmp, "VOLUME");
     knob (d, lfoPwm, "PW");
 
     // --- FX
-    auto& c = addSection (4, "Chorus", 0.5f);
-    knob (c, chorus, "Mix");
-    auto& dl = addSection (4, "Delay", 1.0f);
-    knob (dl, dlyMix, "Mix");
-    combo (dl, dlyTime, "Tempo");
-    knob (dl, dlyFb, "Feedback");
-    auto& r = addSection (4, "Riverbero", 0.8f);
-    knob (r, revMix, "Mix");
-    knob (r, revSize, "Stanza");
-    auto& o = addSection (4, "Uscita", 0.5f);
-    knob (o, master, "Volume");
+    auto& c = section (4, "CHORUS E DELAY", 1.2f, 3);
+    choice (c, dlyTime, "DELAY ");
+    knob (c, chorus, "CHORUS");
+    knob (c, dlyMix, "DELAY");
+    knob (c, dlyFb, "FEEDBACK");
+    auto& r = section (4, "RIVERBERO E USCITA", 1.0f, 3);
+    knob (r, revMix, "RIVERBERO");
+    knob (r, revSize, "STANZA");
+    knob (r, master, "VOLUME");
 
     showTab (0);
 }

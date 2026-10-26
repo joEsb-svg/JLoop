@@ -15,6 +15,23 @@
  */
 class BassForgeAudioProcessorEditor : public juce::AudioProcessorEditor, private juce::Timer
 {
+    /** Manopola grande di una macro (colonna a destra nel layout del telefono) con la sua destinazione sotto. */
+    class MacroKnob : public juce::Component
+    {
+    public:
+        MacroKnob(juce::AudioProcessorValueTreeState& s, int index);
+        void paint(juce::Graphics&) override;
+        void resized() override;
+        void refresh();
+    private:
+        juce::AudioProcessorValueTreeState& apvts;
+        int macro;
+        juce::Slider slider;
+        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
+        juce::String caption;
+        juce::Rectangle<int> nameArea, captionArea;
+    };
+
 public:
     explicit BassForgeAudioProcessorEditor(BassForgeAudioProcessor&);
     ~BassForgeAudioProcessorEditor() override;
@@ -59,6 +76,10 @@ private:
     juce::Component*       pages[4];
     int                    current = 0;
     bool                   compact = false;
+
+    MacroKnob macroKnobs[2];
+    int refreshCounter = 0;
+    bool macrosShown() const;
 
     juce::ComponentBoundsConstrainer constrainer;
 

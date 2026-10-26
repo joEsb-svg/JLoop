@@ -109,6 +109,93 @@ juce::Component& NeonEditor::view (Section& s, std::unique_ptr<juce::Component> 
     return ref;
 }
 
+void NeonEditor::choice (Section& s, const juce::String& id, const juce::String& prefix)
+{
+    if (auto* c = dynamic_cast<juce::AudioParameterChoice*> (apvts.getParameter (id)))
+    {
+        int chars = 0;
+        for (auto& x : c->choices) chars += x.length();
+        if (c->choices.size() <= 4 && chars <= 22 && prefix.isEmpty())
+        {
+            juce::StringArray up;
+            for (auto& x : c->choices) up.add (x.toUpperCase());
+            segment (s, id, up);
+            return;
+        }
+        lcd (s, id, prefix);
+        return;
+    }
+    if (dynamic_cast<juce::AudioParameterBool*> (apvts.getParameter (id)) != nullptr)
+    {
+        segment (s, id, { prefix.isNotEmpty() ? prefix + ": NO" : "NO", prefix.isNotEmpty() ? prefix + ": SI'" : "SI'" });
+        return;
+    }
+    lcd (s, id, prefix);
+}
+
+void NeonEditor::adsr (Section& s, const juce::String& a, const juce::String& d, const juce::String& su, const juce::String& r, float share)
+{
+    auto v = std::make_unique<AdsrView> (apvts, juce::StringArray { a, d, su, r });
+    adsrViews.push_back (v.get());
+    view (s, std::move (v), share);
+}
+
+NeonEditor::AdsrView::AdsrView (juce::AudioProcessorValueTreeState& s, juce::StringArray i) : apvts (s), ids (std::move (i))
+{
+    setInterceptsMouseClicks (false, false);
+}
+
+float NeonEditor::AdsrView::value (int i) const
+{
+    if (auto* v = apvts.getRawParameterValue (ids[i])) return v->load();
+    return 0.0f;
+}
+
+void NeonEditor::AdsrView::refresh()
+{
+    juce::uint64 h = 0;
+    for (int i = 0; i < 4; ++i) h = h * 1000003u + (juce::uint64) (value (i) * 100000.0f);
+    if (h != shown) { shown = h; repaint(); }
+}
+
+void NeonEditor::AdsrView::paint (juce::Graphics& g)
+{
+    const auto accent = frui::accent();
+    auto r = getLocalBounds().toFloat().reduced (0.5f);
+    g.setColour (juce::Colour (0xff07090b));
+    g.fillRoundedRectangle (r, 5.0f);
+    g.setColour (juce::Colours::black);
+    g.drawRoundedRectangle (r, 5.0f, 1.0f);
+
+    const float A = value (0), D = value (1), S = value (2), R = value (3);
+    const float a = std::sqrt (A), d = std::sqrt (D), rel = std::sqrt (R), hold = 0.35f;
+    const float total = juce::jmax (0.001f, a + d + hold + rel);
+    auto in = r.reduced (8.0f, 6.0f).withTrimmedTop (12.0f);
+    auto x = [&] (float t) { return in.getX() + in.getWidth() * t / total; };
+    auto y = [&] (float v) { return in.getBottom() - in.getHeight() * v; };
+    juce::Path p;
+    p.startNewSubPath (x (0), y (0));
+    p.lineTo (x (a), y (1));
+    p.quadraticTo (x (a + d * 0.3f), y (S + (1 - S) * 0.15f), x (a + d), y (S));
+    p.lineTo (x (a + d + hold), y (S));
+    p.quadraticTo (x (a + d + hold + rel * 0.3f), y (S * 0.15f), x (total), y (0));
+    juce::Path fill (p);
+    fill.lineTo (x (0), y (0));
+    fill.closeSubPath();
+    g.setColour (accent.withAlpha (0.12f));
+    g.fillPath (fill);
+    g.setColour (accent.withAlpha (0.25f));
+    g.strokePath (p, juce::PathStrokeType (4.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    g.setColour (accent);
+    g.strokePath (p, juce::PathStrokeType (1.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+
+    auto fmt = [] (float s) { return s < 1.0f ? juce::String (juce::roundToInt (s * 1000)) + "ms" : juce::String (s, 2) + "s"; };
+    g.setFont (frui::mono (10.0f, false));
+    g.setColour (frui::colours::textDim);
+    g.drawText ("A " + fmt (A) + "  D " + fmt (D) + "  S " + juce::String (juce::roundToInt (S * 100)) + "%  R " + fmt (R),
+                r.reduced (8.0f, 2.0f).removeFromTop (14.0f), juce::Justification::centredRight, false);
+}
+
 void NeonEditor::showTab (int index)
 {
     tab = juce::jlimit (0, tabs.size() - 1, index);
@@ -163,7 +250,12 @@ void NeonEditor::layoutSection (Section& s)
             s.view->setBounds (c);
             return;
         }
-        if (c.getHeight() < 150 && c.getWidth() > 420)
+        if (s.viewLeft && c.getWidth() > 300)
+        {
+            s.view->setBounds (c.removeFromLeft ((int) ((float) c.getWidth() * s.viewShare)).reduced (0, 2));
+            c.removeFromLeft (8);
+        }
+        else if (c.getHeight() < 150 && c.getWidth() > 420)
         {
             // pannello basso (telefono con la tastiera aperta): disegno a sinistra, controlli a destra
             const int vw = (int) ((float) c.getWidth() * 0.55f);

@@ -8,12 +8,12 @@ namespace bf::ui
     {
         setColour(juce::ResizableWindow::backgroundColourId, col::bg);
         setColour(juce::Label::textColourId, col::text);
-        setColour(juce::Slider::textBoxTextColourId, col::text);
-        setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
-        setColour(juce::Slider::textBoxBackgroundColourId, juce::Colours::transparentBlack);
+        setColour(juce::Slider::textBoxTextColourId, col::cyan.brighter(0.2f));
+        setColour(juce::Slider::textBoxOutlineColourId, col::edge);
+        setColour(juce::Slider::textBoxBackgroundColourId, col::lcdBg);
         setColour(juce::Slider::textBoxHighlightColourId, col::cyanDim);
         setColour(juce::ComboBox::backgroundColourId, col::panelHi);
-        setColour(juce::ComboBox::textColourId, col::text);
+        setColour(juce::ComboBox::textColourId, col::cyan.brighter(0.2f));
         setColour(juce::ComboBox::outlineColourId, col::edge);
         setColour(juce::ComboBox::arrowColourId, col::cyan);
         setColour(juce::PopupMenu::backgroundColourId, col::panel);
@@ -28,6 +28,21 @@ namespace bf::ui
     {
         const float r = juce::jmax(6.0f, juce::jmin(b.getWidth(), b.getHeight()) * 0.5f - 6.0f);   // 6 px liberi per l'anello
         return { b.getCentre(), r };
+    }
+
+    /** Valore sotto la manopola: displayino nero con cifre azzurre (stile LCD). */
+    juce::Label* CustomLookAndFeel::createSliderTextBox(juce::Slider& s)
+    {
+        auto* l = LookAndFeel_V4::createSliderTextBox(s);
+        l->setColour(juce::Label::backgroundColourId, col::lcdBg);
+        l->setColour(juce::Label::outlineColourId, col::edge);
+        l->setColour(juce::Label::textColourId, col::cyan.brighter(0.2f));
+        l->setColour(juce::Label::textWhenEditingColourId, col::text);
+        l->setColour(juce::TextEditor::backgroundColourId, col::lcdBg);
+        l->setColour(juce::TextEditor::textColourId, col::text);
+        l->setColour(juce::TextEditor::highlightColourId, col::cyanDim);
+        l->setFont(monoFont(11.0f));
+        return l;
     }
 
     juce::Slider::SliderLayout CustomLookAndFeel::getSliderLayout(juce::Slider& s)
@@ -61,9 +76,14 @@ namespace bf::ui
         const bool enabled = s.isEnabled();
         const float ang = a0 + pos * (a1 - a0);
 
-        // corpo
-        g.setGradientFill(juce::ColourGradient(col::panelHi.brighter(0.08f), c.x, c.y - r, col::panel.darker(0.3f), c.x, c.y + r, false));
-        g.fillEllipse(c.x - r + thick + 2, c.y - r + thick + 2, 2 * (r - thick - 2), 2 * (r - thick - 2));
+        // corpo: ombra e manopola scura con luce dall'alto
+        const float br = r - thick - 2.0f;
+        g.setColour(juce::Colours::black.withAlpha(0.45f));
+        g.fillEllipse(c.x - br, c.y - br + 2.0f, 2 * br, 2 * br);
+        g.setGradientFill(juce::ColourGradient(juce::Colour(0xff2b3138), c.x, c.y - br, juce::Colour(0xff14181c), c.x, c.y + br, false));
+        g.fillEllipse(c.x - br, c.y - br, 2 * br, 2 * br);
+        g.setColour(juce::Colours::black);
+        g.drawEllipse(c.x - br, c.y - br, 2 * br, 2 * br, 1.0f);
 
         // binario
         juce::Path track; track.addCentredArc(c.x, c.y, arcR, arcR, 0, a0, a1, true);
@@ -76,8 +96,10 @@ namespace bf::ui
         const float from = a0 + zeroPos * (a1 - a0);
         juce::Path val; val.addCentredArc(c.x, c.y, arcR, arcR, 0, juce::jmin(from, ang), juce::jmax(from, ang), true);
         const auto vc = enabled ? col::cyan : col::cyanDim;
-        g.setColour(vc.withAlpha(0.18f));
-        g.strokePath(val, juce::PathStrokeType(thick + 4.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));   // glow
+        g.setColour(vc.withAlpha(0.14f));
+        g.strokePath(val, juce::PathStrokeType(thick + 7.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));   // alone
+        g.setColour(vc.withAlpha(0.28f));
+        g.strokePath(val, juce::PathStrokeType(thick + 3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         g.setColour(vc);
         g.strokePath(val, juce::PathStrokeType(thick, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
@@ -85,8 +107,8 @@ namespace bf::ui
         const float ir0 = r * 0.30f, ir1 = r - thick - 3.0f;
         juce::Line<float> pointer(c.x + std::sin(ang) * ir0, c.y - std::cos(ang) * ir0,
                                   c.x + std::sin(ang) * ir1, c.y - std::cos(ang) * ir1);
-        g.setColour(col::text);
-        g.drawLine(pointer, 2.0f);
+        g.setColour(juce::Colour(0xffe8edf1));
+        g.drawLine(pointer, 2.2f);
     }
 
     void CustomLookAndFeel::drawLinearSlider(juce::Graphics& g, int x, int y, int w, int h, float pos, float, float,
@@ -130,6 +152,26 @@ namespace bf::ui
     void CustomLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& b, const juce::Colour&, bool hl, bool)
     {
         auto r = b.getLocalBounds().toFloat();
+        if (b.getProperties().contains("segment"))   // fila delle sezioni: segmenti, quello acceso pieno
+        {
+            g.setColour(col::lcdBg);
+            g.fillRoundedRectangle(r.reduced(0.5f), 5.0f);
+            g.setColour(col::edge);
+            g.drawRoundedRectangle(r.reduced(0.5f), 5.0f, 1.0f);
+            if (b.getToggleState())
+            {
+                g.setColour(col::cyan.withAlpha(0.25f));
+                g.fillRoundedRectangle(r.reduced(1.0f), 5.0f);
+                g.setColour(col::cyan);
+                g.fillRoundedRectangle(r.reduced(3.0f), 4.0f);
+            }
+            else if (hl)
+            {
+                g.setColour(col::panelHi);
+                g.fillRoundedRectangle(r.reduced(3.0f), 4.0f);
+            }
+            return;
+        }
         g.setColour(hl ? col::panelHi : juce::Colours::transparentBlack);
         g.fillRoundedRectangle(r.reduced(1.0f), 6.0f);
         if (! b.getClickingTogglesState())          // pulsanti d'azione (Save, Init, Clear...): bordo sottile
@@ -146,16 +188,29 @@ namespace bf::ui
 
     void CustomLookAndFeel::drawButtonText(juce::Graphics& g, juce::TextButton& b, bool, bool)
     {
+        if (b.getProperties().contains("segment"))
+        {
+            g.setColour(b.getToggleState() ? juce::Colour(0xff0b0d10) : col::textDim);
+            g.setFont(spacedFont(juce::jlimit(9.0f, 12.0f, (float) b.getHeight() * 0.42f)));
+            g.drawFittedText(b.getButtonText().toUpperCase(), b.getLocalBounds().reduced(3, 0), juce::Justification::centred, 1, 0.6f);
+            return;
+        }
         const bool tab = b.getClickingTogglesState();
-        g.setColour(b.getToggleState() ? col::cyan : (tab ? col::textDim : col::text));
-        g.setFont(juce::Font(juce::FontOptions(tab ? 15.0f : 12.5f, tab ? juce::Font::bold : juce::Font::plain)));
-        g.drawText(b.getButtonText(), b.getLocalBounds().withTrimmedBottom(3), juce::Justification::centred);
+        const auto text = tab ? b.getButtonText().toUpperCase() : b.getButtonText();
+        g.setFont(tab ? spacedFont(13.0f) : juce::Font(juce::FontOptions(12.5f)));
+        if (tab && b.getToggleState())
+            drawGlowText(g, text, b.getLocalBounds().withTrimmedBottom(3), juce::Justification::centred, col::cyan);
+        else
+        {
+            g.setColour(tab ? col::textDim : col::text);
+            g.drawText(text, b.getLocalBounds().withTrimmedBottom(3), juce::Justification::centred);
+        }
     }
 
     void CustomLookAndFeel::drawComboBox(juce::Graphics& g, int w, int h, bool down, int, int, int, int, juce::ComboBox& cb)
     {
         auto r = juce::Rectangle<float>(0, 0, (float) w, (float) h).reduced(0.5f);
-        g.setColour(down ? col::panelHi.brighter(0.1f) : col::panelHi);
+        g.setColour(down ? col::panelHi : col::lcdBg);
         g.fillRoundedRectangle(r, 5.0f);
         g.setColour(cb.hasKeyboardFocus(false) ? col::cyan : col::edge);
         g.drawRoundedRectangle(r, 5.0f, 1.0f);
@@ -172,7 +227,7 @@ namespace bf::ui
         l.setFont(getComboBoxFont(cb));
     }
 
-    juce::Font CustomLookAndFeel::getComboBoxFont(juce::ComboBox&) { return juce::Font(juce::FontOptions(12.5f)); }
+    juce::Font CustomLookAndFeel::getComboBoxFont(juce::ComboBox&) { return monoFont(12.0f); }
     juce::Font CustomLookAndFeel::getLabelFont(juce::Label&)       { return juce::Font(juce::FontOptions(12.0f)); }
     juce::Font CustomLookAndFeel::getPopupMenuFont()               { return juce::Font(juce::FontOptions(13.5f)); }
 

@@ -14,7 +14,14 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.44)
+## Stato attuale (v0.45)
+
+**Novita' della 0.45**: BassForge, PolyForge e FMForge nello stile neon dei synth nuovi
+- BassForge (azzurro): pannelli, manopole e valori stile LCD; a destra le manopole grandi MACRO 1 e MACRO 2
+  con scritta la loro destinazione (nel preset Init sono gia' collegate a cutoff e wavetable)
+- PolyForge (viola): knob grandi CUTOFF (col tipo di filtro) e SPAZIO (nuovo: riverbero + delay insieme), inviluppi disegnati
+- FMForge (verde acqua): algoritmo disegnato a neon, knob grandi TIMBRO e TONO
+- Stessi controlli di prima, i preset suonano uguale
 
 **Novita' della 0.44**
 - Partendo a meta' canzone (righello della playlist) i campioni lunghi gia' in corso (riser, loop, voci, pad tenuti

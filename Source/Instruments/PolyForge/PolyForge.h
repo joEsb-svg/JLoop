@@ -63,6 +63,7 @@ namespace pf
         inline constexpr const char* dlyFb  = "dlyFb";
         inline constexpr const char* revMix = "revMix";       inline constexpr const char* revSize = "revSize";
         inline constexpr const char* master = "master";
+        inline constexpr const char* space  = "space";        // macro SPAZIO: piu' riverbero e delay insieme
     }
 
     juce::AudioProcessorValueTreeState::ParameterLayout createLayout();

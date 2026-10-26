@@ -63,6 +63,7 @@ namespace bf::ui
             auto b = std::make_unique<juce::TextButton>(name);
             const int i = (int) sectionButtons.size();
             b->setClickingTogglesState(true);
+            b->getProperties().set("segment", true);
             b->setRadioGroupId(5100 + (int) (reinterpret_cast<std::uintptr_t>(this) & 0xfff));
             b->setToggleState(i == 0, juce::dontSendNotification);
             b->onClick = [this, i] { showSection(i); };
