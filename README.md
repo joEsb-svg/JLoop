@@ -14,7 +14,17 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.45)
+## Stato attuale (v0.46)
+
+**Novita' della 0.46**: Riser automatico con tanti suoni
+- 16 suoni pronti (Classico EDM, Big Room, Electro 2010, Complextro Laser, Dubstep Sirena, Hoover Rave,
+  Whoosh di rumore, Arpeggio che accelera, Pompa sidechain, Vento scuro, Fidget a scatti, Piatto al contrario,
+  Tensione lenta, Hardstyle cassa, Trance supersaw, Jet e laser): ◂ ▸ o tocca il nome per la lista
+- "Casuale" inventa un suono nuovo a ogni tocco (rumore, nota, rullata, impatto ed extra diversi)
+- "Ascolta" fa sentire il riser prima di crearlo (cambiando suono o ingredienti si aggiorna)
+- Ogni ingrediente ha piu' caratteri: rumore (sweep, whoosh, jet, vento), nota (supersaw, quadra PWM, sirena,
+  arpeggio, hoover, laser FM, anche a scatti), rullata (rullante, clap, cassa, hi-hat, tom),
+  impatto (boom, crash, downlifter, sub che scende), extra (pausa prima del drop, pompa, piatto al contrario)
 
 **Novita' della 0.45**: BassForge, PolyForge e FMForge nello stile neon dei synth nuovi
 - BassForge (azzurro): pannelli, manopole e valori stile LCD; a destra le manopole grandi MACRO 1 e MACRO 2

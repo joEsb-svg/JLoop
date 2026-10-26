@@ -3,6 +3,7 @@
 #include <JuceHeader.h>
 #include "SequencerEngine.h"
 #include "SampleStore.h"
+#include "RiserSound.h"
 
 //==============================================================================
 /**
@@ -24,6 +25,8 @@ namespace riser
         bool noise = true, note = true, roll = true, impact = true, filter = false;
         bool toPlaylist = true;
         int dropBar = 16;   // 0 = prima battuta
+        Sound sound;                              // carattere di ogni ingrediente (preset o casuale)
+        juce::String soundName { "Classico EDM" };
     };
 
     inline bool hasAudio (const Options& o)   { return o.noise || o.note || o.roll || o.impact; }
@@ -33,108 +36,43 @@ namespace riser
     /** L'audio del riser (mono). La salita dura 'bars' battute; l'impatto (se c'e') comincia subito dopo. */
     inline juce::AudioBuffer<float> render (const Options& o, double bpm, double sr, int rootPitchClass)
     {
-        constexpr double twoPi = juce::MathConstants<double>::twoPi;
+        const auto& s = o.sound;
         const int T = (int) (riserSeconds (o, bpm) * sr);
         const int tail = o.impact ? (int) (3.0 * sr) : (int) (0.05 * sr);
         juce::AudioBuffer<float> out (1, T + tail);
         out.clear();
         auto* y = out.getWritePointer (0);
-        juce::Random rnd (1234);
+        juce::Random rnd (s.seed);
 
-        struct Svf
+        // rumore e nota (su cui agisce la "pompa" del sidechain)
+        juce::AudioBuffer<float> bed (1, T);
+        bed.clear();
+        if (o.noise) detail::noiseLayer (bed.getWritePointer (0), T, sr, s, rnd);
+        if (o.note && s.toneGain > 0.0f) detail::toneLayer (bed.getWritePointer (0), T, sr, bpm, s, rootPitchClass, rnd);
+        if (o.noise && s.reverseCymbal) detail::reverseCymbalLayer (bed.getWritePointer (0), T, sr, bpm, rnd);
+        if (s.pump)
         {
-            double s1 = 0, s2 = 0;
-            double run (double x, double fc, double q, double sr, int mode)
-            {
-                const double g = std::tan (juce::MathConstants<double>::pi * juce::jlimit (20.0, sr * 0.45, fc) / sr), k = 1.0 / q;
-                const double a1 = 1.0 / (1.0 + g * (g + k)), a2 = g * a1, a3 = g * a2;
-                const double v3 = x - s2, v1 = a1 * s1 + a2 * v3, v2 = s2 + a2 * s1 + a3 * v3;
-                s1 = 2 * v1 - s1; s2 = 2 * v2 - s2;
-                return mode == 0 ? v2 : mode == 1 ? v1 * k : x - k * v1 - v2;
-            }
-        };
-
-        // --- rumore che sale
-        if (o.noise)
-        {
-            Svf f1, f2;
+            const double beat = 60.0 / bpm * sr;
+            auto* b = bed.getWritePointer (0);
             for (int i = 0; i < T; ++i)
             {
-                const double x = (double) i / T;
-                const double fc = 250.0 * std::pow (2.0, x * 5.2);
-                const double n = rnd.nextFloat() * 2.0f - 1.0f;
-                const double v = f2.run (f1.run (n, fc, 1.2, sr, 1), fc * 1.5, 0.8, sr, 1);
-                y[i] += (float) (v * (0.08 + 0.9 * x * x) * 0.9);
+                const double t = std::fmod ((double) i, beat) / sr;
+                b[i] *= (float) (1.0 - 0.85 * std::exp (-t / 0.09));
             }
+        }
+        out.addFrom (0, 0, bed, 0, 0, T);
+        if (o.roll) detail::rollLayer (y, T, sr, bpm, o.bars * 4.0, s, rnd);
+
+        // pausa prima del drop: l'ultimo mezzo quarto tace (con 3 ms di sfumatura)
+        if (s.gap && (o.noise || o.note || o.roll))
+        {
+            const int gapLen = juce::jmin (T, (int) (0.5 * 60.0 / bpm * sr));
+            const int fadeLen = (int) (0.003 * sr);
+            for (int i = T - gapLen - fadeLen; i < T; ++i)
+                if (i >= 0) y[i] *= i < T - gapLen ? 1.0f - (float) (i - (T - gapLen - fadeLen)) / (float) fadeLen : 0.0f;
         }
 
-        // --- nota che sale (supersaw, dalla tonica del progetto, +2 ottave)
-        if (o.note)
-        {
-            Svf lp;
-            double ph[5] {};
-            for (int u = 0; u < 5; ++u) ph[u] = rnd.nextDouble();
-            const double base = 48 + ((rootPitchClass % 12) + 12) % 12;
-            for (int i = 0; i < T; ++i)
-            {
-                const double x = (double) i / T;
-                const double pitch = base + 24.0 * std::pow (x, 1.6);
-                double s = 0;
-                for (int u = 0; u < 5; ++u)
-                {
-                    const double f = 440.0 * std::pow (2.0, (pitch + (u - 2) * 0.12 - 69.0) / 12.0);
-                    ph[u] += f / sr; if (ph[u] >= 1.0) ph[u] -= 1.0;
-                    s += 2.0 * ph[u] - 1.0;
-                }
-                s = lp.run (s * 0.2, 400.0 * std::pow (2.0, x * 4.5), 0.9, sr, 0);
-                y[i] += (float) (s * (0.15 + 0.45 * x));
-            }
-        }
-
-        // --- rullata che accelera: 1/4, 1/8, 1/16, 1/32 (un quarto della salita ciascuno)
-        if (o.roll)
-        {
-            const double beatSec = 60.0 / bpm;
-            const double totalBeats = o.bars * 4.0;
-            static constexpr double every[4] { 1.0, 0.5, 0.25, 0.125 };
-            for (double b = 0.0; b < totalBeats - 1.0e-6;)
-            {
-                const double x = b / totalBeats;
-                const int section = juce::jlimit (0, 3, (int) (x * 4.0));
-                const int start = (int) (b * beatSec * sr);
-                const double vel = 0.25 + 0.75 * x;
-                const double tone = 180.0 + 160.0 * x;
-                Svf bp;
-                double phT = 0;
-                const int len = juce::jmin ((int) (0.18 * sr), T - start);
-                for (int i = 0; i < len; ++i)
-                {
-                    const double t = (double) i / sr;
-                    const double nz = bp.run (rnd.nextFloat() * 2.0f - 1.0f, 3500.0, 0.7, sr, 1) * std::exp (-t * 28.0);
-                    phT += tone / sr;
-                    const double body = std::sin (twoPi * phT) * std::exp (-t * 40.0) * 0.6;
-                    y[start + i] += (float) ((nz * 1.4 + body) * vel * 0.55);
-                }
-                b += every[section];
-            }
-        }
-
-        // --- impatto sul drop
-        if (o.impact)
-        {
-            Svf lp, lp2;
-            double ph = 0;
-            for (int i = 0; i < tail; ++i)
-            {
-                const double t = (double) i / sr;
-                const double f = 30.0 + 60.0 * std::exp (-t * 6.0);
-                ph += f / sr;
-                const double boom = std::sin (twoPi * ph) * std::exp (-t * 1.6) * 0.9;
-                const double hit = lp.run (rnd.nextFloat() * 2.0f - 1.0f, 3000.0, 0.7, sr, 0) * std::exp (-t * 9.0) * 0.8;
-                const double wash = lp2.run (rnd.nextFloat() * 2.0f - 1.0f, 1800.0, 0.7, sr, 0) * std::exp (-t * 1.4) * 0.12;
-                y[T + i] += (float) (boom + hit + wash);
-            }
-        }
+        if (o.impact) detail::impactLayer (y + T, tail, sr, s.impactType, rnd);
 
         // il riser si chiude di netto sul drop (2 ms di sfumatura per non fare click)
         const int fade = juce::jmin (T, (int) (0.002 * sr));
@@ -227,7 +165,8 @@ namespace riser
             auto audio = render (o, bpm, 44100.0, engine.getScaleRoot());
             auto folder = SampleStore::getFolder();
             folder.createDirectory();
-            const auto base = "Riser " + juce::String (o.bars) + (o.bars == 1 ? " battuta " : " battute ") + juce::String (juce::roundToInt (bpm)) + " BPM";
+            const auto base = juce::File::createLegalFileName ("Riser " + o.soundName + " " + juce::String (o.bars) + (o.bars == 1 ? " battuta " : " battute ")
+                                                               + juce::String (juce::roundToInt (bpm)) + " BPM");
             juce::File file = folder.getChildFile (base + ".wav");
             for (int i = 2; file.exists(); ++i) file = folder.getChildFile (base + " (" + juce::String (i) + ").wav");
             {
@@ -251,7 +190,7 @@ namespace riser
             ch.sampleName = file.getFileName();
             ch.sample.store (data);
             ch.colour.store (0xff4fd8ff);
-            ch.name = "Riser " + juce::String (o.bars);
+            ch.name = "Riser " + o.soundName;
             ch.customName = true;
             ch.touchSound();
             r.sampleName = file.getFileName();
@@ -262,7 +201,7 @@ namespace riser
             pat.velocity[(size_t) r.channel][0].store ((uint8_t) 110);
             pat.probability[(size_t) r.channel][0].store ((uint8_t) 100);
             pat.ratchet[(size_t) r.channel][0].store ((uint8_t) 1);
-            engine.setPatternName (r.pattern, "Riser " + juce::String (o.bars) + (o.bars == 1 ? " battuta" : " battute"));
+            engine.setPatternName (r.pattern, "Riser " + o.soundName + " (" + juce::String (o.bars) + ")");
 
             if (o.toPlaylist)
             {
