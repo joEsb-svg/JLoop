@@ -14,7 +14,13 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.43)
+## Stato attuale (v0.44)
+
+**Novita' della 0.44**
+- Partendo a meta' canzone (righello della playlist) i campioni lunghi gia' in corso (riser, loop, voci, pad tenuti
+  nel piano roll) ripartono esattamente dal punto in cui sarebbero, invece di restare muti
+- Stop: i campioni lunghi si fermano subito (le code brevi della batteria finiscono da sole); il panico ferma tutto
+- Guida rapida aggiornata (12 schede: quarti, synth neon, riser, condivisione, CPU); si apre solo da MENU > Guida rapida
 
 **Novita' della 0.43**
 - Lunghezza del pattern in quarti (1 quarto = 4 step): da 1 a 64 quarti (16 battute). Le frecce ◂ ▸ aggiungono

@@ -40,13 +40,17 @@ public:
 
     const SampleData* getSample() const noexcept     { return sample; }
 
+    /** Quanti campioni del file avanza ogni campione d'uscita, per quella distanza in semitoni. */
+    double stepFor (float semitones) const noexcept  { return baseStep * std::pow (2.0, (double) semitones / 12.0); }
+
     /**
         Fa partire una nota.
         @param semitones   distanza dalla nota a cui e' registrato il campione
         @param gateTicks   dopo quanti tick del sequencer sfumare (-1 = suona fino alla fine)
         @param humanize    piccole variazioni di forza e di tempo
     */
-    void trigger (float velocity, float semitones, int gateTicks, float humanize, float randomA, float randomB, bool cutPrevious = false)
+    void trigger (float velocity, float semitones, int gateTicks, float humanize, float randomA, float randomB, bool cutPrevious = false,
+                  double startPosition = 0.0)
     {
         if (sample == nullptr || sample->audio.getNumSamples() < 2)
             return;
@@ -66,7 +70,9 @@ public:
             delay = (int) (std::abs (randomB) * humanize * 0.006 * sr);
         }
 
-        v.pos       = 0.0;
+        v.pos       = juce::jmax (0.0, startPosition);
+        v.ramp      = startPosition > 0.0 ? 0.0f : 1.0f;   // partenza a meta': entra in 5 ms senza click
+        v.rampInc   = (float) (1.0 / (0.005 * sr));
         v.step      = baseStep * std::pow (2.0, (double) semitones / 12.0);
         v.level     = std::pow (juce::jlimit (0.0f, 1.0f, vel), 1.3f);
         v.env       = 1.0f;
@@ -93,6 +99,23 @@ public:
         for (auto& v : voices)
             if (v.active && v.gateTicks >= 0)
                 v.releasing = true;
+    }
+
+    /** Stop del trasporto: i colpi lunghi (riser, loop, voci) si fermano in pochi ms; le code brevi della batteria finiscono da sole. */
+    void stopLong (double maxRemainingSeconds) noexcept
+    {
+        if (sample == nullptr) return;
+        const int len = sample->audio.getNumSamples();
+        for (auto& v : voices)
+            if (v.active && v.step > 0.0 && (double) (len - v.pos) / v.step / sr > maxRemainingSeconds)
+                v.cut = true;
+    }
+
+    /** Panico: tutto sfuma in pochi ms. */
+    void cutAll() noexcept
+    {
+        for (auto& v : voices)
+            if (v.active) v.cut = true;
     }
 
     void stopAll() noexcept
@@ -150,7 +173,8 @@ public:
             const float x = data[pos] + frac * (data[pos + 1] - data[pos]);
             v.pos += v.step;
 
-            sum += x * v.level * v.env * v.release;
+            if (v.ramp < 1.0f) v.ramp = juce::jmin (1.0f, v.ramp + v.rampInc);
+            sum += x * v.level * v.env * v.release * v.ramp;
             v.env *= fade;
             if (v.cut)
                 v.release *= cutCoef;
@@ -187,7 +211,7 @@ private:
     struct Voice
     {
         double pos = 0.0, step = 1.0;
-        float  level = 1.0f, env = 1.0f, release = 1.0f;
+        float  level = 1.0f, env = 1.0f, release = 1.0f, ramp = 1.0f, rampInc = 0.01f;
         bool   active = false, releasing = false, cut = false;
         int    gateTicks = -1, delay = 0;
         uint32_t age = 0;

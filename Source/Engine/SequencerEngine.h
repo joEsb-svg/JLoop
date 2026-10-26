@@ -1300,6 +1300,7 @@ public:
             tickInStep = 0;
             samplesUntilNextTick = 0.0;   // il primo step parte subito
             numActiveClips = 0;
+            chaseAtStep = inSong && songStep + 1 > 0 ? songStep + 1 : -1;   // partenza a meta' canzone: i campioni lunghi riprendono
         }
 
         numActive = numActiveChannels.load();
@@ -1359,7 +1360,7 @@ public:
                     instMidi[(size_t) c].clear();
                     proc->reset();   // silenzio immediato (voci ed effetti interni)
                 }
-                samplers[(size_t) c].releaseAll();
+                samplers[(size_t) c].cutAll();
             }
             browserSampler.stopAll();
             for (auto& tr : tracks)
@@ -1381,7 +1382,10 @@ public:
                 if (instruments[(size_t) c] != nullptr)
                     instAllNotesOff (c);
             for (int c = 0; c < numActive; ++c)
+            {
                 samplers[(size_t) c].releaseAll();
+                samplers[(size_t) c].stopLong (0.6);
+            }
         }
         wasPlaying = playing.load();
 
@@ -2437,6 +2441,11 @@ private:
         ++songStep;
         if (songStep >= songLength)
             songStep = 0;                      // fine della canzone: ricomincia (giro)
+        if (songStep == chaseAtStep)
+        {
+            chaseAtStep = -1;
+            chaseSamples (songStep, samplesPerStep);
+        }
 
         currentSongStep.store (songStep);
 
@@ -2496,6 +2505,93 @@ private:
             metroEnv = 1.0f;
             metroPhase = 0.0;
             metroDecay = (float) std::exp (-1.0 / (0.012 * sampleRate.load()));
+        }
+    }
+
+    /**
+        La canzone parte a meta' (righello della playlist): i campioni che sarebbero gia' in corso
+        (riser, loop, voci, pad lunghi) ripartono dal punto giusto invece di restare muti.
+        Per ogni canale campione si cerca l'ultimo colpo prima del punto di partenza (step o nota del piano roll).
+    */
+    void chaseSamples (int start, double samplesPerStep)
+    {
+        for (int c = 0; c < numActive; ++c)
+        {
+            if (instruments[(size_t) c] != nullptr || channels[(size_t) c].type.load() != drumOrSample)
+                continue;
+            auto& smp = samplers[(size_t) c];
+            const auto* sample = smp.getSample();
+            if (sample == nullptr || sample->audio.getNumSamples() < 2)
+                continue;
+            const int len = sample->audio.getNumSamples();
+            // fin dove guardare indietro: il campione suonato due ottave sotto (il caso piu' lungo)
+            const int maxBack = juce::jlimit (1, 4096, (int) std::ceil ((double) len / juce::jmax (1.0e-6, smp.stepFor (-24.0f)) / samplesPerStep) + 1);
+
+            struct Hit { int tick = -1; float vel = 0.0f, semis = 0.0f; int endTick = -1; };
+            Hit stepHit;                        // gli step: conta solo l'ultimo (uno step taglia il precedente)
+            std::array<Hit, 32> noteHits {};    // le note: possono suonare insieme (accordi)
+            int numNoteHits = 0;
+            const int startTick = start * ticksPerStep;
+
+            for (auto& slot : clips)
+            {
+                const auto v = slot.load();
+                if (v == 0) continue;
+                const auto clip = unpackClip (v);
+                auto& pattern = patterns[(size_t) clip.pattern];
+                const int clipStart = clip.startStep();
+                const int clipLength = clip.length > 0 ? clip.length : pattern.length.load();
+                const int relEnd = juce::jmin (clipLength, start - clipStart);
+                if (relEnd <= 0) continue;
+                const int relBegin = juce::jmax (0, relEnd - maxBack);
+                const int patLen = juce::jmax (1, pattern.length.load());
+                const int noteCount = pattern.noteCount[(size_t) c].load();
+
+                if (noteCount <= 0)
+                {
+                    for (int rel = relEnd - 1; rel >= relBegin; --rel)
+                    {
+                        const int tick = (clipStart + rel) * ticksPerStep;
+                        if (tick <= stepHit.tick) break;
+                        const int local = (clip.offset + rel) % patLen;
+                        const int vel = pattern.velocity[(size_t) c][(size_t) local].load();
+                        if (vel <= 0) continue;
+                        stepHit = { tick, (float) vel / 127.0f, (float) (int8_t) pattern.semis[(size_t) c][(size_t) local].load(), -1 };
+                        break;
+                    }
+                    continue;
+                }
+
+                for (int i = 0; i < juce::jmin (noteCount, maxNotes); ++i)
+                {
+                    const auto n = unpackNote (pattern.notes[(size_t) c][(size_t) i].load());
+                    const int localStep = n.start / ticksPerStep;
+                    if (localStep >= patLen) continue;
+                    // ultima volta che la nota parte dentro la clip prima della partenza
+                    int rel = ((localStep - clip.offset) % patLen + patLen) % patLen;
+                    if (rel >= relEnd) continue;
+                    rel += ((relEnd - 1 - rel) / patLen) * patLen;
+                    if (rel < relBegin) continue;
+                    const int tick = (clipStart + rel) * ticksPerStep + n.start % ticksPerStep;
+                    if (tick >= startTick) continue;
+                    const Hit h { tick, (float) n.velocity / 127.0f, (float) (n.pitch - sample->rootNote), tick + n.length };
+                    if (sample->gated && h.endTick <= startTick) continue;   // nota tenuta gia' finita
+                    if (numNoteHits < (int) noteHits.size()) noteHits[(size_t) numNoteHits++] = h;
+                }
+            }
+
+            auto resume = [&] (const Hit& h, bool fromNote)
+            {
+                if (h.tick < 0) return;
+                const double elapsed = (double) (startTick - h.tick) / ticksPerStep * samplesPerStep;   // campioni d'uscita
+                const double pos = elapsed * smp.stepFor (h.semis);
+                if (pos >= (double) (len - 2)) return;   // gia' finito
+                const int gate = fromNote && sample->gated ? juce::jmax (1, h.endTick - startTick) : -1;
+                smp.trigger (h.vel, h.semis, gate, 0.0f, 0.0f, 0.0f, false, pos);
+            };
+            resume (stepHit, false);
+            for (int i = 0; i < numNoteHits; ++i)
+                resume (noteHits[(size_t) i], true);
         }
     }
 
@@ -2818,6 +2914,7 @@ private:
     std::atomic<int>    currentTick      { -1 };
     std::array<std::atomic<uint64_t>, maxClips> clips {};
     std::atomic<bool>   songMode         { false };
+    int chaseAtStep = -1;   // thread audio: step in cui riprendere i campioni gia' in corso
     std::atomic<int>    songStartBar     { 0 };
     std::atomic<int>    currentSongStep  { -1 };
     std::atomic<float>  outputPeak       { 0.0f };

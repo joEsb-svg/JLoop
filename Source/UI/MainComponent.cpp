@@ -280,9 +280,7 @@ MainComponent::MainComponent()
         if (safe != nullptr && safe->splash != nullptr)
         {
             safe->removeChildComponent (safe->splash.get());
-            safe->splash.reset();
-            if (safe->settings != nullptr && ! safe->settings->getBoolValue ("guideShown", false))
-                safe->showGuide();
+            safe->splash.reset();   // la guida rapida si apre solo dal menu
         }
     };
     addAndMakeVisible (*splash);
