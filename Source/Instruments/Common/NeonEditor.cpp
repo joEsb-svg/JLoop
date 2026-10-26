@@ -243,6 +243,20 @@ void NeonEditor::paint (juce::Graphics& g)
 void NeonEditor::layoutSection (Section& s)
 {
     auto c = s.panel->content();
+    bool anyKnob = false;
+    for (auto* item : s.items) anyKnob = anyKnob || dynamic_cast<frui::Knob*> (item) != nullptr;
+    if (s.view != nullptr && ! s.items.empty() && ! anyKnob)
+    {
+        // solo selettori: in fila sopra, il disegno prende tutto il resto (a tutta larghezza)
+        const int barH = juce::jlimit (22, 30, c.getHeight() / 5);
+        for (auto* item : s.items)
+        {
+            item->setBounds (c.removeFromTop (barH).withSizeKeepingCentre (juce::jmin (c.getWidth(), 360), barH));
+            c.removeFromTop (5);
+        }
+        s.view->setBounds (c.reduced (0, 2));
+        return;
+    }
     if (s.view != nullptr)
     {
         if (s.items.empty())

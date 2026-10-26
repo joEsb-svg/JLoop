@@ -14,7 +14,17 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.46)
+## Stato attuale (v0.47)
+
+**Novita' della 0.47**: PsyForge (rosa), cassa e basso "rolling" per Psytrance e Hi-tech
+- Griglia di una battuta: K = cassa, B = basso (tocca una casella: cassa > basso > pausa);
+  figure pronte Full-on (K-B-B-B), Night, Goa, Hi-tech (a trentaduesimi)
+- Suona mentre c'e' una nota: nel channel rack bastano gli step sui quarti (ogni step tiene acceso il suo quarto),
+  nel piano roll una nota lunga = rolling continuo; l'altezza della nota decide la tonalita'
+- Cassa psy integrata (click, punch, durata) accordata un'ottava sotto il basso: basso e coda non si scontrano
+- Knob grandi CODA (basso corto/lungo) e MORSO (schiocco del filtro); onda saw / quadra / FM
+- 12 preset: Full-on Rolling, Dark Forest, Goa Classic, Hi-tech 190, Twilight, Progressive Psy, Zenonesque,
+  Forest Night, Squelch 303, Solo basso, Hi-tech Twister
 
 **Novita' della 0.46**: Riser automatico con tanti suoni
 - 16 suoni pronti (Classico EDM, Big Room, Electro 2010, Complextro Laser, Dubstep Sirena, Hoover Rave,

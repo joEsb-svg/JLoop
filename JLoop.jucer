@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <JUCERPROJECT name="JLoop" projectType="guiapp" bundleIdentifier="com.joesb.dawfl"
-              version="0.46.0" companyName="joEsb" id="DwFl01" useAppConfig="0"
+              version="0.47.0" companyName="joEsb" id="DwFl01" useAppConfig="0"
               addUsingNamespaceToJuceHeader="0" cppLanguageStandard="20" defines="JucePlugin_Name=&quot;BassForge&quot;&#10;JUCE_STRICT_REFCOUNTEDPOINTER=1"
               jucerFormatVersion="1">
   <MAINGROUP id="Mg0001" name="JLoop">
@@ -90,6 +90,10 @@
       <FILE id="RvxC01" name="RoboVox.cpp" compile="1" resource="0" file="Source/Instruments/RoboVox/RoboVox.cpp"/>
       <FILE id="RvxH02" name="RoboVoxEditor.h" compile="0" resource="0" file="Source/Instruments/RoboVox/RoboVoxEditor.h"/>
       <FILE id="RvxC02" name="RoboVoxEditor.cpp" compile="1" resource="0" file="Source/Instruments/RoboVox/RoboVoxEditor.cpp"/>
+      <FILE id="PsyH01" name="PsyForge.h" compile="0" resource="0" file="Source/Instruments/PsyForge/PsyForge.h"/>
+      <FILE id="PsyC01" name="PsyForge.cpp" compile="1" resource="0" file="Source/Instruments/PsyForge/PsyForge.cpp"/>
+      <FILE id="PsyH02" name="PsyForgeEditor.h" compile="0" resource="0" file="Source/Instruments/PsyForge/PsyForgeEditor.h"/>
+      <FILE id="PsyC02" name="PsyForgeEditor.cpp" compile="1" resource="0" file="Source/Instruments/PsyForge/PsyForgeEditor.cpp"/>
       <FILE id="FmH001" name="FMForge.h" compile="0" resource="0" file="Source/Instruments/FMForge/FMForge.h"/>
       <FILE id="FmC001" name="FMForge.cpp" compile="1" resource="0" file="Source/Instruments/FMForge/FMForge.cpp"/>
       <FILE id="FmH002" name="FMForgeEditor.h" compile="0" resource="0" file="Source/Instruments/FMForge/FMForgeEditor.h"/>
@@ -529,7 +533,7 @@
   </MAINGROUP>
   <EXPORTFORMATS>
     <ANDROIDSTUDIO targetFolder="Builds/Android" microphonePermissionNeeded="1" androidEnableContentSharing="1" androidBluetoothScanNeeded="1" androidBluetoothConnectNeeded="1" smallIcon="IcOn01" bigIcon="IcOn01"
-                   androidVersionCode="51" androidMinimumSDK="24" androidScreenOrientation="landscape"
+                   androidVersionCode="52" androidMinimumSDK="24" androidScreenOrientation="landscape"
                    androidInternetNeeded="0" androidExternalWriteNeeded="0" androidPushNotifications="0"
                    androidReadMediaAudioPermission="0" androidReadMediaImagesPermission="0"
                    androidReadMediaVideoPermission="0">
