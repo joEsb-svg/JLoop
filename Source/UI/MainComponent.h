@@ -4,6 +4,7 @@
 #include "../Engine/SequencerEngine.h"
 #include "../Engine/RenderAhead.h"
 #include "../Engine/Freeze.h"
+#include "../Engine/ProjectShare.h"
 #include "DawLookAndFeel.h"
 #include "Widgets.h"
 #include "ChannelRow.h"
@@ -208,6 +209,10 @@ private:
     std::vector<std::unique_ptr<SequencerEngine::FrozenAudio>> frozenStore;
     juce::Label freezeStatus;
     void startFreeze (int channel);
+    void shareProject();
+    void openProjectFile();
+    std::unique_ptr<juce::FileChooser> projectChooser;
+    juce::ScopedMessageBox shareBox;
     void unfreezeChannel (int channel);
     void checkFreezer();
     void askUnfreeze (int channel, std::function<void()> then);

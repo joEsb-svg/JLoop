@@ -945,6 +945,8 @@ void MainComponent::showFileMenu()
     menu.addItem (2, "Salva", true);
     menu.addItem (3, "Salva con nome...");
     menu.addSubMenu ("Elimina", deleteMenu, ! projects.isEmpty());
+    menu.addItem (11, "Condividi progetto...");
+    menu.addItem (12, "Apri progetto da file...");
     menu.addSeparator();
     menu.addItem (7, "Mixer...");
     menu.addItem (10, "Live (lancia i pattern)...");
@@ -990,6 +992,10 @@ void MainComponent::showFileMenu()
                                 self.showUndoHistory();
                             else if (result == 10)
                                 self.openLive();
+                            else if (result == 11)
+                                self.shareProject();
+                            else if (result == 12)
+                                self.openProjectFile();
                             else if (result >= 3000 && result < 4000)
                                 self.loadDemo (result - 3000);
                             else if (result >= 5000 && result < 9000)
@@ -1560,6 +1566,53 @@ void MainComponent::askUnfreeze (int channel, std::function<void()> then)
             return;
         safe->unfreezeChannel (channel);
         if (then) then();
+    });
+}
+
+//==============================================================================
+// Condivisione dei progetti
+
+void MainComponent::shareProject()
+{
+    // I nomi dei campioni dentro gli strumenti (DrumForge, Slicer) stanno nei loro stati
+    juce::StringArray states;
+    for (int c = 0; c < engine.getNumChannels(); ++c)
+        if (auto* proc = engine.getInstrument (c))
+        {
+            juce::MemoryBlock mb;
+            proc->getStateInformation (mb);
+            states.add (juce::String::createStringFromData (mb.getData(), (int) mb.getSize()));
+        }
+    juce::String error;
+    const auto file = ProjectShare::pack (ProjectIO::toJson (engine), projectName == untitled ? juce::String ("Progetto") : projectName, states, error);
+    if (! file.existsAsFile())
+    {
+        showMessage ("Condividi progetto", error);
+        return;
+    }
+    shareBox = juce::ContentSharer::shareFilesScoped ({ juce::URL (file) }, [] (bool, const juce::String&) {}, this);
+}
+
+void MainComponent::openProjectFile()
+{
+    projectChooser = std::make_unique<juce::FileChooser> ("Apri un progetto JLoop", juce::File(), "*.jloop;*.dawfl");
+    juce::Component::SafePointer<MainComponent> safe (this);
+    projectChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe] (const juce::FileChooser& fc)
+    {
+        if (safe == nullptr || fc.getURLResults().isEmpty())
+            return;
+        const auto url = fc.getURLResults()[0];
+        std::unique_ptr<juce::InputStream> in (url.createInputStream (juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inAddress)));
+        juce::String error;
+        auto fileName = url.getLocalFile().getFileName();
+        if (fileName.isEmpty()) fileName = juce::URL::removeEscapeChars (url.toString (false).fromLastOccurrenceOf ("/", false, false));
+        const auto name = in != nullptr ? ProjectShare::unpack (*in, fileName, error) : juce::String();
+        if (name.isEmpty())
+        {
+            safe->showMessage ("Apri progetto", error.isNotEmpty() ? error : juce::String ("Non riesco a leggere il file."));
+            return;
+        }
+        safe->openProject (name);
     });
 }
 

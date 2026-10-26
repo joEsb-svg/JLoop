@@ -56,6 +56,7 @@
       <FILE id="UhH001" name="UndoHistory.h" compile="0" resource="0" file="Source/UI/UndoHistory.h"/>
       <FILE id="LpH001" name="LivePanel.h" compile="0" resource="0" file="Source/UI/LivePanel.h"/>
       <FILE id="HoH001" name="HoloDisplay.h" compile="0" resource="0" file="Source/UI/HoloDisplay.h"/>
+      <FILE id="PsH001" name="ProjectShare.h" compile="0" resource="0" file="Source/Engine/ProjectShare.h"/>
       <FILE id="FzH001" name="Freeze.h" compile="0" resource="0" file="Source/Engine/Freeze.h"/>
       <FILE id="RaH001" name="RenderAhead.h" compile="0" resource="0" file="Source/Engine/RenderAhead.h"/>
       <FILE id="PbH001" name="PresetBrowser.h" compile="0" resource="0" file="Source/UI/PresetBrowser.h"/>
