@@ -14,7 +14,12 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.39)
+## Stato attuale (v0.40)
+
+**Novita' della 0.40**: WubForge, synth nuovo (verde) per i bassi wobble. Quattro forme di LFO (A, B, C, D)
+da disegnare col dito (doppio tocco = forme pronte), ognuna con la sua velocita' a tempo (1/4, 1/8, 1/8T, 1/16...);
+una sequenza di 8 caselle sceglie la forma per ogni mezza battuta. L'LFO muove cutoff, filtro a vocali
+(talking, yoi), volume e intonazione; knob grandi WOBBLE e GROWL; 11 preset (Talking Wub, Yoi Bass, Brostep Growl...)
 
 **Novita' della 0.39**
 - MegaSaw: synth nuovo (arancione) per supersaw, hoover e reese. Fino a 9 voci stonate e aperte nello stereo,

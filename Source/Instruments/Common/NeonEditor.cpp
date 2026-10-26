@@ -62,9 +62,11 @@ NeonEditor::~NeonEditor()
     setLookAndFeel (nullptr);
 }
 
-NeonEditor::Section& NeonEditor::section (int tabIndex, const juce::String& title, float weight, int columns)
+NeonEditor::Section& NeonEditor::section (int tabIndex, const juce::String& title, float weight, int columns, int row, float rowWeight)
 {
     auto s = std::make_unique<Section>();
+    s->row = row;
+    s->rowWeight = rowWeight;
     s->panel = std::make_unique<frui::Panel> (title);
     s->weight = weight;
     s->columns = columns;
@@ -161,8 +163,18 @@ void NeonEditor::layoutSection (Section& s)
             s.view->setBounds (c);
             return;
         }
-        s.view->setBounds (c.removeFromTop ((int) ((float) c.getHeight() * s.viewShare)).reduced (0, 2));
-        c.removeFromTop (4);
+        if (c.getHeight() < 150 && c.getWidth() > 420)
+        {
+            // pannello basso (telefono con la tastiera aperta): disegno a sinistra, controlli a destra
+            const int vw = (int) ((float) c.getWidth() * 0.55f);
+            s.view->setBounds (c.removeFromLeft (vw).withSizeKeepingCentre (vw, juce::jmin (c.getHeight(), 64)).reduced (0, 2));
+            c.removeFromLeft (8);
+        }
+        else
+        {
+            s.view->setBounds (c.removeFromTop ((int) ((float) c.getHeight() * s.viewShare)).reduced (0, 2));
+            c.removeFromTop (4);
+        }
     }
     std::vector<juce::Component*> knobs;
     const int barH = juce::jlimit (22, 30, c.getHeight() / 6);
@@ -229,24 +241,42 @@ void NeonEditor::resized()
     std::vector<Section*> list;
     for (auto& s : sections[(size_t) tab]) list.push_back (s.get());
     if (list.empty()) return;
-    float total = 0.0f;
-    for (auto* s : list) total += s->weight;
-    if (area.getWidth() > 520 || list.size() <= 2)
+
+    // righe (una sola, salvo pannelli con row > 0)
+    int numRows = 0;
+    for (auto* s : list) numRows = juce::jmax (numRows, s->row + 1);
+    std::vector<float> rowW ((size_t) numRows, 0.0f);
+    for (auto* s : list) rowW[(size_t) s->row] = juce::jmax (rowW[(size_t) s->row], s->rowWeight);
+    float rowTotal = 0.0f;
+    for (auto w : rowW) rowTotal += w;
+    int y = area.getY();
+    for (int r = 0; r < numRows; ++r)
     {
-        int x = area.getX();
-        for (size_t i = 0; i < list.size(); ++i)
+        const int h = r + 1 == numRows ? area.getBottom() - y : juce::roundToInt ((float) area.getHeight() * rowW[(size_t) r] / juce::jmax (0.001f, rowTotal));
+        const juce::Rectangle<int> rowArea (area.getX(), y, area.getWidth(), h);
+        y += h;
+        std::vector<Section*> inRow;
+        for (auto* s : list) if (s->row == r) inRow.push_back (s);
+        if (inRow.empty()) continue;
+        float total = 0.0f;
+        for (auto* s : inRow) total += s->weight;
+        if (numRows > 1 || rowArea.getWidth() > 520 || inRow.size() <= 2)
         {
-            const int w = i + 1 == list.size() ? area.getRight() - x : juce::roundToInt ((float) area.getWidth() * list[i]->weight / total);
-            list[i]->panel->setBounds (juce::Rectangle<int> (x, area.getY(), w, area.getHeight()).reduced (3));
-            x += w;
+            int x = rowArea.getX();
+            for (size_t i = 0; i < inRow.size(); ++i)
+            {
+                const int w = i + 1 == inRow.size() ? rowArea.getRight() - x : juce::roundToInt ((float) rowArea.getWidth() * inRow[i]->weight / total);
+                inRow[i]->panel->setBounds (juce::Rectangle<int> (x, rowArea.getY(), w, rowArea.getHeight()).reduced (3));
+                x += w;
+            }
         }
-    }
-    else
-    {
-        const int rows = ((int) list.size() + 1) / 2;
-        const int h = area.getHeight() / rows, w = area.getWidth() / 2;
-        for (size_t i = 0; i < list.size(); ++i)
-            list[i]->panel->setBounds (juce::Rectangle<int> (area.getX() + (int) (i % 2) * w, area.getY() + (int) (i / 2) * h, w, h).reduced (3));
+        else
+        {
+            const int rows = ((int) inRow.size() + 1) / 2;
+            const int hh = rowArea.getHeight() / rows, w = rowArea.getWidth() / 2;
+            for (size_t i = 0; i < inRow.size(); ++i)
+                inRow[i]->panel->setBounds (juce::Rectangle<int> (rowArea.getX() + (int) (i % 2) * w, rowArea.getY() + (int) (i / 2) * hh, w, hh).reduced (3));
+        }
     }
     for (auto* s : list)
         layoutSection (*s);

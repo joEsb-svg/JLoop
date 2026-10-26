@@ -29,11 +29,13 @@ protected:
         std::unique_ptr<frui::Panel> panel;
         std::vector<juce::Component*> items;
         juce::Component* view = nullptr;
-        float viewShare = 0.4f, weight = 1.0f;
-        int columns = 0;
+        float viewShare = 0.4f, weight = 1.0f, rowWeight = 1.0f;
+        int columns = 0, row = 0;
     };
 
-    Section& section (int tab, const juce::String& title, float weight = 1.0f, int columns = 0);
+    /** Un pannello nella scheda 'tab'. I pannelli della stessa riga stanno affiancati, le righe una sotto l'altra
+        (altezza in proporzione a rowWeight). */
+    Section& section (int tab, const juce::String& title, float weight = 1.0f, int columns = 0, int row = 0, float rowWeight = 1.0f);
     void knob (Section&, const juce::String& id, const juce::String& title);
     void segment (Section&, const juce::String& id, juce::StringArray labels = {});
     void lcd (Section&, const juce::String& id, const juce::String& prefix = {});
