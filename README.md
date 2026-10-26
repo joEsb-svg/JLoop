@@ -14,7 +14,20 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.47)
+## Stato attuale (v0.48)
+
+**Novita' della 0.48**: AcidLine (giallo acido), linee acide stile TB-303 per acid, psy e goa
+- Sequenza di 16 step: trascina le barre su/giu' per la nota, tocca per la pausa, puntini ACCENT e SLIDE,
+  pulsante CASUALE per una linea nuova; ogni nota tiene accesa la sua battuta e l'altezza traspone la linea
+- Modalita' TASTIERA: suona come un synth mono (legato = slide, velocity alta = accent)
+- Filtro a 4 poli che squitta, knob grandi SQUELCH (risonanza + inviluppo) e ACIDO (distorsione)
+- 10 preset: Acid Classico, Psy Acid 145, Acid Techno, Gomma Acida, Hi-tech Acid, Goa Acid, Acido Scuro,
+  Bleep Quadra, Squelch Totale
+
+PsyForge rifatto nel suono: preset davvero diversi tra loro
+- Nuove onde Doppio (due saw stonate) e Piegato (wavefolder), knob COLORE (cambia il timbro di ogni onda),
+  SUB (sinusoide un'ottava sotto), ZAP (colpo "laser" hi-tech) e MOVIMENTO (Fisso, Ottava, Quinta, Galoppo, Scala)
+- 13 preset ridisegnati, piu' Sub Morbido e Laser Goa
 
 **Novita' della 0.47**: PsyForge (rosa), cassa e basso "rolling" per Psytrance e Hi-tech
 - Griglia di una battuta: K = cassa, B = basso (tocca una casella: cassa > basso > pausa);

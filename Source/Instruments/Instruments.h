@@ -15,6 +15,7 @@
 #include "WubForge/WubForge.h"
 #include "RoboVox/RoboVox.h"
 #include "PsyForge/PsyForge.h"
+#include "AcidLine/AcidLine.h"
 
 //==============================================================================
 /**
@@ -46,6 +47,7 @@ namespace Instruments
             { "wubforge", "WubForge", "Wobble: LFO disegnabili, vocali, growl (dubstep, brostep)", 0xff8cff3a },
             { "robovox", "RoboVox", "Vocoder: una voce fa cantare i tuoi accordi da robot", 0xffc46bff },
             { "psyforge", "PsyForge", "Psytrance e Hi-tech: cassa e basso rolling (K-B-B-B)", 0xfff59ac8 },
+            { "acidline", "AcidLine", "Linee acide stile 303: note, accent e slide (acid, psy, goa)", 0xffd8ff4a },
             { "slicer", "Slicer", "Taglia loop e voci sui colpi: un pezzo per tasto (vocal chop)", 0xffe8c35a },
         };
         return infos;
@@ -76,6 +78,7 @@ namespace Instruments
         if (id == "wubforge") return std::make_unique<WubForgeAudioProcessor>();
         if (id == "robovox") return std::make_unique<RoboVoxAudioProcessor>();
         if (id == "psyforge") return std::make_unique<PsyForgeAudioProcessor>();
+        if (id == "acidline") return std::make_unique<AcidLineAudioProcessor>();
         return std::make_unique<BassForgeAudioProcessor>();
     }
 
@@ -105,6 +108,8 @@ namespace Instruments
             for (int i = 0; i < rv::Presets::numFactory(); ++i) names.add (rv::Presets::factoryName (i));
         else if (dynamic_cast<PsyForgeAudioProcessor*> (p) != nullptr)
             for (int i = 0; i < psy::Presets::numFactory(); ++i) names.add (psy::Presets::factoryName (i));
+        else if (dynamic_cast<AcidLineAudioProcessor*> (p) != nullptr)
+            for (int i = 0; i < acid::Presets::numFactory(); ++i) names.add (acid::Presets::factoryName (i));
         return names;
     }
 
@@ -120,6 +125,7 @@ namespace Instruments
         if (auto* wb = dynamic_cast<WubForgeAudioProcessor*> (p))  wb->getPresets().loadFactory (index);
         if (auto* rx = dynamic_cast<RoboVoxAudioProcessor*> (p))  rx->getPresets().loadFactory (index);
         if (auto* ps = dynamic_cast<PsyForgeAudioProcessor*> (p))  ps->getPresets().loadFactory (index);
+        if (auto* ac = dynamic_cast<AcidLineAudioProcessor*> (p))  ac->getPresets().loadFactory (index);
     }
 
     inline juce::Array<juce::File> userPresets (juce::AudioProcessor* p)
@@ -134,6 +140,7 @@ namespace Instruments
         if (auto* wb = dynamic_cast<WubForgeAudioProcessor*> (p))  return wb->getPresets().userPresets();
         if (auto* rx = dynamic_cast<RoboVoxAudioProcessor*> (p))  return rx->getPresets().userPresets();
         if (auto* ps = dynamic_cast<PsyForgeAudioProcessor*> (p))  return ps->getPresets().userPresets();
+        if (auto* ac = dynamic_cast<AcidLineAudioProcessor*> (p))  return ac->getPresets().userPresets();
         return {};
     }
 
@@ -149,6 +156,7 @@ namespace Instruments
         if (auto* wb = dynamic_cast<WubForgeAudioProcessor*> (p))  wb->getPresets().load (file);
         if (auto* rx = dynamic_cast<RoboVoxAudioProcessor*> (p))  rx->getPresets().load (file);
         if (auto* ps = dynamic_cast<PsyForgeAudioProcessor*> (p))  ps->getPresets().load (file);
+        if (auto* ac = dynamic_cast<AcidLineAudioProcessor*> (p))  ac->getPresets().load (file);
     }
 
     inline bool saveUser (juce::AudioProcessor* p, const juce::String& name)
@@ -163,6 +171,7 @@ namespace Instruments
         if (auto* wb = dynamic_cast<WubForgeAudioProcessor*> (p))  return wb->getPresets().save (name);
         if (auto* rx = dynamic_cast<RoboVoxAudioProcessor*> (p))  return rx->getPresets().save (name);
         if (auto* ps = dynamic_cast<PsyForgeAudioProcessor*> (p))  return ps->getPresets().save (name);
+        if (auto* ac = dynamic_cast<AcidLineAudioProcessor*> (p))  return ac->getPresets().save (name);
         return false;
     }
 
@@ -178,6 +187,7 @@ namespace Instruments
         if (auto* wb = dynamic_cast<WubForgeAudioProcessor*> (p))  return wb->getPresets().currentName();
         if (auto* rx = dynamic_cast<RoboVoxAudioProcessor*> (p))  return rx->getPresets().currentName();
         if (auto* ps = dynamic_cast<PsyForgeAudioProcessor*> (p))  return ps->getPresets().currentName();
+        if (auto* ac = dynamic_cast<AcidLineAudioProcessor*> (p))  return ac->getPresets().currentName();
         return "Synth";
     }
 

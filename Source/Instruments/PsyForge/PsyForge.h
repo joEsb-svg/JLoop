@@ -32,6 +32,8 @@ namespace psy
         float kickClick = 0.5f, kickPunch = 0.5f, kickDecay = 0.35f, kickTune = 0.0f, kickLevel = 0.9f;
         float cutoff = 400.0f, reso = 0.3f, drive = 0.3f, bassLevel = 0.8f;
         float coda = 0.3f, morso = 0.6f, snap = 0.3f;
+        float colore = 0.0f, sub = 0.0f, zap = 0.0f;
+        int motion = 0;
         forge::FxParams fx;
     };
 
@@ -105,7 +107,7 @@ public:
 private:
     psy::BlockParams readParams();
     void render (float* L, float* R, int n, const psy::BlockParams& b, double bpm, double ppq);
-    void hit (int what, const psy::BlockParams& b);
+    void hit (int what, int cellIdx, const psy::BlockParams& b);
 
     psy::Presets presets { apvts, *this };
     std::vector<std::atomic<float>*> p;
@@ -121,7 +123,8 @@ private:
     double kPh = 0.0, kT = 1.0e9;
     float kEnv = 0.0f;
     // basso
-    double bPh = 0.0, bMod = 0.0, bT = 1.0e9;
+    double bPh = 0.0, bPh2 = 0.0, subPh = 0.0, bMod = 0.0, bT = 1.0e9;
+    int bOffset = 0;
     float bEnv = 0.0f, fEnv = 0.0f, s1 = 0.0f, s2 = 0.0f, s1b = 0.0f, s2b = 0.0f;
     juce::Random rng;
     forge::Effects fx;

@@ -171,9 +171,14 @@ PsyForgeEditor::PsyForgeEditor (PsyForgeAudioProcessor& p)
     knob (k, "kickTune", "ACCORDA");
     knob (k, "kickLevel", "VOLUME");
 
-    auto& b = section (2, "BASSO", 1.0f, 4);
-    choice (b, "bassWave");
-    choice (b, "bassOct", "OTTAVA ");
+    auto& t = section (2, "TIMBRO", 1.0f, 3);
+    choice (t, "bassWave");
+    choice (t, "bassOct", "OTTAVA ");
+    choice (t, "motion", "MOVIMENTO ");
+    knob (t, "colore", "COLORE");
+    knob (t, "sub", "SUB");
+    knob (t, "zap", "ZAP");
+    auto& b = section (2, "FILTRO E VOLUME", 1.0f, 3);
     knob (b, "cutoff", "CUTOFF");
     knob (b, "reso", "RESO");
     knob (b, "drive", "DRIVE");

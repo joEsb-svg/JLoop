@@ -5,9 +5,10 @@ namespace psy
 {
     static const char* ids[] { "figure", "kickOn", "kickClick", "kickPunch", "kickDecay", "kickTune", "kickLevel",
                                "bassWave", "bassOct", "transpose", "cutoff", "reso", "drive", "bassLevel", "coda", "morso", "snap",
+                               "colore", "sub", "zap", "motion",
                                "revMix", "revSize", "dlyMix", "dlyTime", "dlyFb", "master" };
     enum { iFigure, iKickOn, iClick, iPunch, iKDecay, iKTune, iKLevel, iWave, iOct, iTranspose, iCutoff, iReso, iDrive, iBLevel,
-           iCoda, iMorso, iSnap, iRevMix, iRevSize, iDlyMix, iDlyTime, iDlyFb, iMaster, numIds };
+           iCoda, iMorso, iSnap, iColore, iSub, iZap, iMotion, iRevMix, iRevSize, iDlyMix, iDlyTime, iDlyFb, iMaster, numIds };
 
     static inline double mtof (double m) noexcept { return 440.0 * std::pow (2.0, (m - 69.0) / 12.0); }
 
@@ -40,7 +41,7 @@ namespace psy
         flt ("kickDecay", "Coda cassa", { 0.0f, 1.0f }, 0.35f, pct);
         flt ("kickTune", "Accorda cassa", { -12.0f, 12.0f, 1.0f }, 0.0f, [] (float x, int) { return (x > 0 ? "+" : "") + String (roundToInt (x)) + " st"; });
         flt ("kickLevel", "Volume cassa", { 0.0f, 1.0f }, 0.85f, pct);
-        choice ("bassWave", "Onda", { "Saw", "Square", "FM" }, 0);
+        choice ("bassWave", "Onda", { "Saw", "Square", "FM", "Doppio", "Piegato" }, 0);
         choice ("bassOct", "Ottava", { "-1", "0", "+1" }, 1);
         flt ("transpose", "Nota", { -12.0f, 12.0f, 1.0f }, 0.0f, [] (float x, int)
         {
@@ -54,6 +55,10 @@ namespace psy
         flt ("coda", "Coda", { 0.0f, 1.0f }, 0.3f, pct);
         flt ("morso", "Morso", { 0.0f, 1.0f }, 0.6f, pct);
         flt ("snap", "Schiocco", { 0.0f, 1.0f }, 0.3f, pct);
+        flt ("colore", "Colore", { 0.0f, 1.0f }, 0.0f, pct);
+        flt ("sub", "Sub", { 0.0f, 1.0f }, 0.0f, pct);
+        flt ("zap", "Zap", { 0.0f, 1.0f }, 0.0f, pct);
+        choice ("motion", "Movimento", { "Fisso", "Ottava", "Quinta", "Galoppo", "Scala" }, 0);
         flt ("revMix", "Riverbero", { 0.0f, 1.0f }, 0.0f, pct);
         flt ("revSize", "Stanza", { 0.0f, 1.0f }, 0.4f, pct);
         flt ("dlyMix", "Delay", { 0.0f, 1.0f }, 0.0f, pct);
@@ -73,28 +78,43 @@ namespace psy
     struct Factory { const char* name; int figure; const char* grid; std::vector<std::pair<const char*, float>> values; };
     static const std::vector<Factory>& factory()
     {
-        // bassWave 0 saw 1 square 2 FM | bassOct 0 = -1, 1 = 0, 2 = +1
+        // bassWave 0 saw 1 quadra 2 FM 3 doppio 4 piegato | bassOct 0 = -1, 1 = 0, 2 = +1
+        // motion 0 fisso 1 ottava 2 quinta 3 galoppo 4 scala | dlyTime 0 1/16 1 1/8 2 3/16 3 1/4
         static const std::vector<Factory> list
         {
             { "Init", 0, nullptr, {} },
-            { "Full-on Rolling", 0, nullptr, { { "cutoff", 380 }, { "reso", 0.35f }, { "morso", 0.65f }, { "coda", 0.28f }, { "snap", 0.3f }, { "drive", 0.35f }, { "master", 0.7f } } },
-            { "Dark Forest", 1, nullptr, { { "bassWave", 1 }, { "cutoff", 220 }, { "reso", 0.5f }, { "morso", 0.75f }, { "coda", 0.22f }, { "snap", 0.2f },
-                                            { "drive", 0.5f }, { "kickDecay", 0.25f }, { "dlyMix", 0.1f }, { "master", 1.7f } } },
-            { "Goa Classic", 2, nullptr, { { "cutoff", 500 }, { "reso", 0.55f }, { "morso", 0.55f }, { "coda", 0.45f }, { "snap", 0.4f }, { "kickDecay", 0.45f },
-                                            { "revMix", 0.12f }, { "master", -4.5f } } },
-            { "Hi-tech 190", 3, nullptr, { { "bassWave", 2 }, { "cutoff", 700 }, { "reso", 0.3f }, { "morso", 0.8f }, { "coda", 0.1f }, { "snap", 0.12f },
-                                            { "kickDecay", 0.18f }, { "kickPunch", 0.7f }, { "drive", 0.45f }, { "master", 2.0f } } },
-            { "Twilight", 0, nullptr, { { "cutoff", 650 }, { "reso", 0.25f }, { "morso", 0.45f }, { "coda", 0.35f }, { "snap", 0.35f }, { "drive", 0.2f }, { "master", 0.5f } } },
-            { "Progressive Psy", 2, nullptr, { { "bassWave", 1 }, { "cutoff", 300 }, { "reso", 0.2f }, { "morso", 0.4f }, { "coda", 0.5f }, { "snap", 0.5f },
-                                                { "kickDecay", 0.5f }, { "revMix", 0.15f }, { "master", -4.9f } } },
-            { "Zenonesque", 0, "KB.BKB.BKB.BK.BB", { { "cutoff", 450 }, { "reso", 0.45f }, { "morso", 0.7f }, { "coda", 0.15f }, { "snap", 0.2f },
-                                                     { "dlyMix", 0.18f }, { "dlyTime", 2 }, { "master", 0.9f } } },
-            { "Forest Night", 1, "K.BBK.BBK.B.KBBB", { { "bassWave", 2 }, { "cutoff", 260 }, { "reso", 0.6f }, { "morso", 0.85f }, { "coda", 0.18f },
-                                                        { "drive", 0.55f }, { "kickTune", -2 }, { "master", 1.4f } } },
-            { "Squelch 303", 0, nullptr, { { "cutoff", 300 }, { "reso", 0.82f }, { "morso", 0.9f }, { "coda", 0.3f }, { "snap", 0.25f }, { "drive", 0.6f }, { "master", 0.6f } } },
-            { "Solo basso", 0, nullptr, { { "kickOn", 0 }, { "cutoff", 400 }, { "reso", 0.35f }, { "morso", 0.65f }, { "coda", 0.3f }, { "master", 3.4f } } },
-            { "Hi-tech Twister", 3, "K.BBB.BBK.BBBB.BK.B.BBBBK.BB.BBB", { { "bassWave", 2 }, { "cutoff", 900 }, { "reso", 0.4f }, { "morso", 0.9f },
-                                                                              { "coda", 0.08f }, { "snap", 0.1f }, { "drive", 0.6f }, { "kickDecay", 0.15f }, { "master", 2.7f } } },
+            { "Full-on Rolling", 0, nullptr, { { "colore", 0.25f }, { "cutoff", 320 }, { "reso", 0.5f }, { "morso", 0.8f }, { "coda", 0.2f }, { "snap", 0.2f },
+                                               { "drive", 0.4f }, { "sub", 0.3f }, { "kickClick", 0.7f }, { "kickPunch", 0.7f }, { "master", 0.5f } } },
+            { "Dark Forest", 1, nullptr, { { "bassWave", 2 }, { "bassOct", 0 }, { "colore", 0.6f }, { "cutoff", 260 }, { "reso", 0.6f }, { "morso", 0.85f },
+                                           { "coda", 0.15f }, { "snap", 0.15f }, { "drive", 0.6f }, { "zap", 0.25f }, { "kickDecay", 0.2f }, { "kickClick", 0.9f },
+                                           { "dlyMix", 0.12f }, { "master", 3.0f } } },
+            { "Goa Classic", 2, nullptr, { { "colore", 0.6f }, { "cutoff", 900 }, { "reso", 0.7f }, { "morso", 0.5f }, { "coda", 0.55f }, { "snap", 0.55f },
+                                           { "motion", 2 }, { "kickDecay", 0.5f }, { "kickClick", 0.2f }, { "revMix", 0.15f }, { "master", -4.7f } } },
+            { "Hi-tech 190", 3, nullptr, { { "bassWave", 4 }, { "bassOct", 2 }, { "colore", 0.5f }, { "zap", 0.6f }, { "cutoff", 1500 }, { "reso", 0.3f },
+                                           { "morso", 0.9f }, { "coda", 0.06f }, { "snap", 0.1f }, { "drive", 0.45f }, { "kickDecay", 0.12f },
+                                           { "kickPunch", 0.9f }, { "kickClick", 0.8f }, { "master", 3.1f } } },
+            { "Twilight", 0, nullptr, { { "bassWave", 3 }, { "colore", 0.5f }, { "cutoff", 700 }, { "reso", 0.2f }, { "morso", 0.35f }, { "coda", 0.4f },
+                                        { "snap", 0.4f }, { "drive", 0.2f }, { "sub", 0.4f }, { "dlyMix", 0.15f }, { "dlyTime", 1 }, { "master", 1.5f } } },
+            { "Progressive Psy", 2, nullptr, { { "bassWave", 1 }, { "bassOct", 0 }, { "colore", 0.2f }, { "cutoff", 280 }, { "reso", 0.15f }, { "morso", 0.3f },
+                                               { "coda", 0.7f }, { "snap", 0.6f }, { "sub", 0.6f }, { "kickDecay", 0.6f }, { "kickPunch", 0.3f },
+                                               { "revMix", 0.2f }, { "master", -5.8f } } },
+            { "Zenonesque", 0, "KB.BKB.BKB.BK.BB", { { "bassWave", 2 }, { "colore", 0.3f }, { "cutoff", 500 }, { "reso", 0.45f }, { "morso", 0.7f },
+                                                     { "coda", 0.2f }, { "snap", 0.2f }, { "motion", 3 }, { "dlyMix", 0.2f }, { "dlyTime", 2 }, { "master", 0.7f } } },
+            { "Forest Night", 1, "K.BBK.BBK.B.KBBB", { { "bassWave", 4 }, { "bassOct", 0 }, { "colore", 0.8f }, { "cutoff", 200 }, { "reso", 0.75f },
+                                                       { "morso", 1.0f }, { "coda", 0.12f }, { "drive", 0.7f }, { "zap", 0.4f }, { "kickTune", -3 },
+                                                       { "kickDecay", 0.25f }, { "master", 2.5f } } },
+            { "Squelch 303", 0, nullptr, { { "cutoff", 250 }, { "reso", 0.9f }, { "morso", 0.95f }, { "coda", 0.35f }, { "snap", 0.2f }, { "drive", 0.7f },
+                                           { "motion", 4 }, { "master", 0.6f } } },
+            { "Solo basso", 0, nullptr, { { "kickOn", 0 }, { "bassWave", 3 }, { "colore", 0.3f }, { "sub", 0.5f }, { "cutoff", 450 }, { "reso", 0.35f },
+                                          { "morso", 0.6f }, { "coda", 0.3f }, { "motion", 1 }, { "master", 4.3f } } },
+            { "Hi-tech Twister", 3, "K.BBB.BBK.BBBB.BK.B.BBBBK.BB.BBB", { { "bassWave", 2 }, { "bassOct", 2 }, { "colore", 0.7f }, { "zap", 0.9f },
+                                                                              { "cutoff", 1400 }, { "reso", 0.5f }, { "morso", 0.9f }, { "coda", 0.05f },
+                                                                              { "snap", 0.1f }, { "drive", 0.6f }, { "motion", 3 }, { "kickDecay", 0.1f }, { "master", 3.7f } } },
+            { "Sub Morbido", 1, nullptr, { { "bassWave", 1 }, { "bassOct", 0 }, { "cutoff", 150 }, { "reso", 0.0f }, { "morso", 0.1f }, { "coda", 0.6f },
+                                           { "snap", 0.5f }, { "drive", 0.1f }, { "sub", 0.8f }, { "kickDecay", 0.7f }, { "kickPunch", 0.2f },
+                                           { "kickClick", 0.1f }, { "master", -1.4f } } },
+            { "Laser Goa", 2, nullptr, { { "zap", 1.0f }, { "motion", 1 }, { "cutoff", 1200 }, { "reso", 0.55f }, { "morso", 0.6f }, { "coda", 0.25f },
+                                         { "dlyMix", 0.25f }, { "dlyTime", 1 }, { "dlyFb", 0.45f }, { "master", 1.4f } } },
         };
         return list;
     }
@@ -217,16 +237,32 @@ psy::BlockParams PsyForgeAudioProcessor::readParams()
     b.bassWave = (int) p[iWave]->load(); b.bassOct = (int) p[iOct]->load(); b.transpose = juce::roundToInt (p[iTranspose]->load());
     b.cutoff = p[iCutoff]->load(); b.reso = p[iReso]->load(); b.drive = p[iDrive]->load(); b.bassLevel = p[iBLevel]->load();
     b.coda = p[iCoda]->load(); b.morso = p[iMorso]->load(); b.snap = p[iSnap]->load();
+    b.colore = p[iColore]->load(); b.sub = p[iSub]->load(); b.zap = p[iZap]->load(); b.motion = (int) p[iMotion]->load();
     b.fx.reverbMix = p[iRevMix]->load(); b.fx.reverbSize = p[iRevSize]->load(); b.fx.delayMix = p[iDlyMix]->load();
     b.fx.delayBeats = delayBeats[juce::jlimit (0, 5, (int) p[iDlyTime]->load())]; b.fx.delayFeedback = p[iDlyFb]->load();
     b.fx.gain = juce::Decibels::decibelsToGain (p[iMaster]->load());
     return b;
 }
 
-void PsyForgeAudioProcessor::hit (int what, const psy::BlockParams& b)
+void PsyForgeAudioProcessor::hit (int what, int cellIdx, const psy::BlockParams& b)
 {
     if (what == 1 && b.kickOn) { kT = 0.0; kPh = 0.0; }
-    if (what == 2) { bT = 0.0; bPh = 0.0; bMod = 0.0; }   // fase da zero: ogni colpo uguale, "morso" pulito
+    if (what == 2)
+    {
+        bT = 0.0; bPh = 0.0; bMod = 0.0; bPh2 = 0.25; subPh = 0.0;   // fase da zero: ogni colpo uguale, "morso" pulito
+        // MOVIMENTO: l'altezza di ogni colpo di basso segue una figura dentro il quarto / la battuta
+        const int cellsN = psy::cellsFor (b.figure), perBeat = cellsN / 4;
+        const int c = ((cellIdx % cellsN) + cellsN) % cellsN, inBeat = c % perBeat, beat = c / perBeat;
+        static constexpr int quinta[] { 0, 0, 7, 5 }, scala[] { 0, 3, 5, -2 };
+        switch (b.motion)
+        {
+            case 1:  bOffset = inBeat == perBeat - 1 ? 12 : 0; break;
+            case 2:  bOffset = quinta[beat & 3]; break;
+            case 3:  bOffset = (inBeat & 1) ? 12 : 0; break;
+            case 4:  bOffset = scala[beat & 3]; break;
+            default: bOffset = 0; break;
+        }
+    }
 }
 
 void PsyForgeAudioProcessor::render (float* L, float* R, int n, const psy::BlockParams& b, double bpm, double ppq)
@@ -249,7 +285,7 @@ void PsyForgeAudioProcessor::render (float* L, float* R, int n, const psy::Block
         double pos;
         if (ppq >= 0.0) pos = ppq + bps * (double) i / sr;
         else { pos = freeBeats; freeBeats += bps / sr; }
-        const bool active = ! held.empty() || pos < latchEnd;
+        const bool active = ! held.empty() || pos < latchEnd - 0.001;
         const int cellIdx = (int) std::floor (pos * cpb + 1.0e-9);
         if (noteOnPending)
         {
@@ -264,7 +300,7 @@ void PsyForgeAudioProcessor::render (float* L, float* R, int n, const psy::Block
             if (active)
             {
                 playCell.store (cell, std::memory_order_relaxed);
-                hit (getCell (cell), b);
+                hit (getCell (cell), cell, b);
             }
             else playCell.store (-1, std::memory_order_relaxed);
         }
@@ -288,15 +324,41 @@ void PsyForgeAudioProcessor::render (float* L, float* R, int n, const psy::Block
             const double t = bT / sr;
             const double env = juce::jmin (1.0, t / 0.0012) * std::exp (-t / bDecay);
             const double fe = std::exp (-t / fDecay);
-            bPh += bassF / sr; bPh -= std::floor (bPh);
+            // ZAP: l'intonazione parte alta e cade subito (colpo "laser" dell'hi-tech)
+            const double f = bassF * std::pow (2.0, (bOffset + 24.0 * b.zap * std::exp (-t / 0.012)) / 12.0);
+            bPh += f / sr; bPh -= std::floor (bPh);
             double osc;
-            if (b.bassWave == 1) osc = bPh < 0.5 ? 0.8 : -0.8;
-            else if (b.bassWave == 2)
+            switch (b.bassWave)
             {
-                bMod += bassF * 2.0 / sr; bMod -= std::floor (bMod);
-                osc = std::sin (twoPi * bPh + (0.6 + 3.5 * fe * b.morso) * std::sin (twoPi * bMod));
+                case 1:   // quadra: COLORE stringe l'impulso
+                {
+                    const double pw = 0.5 - 0.4 * b.colore;
+                    osc = bPh < pw ? 0.8 : -0.8;
+                    break;
+                }
+                case 2:   // FM: COLORE sceglie il rapporto (1, 2, 3, 4) e alza l'indice
+                {
+                    const double ratio = 1.0 + std::floor (b.colore * 3.99);
+                    bMod += f * ratio / sr; bMod -= std::floor (bMod);
+                    osc = std::sin (twoPi * bPh + (0.6 + b.colore * 1.5 + 3.5 * fe * b.morso) * std::sin (twoPi * bMod));
+                    break;
+                }
+                case 3:   // doppio: due saw stonate, COLORE = quanto stonate
+                {
+                    bPh2 += f * (1.0 + 0.004 + 0.03 * b.colore) / sr; bPh2 -= std::floor (bPh2);
+                    osc = (bPh - 0.5) + (bPh2 - 0.5);
+                    break;
+                }
+                case 4:   // piegato: sinusoide ripiegata, COLORE = quante pieghe
+                {
+                    const double amt = 1.0 + 5.0 * b.colore + 3.0 * fe * b.morso;
+                    osc = std::sin (std::sin (twoPi * bPh) * amt * 1.5) * 0.9;
+                    break;
+                }
+                default:  // saw: COLORE aggiunge un'ottava sopra
+                    osc = (2.0 * bPh - 1.0) * (1.0 - 0.35 * b.colore) + b.colore * 0.45 * (2.0 * (bPh * 2.0 - std::floor (bPh * 2.0)) - 1.0);
+                    break;
             }
-            else osc = 2.0 * bPh - 1.0;
             const float cutoff = (float) juce::jlimit (40.0, sr * 0.45, b.cutoff * std::pow (2.0, b.morso * 5.0 * fe));
             const float g = std::tan (juce::MathConstants<float>::pi * cutoff / (float) sr);
             const float a1 = 1.0f / (1.0f + g * (g + k)), a2 = g * a1, a3 = g * a2;
@@ -308,6 +370,9 @@ void PsyForgeAudioProcessor::render (float* L, float* R, int n, const psy::Block
                 const float w3 = x - s2b, w1 = b1 * s1b + b2 * w3, w2 = s2b + b2 * s1b + b3 * w3;
                 s1b = 2.0f * w1 - s1b; s2b = 2.0f * w2 - s2b; x = w2;
             }
+            // SUB: sinusoide pura un'ottava sotto, fuori dal filtro
+            subPh += f * 0.5 / sr; subPh -= std::floor (subPh);
+            x += (float) (std::sin (twoPi * subPh) * b.sub * 0.9);
             x = std::tanh (x * drive) * dNorm;
             out += (float) (x * env * b.bassLevel * 0.5);
             bT += 1.0;
