@@ -256,9 +256,9 @@ namespace riser
             ch.touchSound();
             r.sampleName = file.getFileName();
 
-            // --- il pattern: un colpo sul primo step (il campione suona tutto)
+            // --- il pattern: lungo quanto il riser, un colpo sul primo step (il campione suona tutto)
             auto& pat = engine.getPattern (r.pattern);
-            pat.length.store (SequencerEngine::stepsPerBar);
+            pat.length.store (juce::jmin (SequencerEngine::maxSteps, o.bars * SequencerEngine::stepsPerBar));   // lungo quanto la salita
             pat.velocity[(size_t) r.channel][0].store ((uint8_t) 110);
             pat.probability[(size_t) r.channel][0].store ((uint8_t) 100);
             pat.ratchet[(size_t) r.channel][0].store ((uint8_t) 1);
@@ -267,7 +267,7 @@ namespace riser
             if (o.toPlaylist)
             {
                 SequencerEngine::Clip c;
-                c.track = r.track; c.bar = startBar; c.pattern = r.pattern; c.length = SequencerEngine::stepsPerBar;
+                c.track = r.track; c.bar = startBar; c.pattern = r.pattern; c.length = 0;   // la clip copre tutta la salita
                 clips.push_back (c);
                 engine.setClips (clips);
                 r.startBar = startBar;

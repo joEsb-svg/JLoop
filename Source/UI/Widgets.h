@@ -374,14 +374,25 @@ private:
 };
 
 //==============================================================================
-/** Lunghezza del pattern (1..48 step): ◂ 16 ▸, tocca il numero per sceglierla da una griglia. */
+/** Lunghezza del pattern in quarti (1..64): ◂ 4q ▸, tocca il numero per scriverla. */
 class PatternLengthChip : public juce::Component
 {
 public:
+    /** Il valore e' in step; si mostra e si sceglie in quarti (1 quarto = 4 step, da 1 a 64 quarti). */
     std::function<void (int)> onChange;
+
+    static constexpr int stepsPerQuarter = 4, maxQuarters = 64;
 
     void setValue (int v)       { if (v != value) { value = v; repaint(); } }
     int getValue() const        { return value; }
+
+    static juce::String describe (int steps)
+    {
+        const int q = steps / stepsPerQuarter;
+        juce::String t = steps % stepsPerQuarter == 0 ? juce::String (q) + (q == 1 ? " quarto" : " quarti") : juce::String (steps) + " step";
+        if (steps % 16 == 0) t << " = " << (steps / 16) << (steps == 16 ? " battuta" : " battute");
+        return t;
+    }
 
     void paint (juce::Graphics& g) override
     {
@@ -394,9 +405,18 @@ public:
         g.drawText (juce::String (juce::CharPointer_UTF8 ("\xe2\x97\x82")), left, juce::Justification::centred, false);
         g.drawText (juce::String (juce::CharPointer_UTF8 ("\xe2\x96\xb8")), right, juce::Justification::centred, false);
         Theme::drawRaised (g, r.reduced (1.0f, 2.0f), Theme::raisedHi, Theme::corner - 1.0f);
+        // numero dei quarti grande, "q" piccola (step dispari dei progetti vecchi: "7 st")
+        const bool whole = value % stepsPerQuarter == 0;
+        const juce::String num (whole ? value / stepsPerQuarter : value), unit (whole ? "q" : "st");
+        const auto big = Theme::font (juce::jmin (14.0f, r.getHeight() * 0.56f), true), small = Theme::font (juce::jmin (10.0f, r.getHeight() * 0.4f), true);
+        const float wNum = juce::GlyphArrangement::getStringWidth (big, num), wUnit = juce::GlyphArrangement::getStringWidth (small, unit);
+        auto text = r.withSizeKeepingCentre (wNum + 2.0f + wUnit, r.getHeight());
         g.setColour (Theme::accent);
-        g.setFont (Theme::font (juce::jmin (13.0f, r.getHeight() * 0.52f), true));
-        g.drawText (juce::String (value), r, juce::Justification::centred, false);
+        g.setFont (big);
+        g.drawText (num, text.removeFromLeft (wNum + 1.0f), juce::Justification::centredRight, false);
+        g.setColour (Theme::textDim);
+        g.setFont (small);
+        g.drawText (unit, text.withTrimmedLeft (1.0f).withTrimmedTop (r.getHeight() * 0.12f), juce::Justification::centredLeft, false);
     }
 
     void mouseUp (const juce::MouseEvent& e) override
@@ -404,37 +424,53 @@ public:
         if (! getLocalBounds().contains (e.getPosition()))
             return;
         const float arrowW = juce::jmin (22.0f, (float) getWidth() * 0.24f);
-        if ((float) e.x < arrowW)                       change (value - 1);
-        else if ((float) e.x > (float) getWidth() - arrowW) change (value + 1);
-        else                                            showPicker();
+        const int q = value / stepsPerQuarter;
+        if ((float) e.x < arrowW)                           change ((value % stepsPerQuarter == 0 ? q - 1 : q) * stepsPerQuarter);
+        else if ((float) e.x > (float) getWidth() - arrowW) change ((q + 1) * stepsPerQuarter);
+        else                                                askValue();
+    }
+
+    /** Il "display": si scrive la lunghezza in quarti. */
+    void askValue()
+    {
+        auto* window = new juce::AlertWindow ("Lunghezza del pattern",
+                                              "Quanti quarti? (1 quarto = 4 step, 4 quarti = 1 battuta)\nDa 1 a " + juce::String (maxQuarters)
+                                                  + ". Adesso: " + describe (value) + ".",
+                                              juce::MessageBoxIconType::NoIcon, this);
+        window->setLookAndFeel (&getLookAndFeel());
+        window->addTextEditor ("q", value % stepsPerQuarter == 0 ? juce::String (value / stepsPerQuarter) : juce::String());
+        if (auto* te = window->getTextEditor ("q"))
+        {
+            te->setInputRestrictions (2, "0123456789");
+            te->setKeyboardType (juce::TextInputTarget::numericKeyboard);
+            te->setFont (Theme::font (20.0f, true));
+            te->setJustification (juce::Justification::centred);
+            te->selectAll();
+        }
+        window->addButton ("OK", 1, juce::KeyPress (juce::KeyPress::returnKey));
+        window->addButton ("Annulla", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+        juce::Component::SafePointer<PatternLengthChip> safe (this);
+        window->enterModalState (true, juce::ModalCallbackFunction::create ([window, safe] (int result)
+        {
+            const int q = window->getTextEditorContents ("q").getIntValue();
+            if (safe != nullptr && result == 1 && q > 0)
+                safe->change (q * stepsPerQuarter);
+        }), true);
+        if (auto* te = window->getTextEditor ("q"))
+            te->grabKeyboardFocus();
     }
 
 private:
     void change (int v)
     {
-        v = juce::jlimit (1, maxValue, v);
+        v = juce::jlimit (stepsPerQuarter, maxQuarters * stepsPerQuarter, v);
         if (v == value) return;
         value = v;
         repaint();
         if (onChange) onChange (v);
     }
 
-    void showPicker()
-    {
-        juce::PopupMenu m;
-        m.addSectionHeader ("Lunghezza del pattern (step)");
-        for (int v = 1; v <= maxValue; ++v)
-        {
-            if (v > 1 && (v - 1) % 8 == 0) m.addColumnBreak();
-            m.addItem (v, juce::String (v) + (v % 16 == 0 ? "  (" + juce::String (v / 16) + (v == 16 ? " battuta)" : " battute)") : juce::String()),
-                       true, v == value);
-        }
-        juce::Component::SafePointer<PatternLengthChip> safe (this);
-        m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this), [safe] (int r) { if (safe != nullptr && r > 0) safe->change (r); });
-    }
-
     int value = 16;
-    static constexpr int maxValue = 48;
 };
 
 //==============================================================================

@@ -1872,6 +1872,8 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
 
     if (args.contains ("--riser"))   // test: finestra del riser automatico
         openRiser();
+    if (args.contains ("--length-dialog"))   // test: lunghezza del pattern scritta a mano
+        lengthChip.askValue();
     if (const int i = args.indexOf ("--pattern-length"); i >= 0)   // test: lunghezza del pattern e scorrimento
     {
         engine.setPatternLength (args[i + 1].getIntValue());

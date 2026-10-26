@@ -38,7 +38,7 @@
 class SequencerEngine : public juce::AudioIODeviceCallback
 {
 public:
-    static constexpr int maxSteps         = 48;    // lunghezza massima di un pattern (3 battute)
+    static constexpr int maxSteps         = 256;   // lunghezza massima di un pattern (64 quarti = 16 battute)
     static constexpr int maxChannels      = 32;    // canali del channel rack (strumenti)
     static constexpr int defaultChannels  = 7;     // progetto nuovo: 6 strumenti di batteria + il synth BassForge
     static constexpr int numDrumTypes     = 6;     // strumenti della batteria sintetizzata (vedi SoundLibrary)
@@ -215,8 +215,8 @@ public:
              | (uint64_t) juce::jlimit (0, maxBars - 1, c.bar) << 8
              | (uint64_t) juce::jlimit (0, numPatterns - 1, c.pattern)
              | (uint64_t) juce::jlimit (0, 8191, c.length) << 32
-             | (uint64_t) juce::jlimit (0, 63, c.offset) << 45
-             | (uint64_t) juce::jlimit (0, 15, c.sub) << 51;
+             | (uint64_t) juce::jlimit (0, 255, c.offset) << 45
+             | (uint64_t) juce::jlimit (0, 15, c.sub) << 53;
     }
 
     static Clip unpackClip (uint64_t v)
@@ -226,8 +226,8 @@ public:
         c.bar = (int) (v >> 8) & 0xfff;
         c.pattern = (int) v & 0xff;
         c.length = (int) (v >> 32) & 0x1fff;
-        c.offset = (int) (v >> 45) & 0x3f;
-        c.sub = (int) (v >> 51) & 0xf;
+        c.offset = (int) (v >> 45) & 0xff;
+        c.sub = (int) (v >> 53) & 0xf;
         return c;
     }
 

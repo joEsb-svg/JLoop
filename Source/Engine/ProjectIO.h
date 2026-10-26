@@ -47,10 +47,15 @@ namespace ProjectIO
 
     //==============================================================================
     /** Una riga di step come stringa compatta: 2 cifre esadecimali per step ("00" = spento). */
-    inline juce::String encodeRow (const SequencerEngine::Pattern::Row& row)
+    inline juce::String encodeRow (const SequencerEngine::Pattern::Row& row, int defaultValue = 0)
     {
+        // solo fino all'ultimo step non vuoto (almeno 16): i pattern lunghi non gonfiano il file
+        int last = 15;
+        for (int i = SequencerEngine::maxSteps - 1; i > last; --i)
+            if ((int) row[(size_t) i].load() != defaultValue) { last = i; break; }
         juce::String s;
-        for (int i = 0; i < SequencerEngine::maxSteps; ++i)
+        s.preallocateBytes ((size_t) (last + 1) * 2);
+        for (int i = 0; i <= last; ++i)
             s << juce::String::toHexString ((int) row[(size_t) i].load()).paddedLeft ('0', 2);
         return s;
     }
@@ -159,8 +164,8 @@ namespace ProjectIO
             for (int c = 0; c < numChannels; ++c)
             {
                 rows.add (encodeRow (pat.velocity[(size_t) c]));
-                probs.add (encodeRow (pat.probability[(size_t) c]));
-                ratchets.add (encodeRow (pat.ratchet[(size_t) c]));
+                probs.add (encodeRow (pat.probability[(size_t) c], 100));
+                ratchets.add (encodeRow (pat.ratchet[(size_t) c], 1));
                 semis.add (encodeRow (pat.semis[(size_t) c]));
                 pans.add (encodeRow (pat.panStep[(size_t) c]));
                 for (int s = 0; s < SequencerEngine::maxSteps; ++s)
@@ -428,7 +433,7 @@ namespace ProjectIO
                     if (f->size() >= 6)
                     {
                         clip.length = juce::jlimit (0, 8191, (int) (*f)[3]);
-                        clip.offset = juce::jlimit (0, 63, (int) (*f)[4]);
+                        clip.offset = juce::jlimit (0, 255, (int) (*f)[4]);
                         clip.sub = juce::jlimit (0, 15, (int) (*f)[5]);
                     }
                     clips.push_back (clip);

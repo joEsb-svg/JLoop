@@ -14,7 +14,12 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.42)
+## Stato attuale (v0.43)
+
+**Novita' della 0.43**
+- Lunghezza del pattern in quarti (1 quarto = 4 step): da 1 a 64 quarti (16 battute). Le frecce ◂ ▸ aggiungono
+  o tolgono un quarto; toccando il numero si scrive la lunghezza a mano.
+- Riser automatico: il pattern e la clip nella playlist ora sono lunghi quanto tutta la salita.
 
 **Novita' della 0.42**: Riser automatico (menu > "Riser automatico..."). Scegli la durata (1-16 battute)
 e gli ingredienti: rumore che sale, nota che sale (nella tonalita' del progetto), rullata che accelera,
