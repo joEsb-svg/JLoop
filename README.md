@@ -14,7 +14,18 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.53)
+## Stato attuale (v0.54)
+
+**Novita' della 0.54**: libreria allargata (309 -> 406 suoni, solo colpi e note: niente loop a BPM fissi)
+- Psytrance e Hi-tech: kick (Full-on, Forest, Goa, Progressive, Twilight, Hi-tech), hat metallici, percussioni FM,
+  bassi "rolling" a colpo, acid 303, lead e pluck goa, zap, laser, alieno, squelch, raffiche glitch, sub drop
+- Pad e atmosfere: 9 pad (caldo, vetro, scuro, coro, archi synth, PWM, sweep, spazio psy, trance supersaw)
+  e 7 atmosfere lunghe (drone scuro e metallico, vento, texture spaziale, pioggia digitale, shimmer, onde)
+- Voci: chop, Hey!, Go!, Yo, Drop, Robot Yeah, stab vocale, coro Ooh, respiro, sussurro
+- Altri generi: DnB e Neurofunk (snare crack, bassi growl/reese), Hardstyle (kick, rawstyle, reverse bass, screech),
+  Trap (808 lungo/distorto/corto, snare, clap, hat), Techno (kick hard, perc industriali, stab, ride), Big Room
+- Kit nuovi: DrumForge (Psytrance, Hi-tech, Hardstyle, Trap moderno, Neurofunk) e batteria sui canali
+  (Psytrance, Hi-tech, Hardstyle, Trap, Neurofunk)
 
 **Novita' della 0.53**: Downer e riser che seguono i BPM
 - Downer automatico (MENU, o il pulsante Downer nella finestra del riser): l'effetto contrario al riser,

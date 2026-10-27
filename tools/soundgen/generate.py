@@ -22,6 +22,7 @@ import instruments    # noqa: E402,F401
 import electronic     # noqa: E402,F401
 import drummachines  # noqa: E402,F401
 import electro2012    # noqa: E402,F401
+import genres2026     # noqa: E402,F401
 from registry import SOUNDS  # noqa: E402
 
 OUT = os.path.join(ROOT, "Resources", "Library")

@@ -32,12 +32,13 @@ struct DrumParams
 //==============================================================================
 namespace SoundLibrary
 {
-    static constexpr int numKits = 6;
+    static constexpr int numKits = 11;
     static constexpr int numInstruments = 6;   // stesso ordine dei canali del channel rack
 
     inline const char* getKitName (int kit)
     {
-        static const char* names[numKits] = { "Classic", "Rock", "Drum & Bass", "Dubstep", "Techno", "Progressive" };
+        static const char* names[numKits] = { "Classic", "Rock", "Drum & Bass", "Dubstep", "Techno", "Progressive",
+                                                  "Psytrance", "Hi-tech", "Hardstyle", "Trap", "Neurofunk" };
         return names[kit];
     }
 
@@ -69,6 +70,11 @@ namespace SoundLibrary
                 out (withClick (tone (1.0f, 220, 42, 0.045f, 0.34f), 0.4f, 0.004f), 6.0f, 0.85f),   // Dubstep: enorme
                 out (withClick (tone (1.0f, 165, 48, 0.050f, 0.27f), 0.4f, 0.002f), 7.0f, 0.82f),   // Techno: distorta, "rumble"
                 out (withClick (tone (1.0f, 180, 52, 0.030f, 0.20f), 0.3f, 0.003f), 3.0f, 0.95f),   // Progressive: morbida e piena
+                out (withClick (tone (1.0f, 300, 50, 0.010f, 0.09f), 0.8f, 0.002f), 3.0f, 0.90f),   // Psytrance: corta, lascia spazio al basso
+                out (withClick (tone (1.0f, 380, 60, 0.006f, 0.05f), 1.0f, 0.0015f), 3.0f, 0.90f),  // Hi-tech: cortissima, tutta click
+                out (withClick (tone (1.0f, 400, 52, 0.035f, 0.30f), 0.6f, 0.003f), 12.0f, 0.80f),  // Hardstyle: distorta, coda lunga
+                out (withClick (tone (1.0f, 160, 45, 0.040f, 0.45f), 0.2f, 0.003f), 1.5f, 1.00f),   // Trap: 808 lunga
+                out (withClick (tone (1.0f, 280, 56, 0.012f, 0.09f), 0.9f, 0.002f), 4.0f, 0.90f),   // Neurofunk: punch secco
             },
             // ---------------------------------------------------------------- SNARE (code corte: niente effetto riverbero)
             {
@@ -78,6 +84,11 @@ namespace SoundLibrary
                 out (withNoise (tone (1.00f, 260, 170, 0.020f, 0.090f), 1.10f, 0.13f, 900),  3.5f, 0.85f),
                 out (withNoise (tone (0.50f, 300, 200, 0.010f, 0.030f), 0.90f, 0.07f, 3000), 1.8f, 1.0f),
                 out (withNoise (tone (0.60f, 240, 190, 0.020f, 0.050f), 0.90f, 0.10f, 2000, 6000, 0.7f), 1.5f, 1.0f),
+                out (withNoise (tone (0.60f, 300, 210, 0.010f, 0.030f), 0.90f, 0.07f, 2500), 1.6f, 1.0f),
+                out (withNoise (tone (0.50f, 340, 240, 0.008f, 0.020f), 0.90f, 0.04f, 3500), 1.8f, 1.0f),
+                out (withNoise (tone (0.90f, 240, 170, 0.020f, 0.070f), 1.10f, 0.12f, 1200), 3.0f, 0.9f),
+                out (withNoise (tone (0.70f, 230, 180, 0.020f, 0.050f), 1.00f, 0.12f, 1500), 1.6f, 1.0f),
+                out (withNoise (tone (1.00f, 200, 150, 0.015f, 0.060f), 1.10f, 0.10f, 1500), 4.0f, 0.85f),
             },
             // ---------------------------------------------------------------- CLAP
             {
@@ -87,6 +98,11 @@ namespace SoundLibrary
                 out (withClap (withNoise ({}, 1.0f, 0.15f, 0, 1000, 1.6f), 4, 0.014f, 0.0050f), 4.0f, 0.9f),
                 out (withClap (withNoise ({}, 1.0f, 0.10f, 0, 1300, 2.0f), 3, 0.009f, 0.0040f), 3.5f, 1.0f),
                 out (withClap (withNoise ({}, 1.0f, 0.13f, 0, 2200, 0.9f), 3, 0.011f, 0.0050f), 3.0f, 1.0f),
+                out (withClap (withNoise ({}, 1.0f, 0.10f, 0, 1400, 1.2f), 4, 0.010f, 0.0045f), 3.0f, 1.0f),
+                out (withClap (withNoise ({}, 1.0f, 0.04f, 0, 2000, 1.2f), 3, 0.006f, 0.0040f), 3.0f, 1.0f),
+                out (withClap (withNoise ({}, 1.0f, 0.16f, 0, 1100, 1.4f), 4, 0.012f, 0.0050f), 4.0f, 0.9f),
+                out (withClap (withNoise ({}, 1.0f, 0.13f, 0, 1200, 1.3f), 4, 0.011f, 0.0050f), 3.0f, 1.0f),
+                out (withClap (withNoise ({}, 1.0f, 0.09f, 0, 1500, 1.6f), 3, 0.009f, 0.0040f), 3.8f, 0.9f),
             },
             // ---------------------------------------------------------------- HI-HAT (chiuso)
             {
@@ -96,6 +112,11 @@ namespace SoundLibrary
                 out (withMetal (withNoise ({}, 0.30f, 0.050f, 7000, 9000,  1.0f), 0.8f, 2.2f), 2.6f, 1.0f),
                 out (withMetal (withNoise ({}, 0.20f, 0.035f, 7500, 10500, 1.0f), 1.0f, 1.5f), 2.4f, 1.0f),
                 out (withMetal (withNoise ({}, 0.60f, 0.050f, 9000, 13000, 0.8f), 0.5f, 1.8f), 2.0f, 1.0f),
+                out (withMetal (withNoise ({}, 0.20f, 0.025f, 8000, 11000, 1.0f), 1.0f, 2.4f), 2.4f, 1.0f),
+                out (withMetal (withNoise ({}, 0.30f, 0.012f, 9500, 13000, 1.0f), 0.9f, 2.8f), 2.6f, 1.0f),
+                out (withMetal (withNoise ({}, 0.50f, 0.040f, 7000, 10000, 0.9f), 0.6f, 1.6f), 2.2f, 1.0f),
+                out (withMetal (withNoise ({}, 0.50f, 0.020f, 8000, 11000, 0.9f), 0.5f, 1.8f), 2.0f, 1.0f),
+                out (withMetal (withNoise ({}, 0.60f, 0.025f, 8500, 12000, 0.9f), 0.5f, 2.0f), 2.4f, 1.0f),
             },
             // ---------------------------------------------------------------- OPEN HAT
             {
@@ -105,6 +126,11 @@ namespace SoundLibrary
                 out (withMetal (withNoise ({}, 0.30f, 0.40f, 7000, 9000,  1.0f), 0.8f, 2.2f), 2.6f, 1.0f),
                 out (withMetal (withNoise ({}, 0.20f, 0.25f, 7500, 10500, 1.0f), 1.0f, 1.5f), 2.4f, 1.0f),
                 out (withMetal (withNoise ({}, 0.60f, 0.45f, 9000, 13000, 0.8f), 0.5f, 1.8f), 2.0f, 1.0f),
+                out (withMetal (withNoise ({}, 0.25f, 0.14f, 7500, 11000, 1.0f), 1.0f, 2.4f), 2.4f, 1.0f),
+                out (withMetal (withNoise ({}, 0.30f, 0.08f, 9000, 12500, 1.0f), 0.9f, 2.8f), 2.6f, 1.0f),
+                out (withMetal (withNoise ({}, 0.60f, 0.35f, 6000, 9000,  0.8f), 0.5f, 1.6f), 2.2f, 1.0f),
+                out (withMetal (withNoise ({}, 0.50f, 0.18f, 7500, 10500, 0.9f), 0.5f, 1.8f), 2.0f, 1.0f),
+                out (withMetal (withNoise ({}, 0.60f, 0.16f, 8000, 11500, 0.9f), 0.5f, 2.0f), 2.4f, 1.0f),
             },
             // ---------------------------------------------------------------- TOM / PERC
             {
@@ -114,6 +140,11 @@ namespace SoundLibrary
                 out (withClick (tone (1.0f, 140,  70, 0.080f, 0.30f), 0.3f, 0.003f), 5.0f, 0.85f),
                 out (withNoise (withClick (tone (0.8f, 420, 380, 0.010f, 0.05f), 0.6f, 0.002f), 0.3f, 0.03f, 3000), 2.0f, 1.0f), // rimshot
                 out (withClick (tone (1.0f, 200, 130, 0.050f, 0.20f), 0.25f, 0.002f), 2.0f, 1.0f),
+                out (withClick (tone (1.0f, 900, 500, 0.015f, 0.05f), 0.3f, 0.002f), 2.0f, 1.0f),     // Psy: goccia
+                out (withClick (tone (1.0f, 2000, 400, 0.006f, 0.03f), 0.5f, 0.002f), 2.5f, 1.0f),    // Hi-tech: zap
+                out (withClick (tone (1.0f, 180,  90, 0.060f, 0.25f), 0.3f, 0.003f), 6.0f, 0.85f),    // Hardstyle: tom distorto
+                out (withNoise (withClick (tone (0.8f, 1700, 1650, 0.010f, 0.015f), 0.7f, 0.001f), 0.2f, 0.01f, 3000), 2.0f, 1.0f), // Trap: rim
+                out (withNoise (withClick (tone (1.0f, 240, 140, 0.030f, 0.12f), 0.4f, 0.002f), 0.2f, 0.03f, 2000), 4.0f, 0.9f),   // Neuro
             },
         };
 
