@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <map>
 #include <array>
 #include <atomic>
 #include <cmath>
@@ -243,6 +244,7 @@ public:
     /** Progetto nuovo: tutto vuoto e valori di default. */
     void resetProject (bool keepMixerEffects = false)
     {
+        sampleRecipes.clear();
         for (int p = 0; p < numPatterns; ++p)
         {
             clearPattern (p);
@@ -933,6 +935,9 @@ public:
         const auto& n = patternNames[(size_t) juce::jlimit (0, numPatterns - 1, index)];
         return n.isNotEmpty() ? n : "Pattern " + juce::String (index + 1);
     }
+    /** Campioni generati (riser, downer): nome del file -> ricetta (JSON) per rifarli quando cambiano i BPM. Solo thread UI. */
+    std::map<juce::String, juce::String> sampleRecipes;
+
     juce::String getCustomPatternName (int index) const        { return patternNames[(size_t) juce::jlimit (0, numPatterns - 1, index)]; }
     void setPatternName (int index, const juce::String& name)  { patternNames[(size_t) juce::jlimit (0, numPatterns - 1, index)] = name.trim(); }
 

@@ -39,9 +39,9 @@ public:
             { "Pattern e playlist", "99 pattern per progetto. Nella playlist li metti in fila per costruire la canzone; tocca il righello "
                                     "per partire da una battuta (riser, loop e voci lunghe riprendono dal punto giusto). "
                                     "Le automazioni muovono volume, filtri ed effetti; LIVE lancia i pattern al volo; REC registra.", picPlaylist },
-            { "Riser automatico", "MENU > Riser automatico: scegli quante battute (1-16) e gli ingredienti: rumore e nota che salgono, "
-                                  "rullata che accelera, impatto, filtro sul master. JLoop lo crea a tempo e lo mette nella playlist "
-                                  "in modo che finisca proprio sul drop.", picRiser },
+            { "Riser e Downer", "MENU > Riser automatico: scegli quante battute (1-16) e gli ingredienti: rumore e nota che salgono, "
+                                  "rullata che accelera, impatto, filtro sul master. Finisce proprio sul drop. Il DOWNER fa il contrario: "
+                                  "parte dal drop con l'impatto e scende. Se cambi i BPM si rifanno da soli a tempo.", picRiser },
             { "Il mixer", "Ogni canale ha la sua traccia con EQ e fino a 6 effetti: compressore, OTT, sidechain, Glitch, "
                           "distorsione trash, filtro a vocali, delay, riverbero e altri. "
                           "Un synth pesante? Menu del canale > Congela traccia: suona uguale e non consuma piu' processore.", picMixer },

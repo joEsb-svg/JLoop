@@ -277,6 +277,15 @@ namespace ProjectIO
                 root->setProperty ("automation", lanes);
         }
 
+        // Campioni generati (riser/downer): le ricette per rifarli a un altro tempo
+        if (! engine.sampleRecipes.empty())
+        {
+            juce::Array<juce::var> list;
+            for (auto& [name, recipe] : engine.sampleRecipes)
+                list.add (juce::Array<juce::var> { name, recipe });
+            root->setProperty ("recipes", list);
+        }
+
         // Mastering
         {
             const auto& m = engine.getMastering();
@@ -310,6 +319,10 @@ namespace ProjectIO
         engine.resetProject (true);   // gli effetti del mixer restano (si riusano se sono dello stesso tipo)
         engine.setBpm ((double) json.getProperty ("bpm", 120.0));
         engine.setSwing ((float) (double) json.getProperty ("swing", 0.0));
+        if (auto* rec = json.getProperty ("recipes", {}).getArray())
+            for (auto& item : *rec)
+                if (auto* pair = item.getArray(); pair != nullptr && pair->size() == 2)
+                    engine.sampleRecipes[(*pair)[0].toString()] = (*pair)[1].toString();
         if (auto* sc = json.getProperty ("scale", {}).getArray(); sc != nullptr && sc->size() >= 2)
             engine.setScale ((int) (*sc)[0], (int) (*sc)[1]);
         engine.setMasterVolume ((float) (double) json.getProperty ("master", 1.0));

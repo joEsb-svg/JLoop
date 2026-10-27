@@ -215,7 +215,9 @@ private:
     void openProjectFromUrl (const juce::URL&);
     void checkOpenWith();   // "Apri con JLoop" da un'altra app
     juce::TimedCallback openWithPoll { [this] { checkOpenWith(); } };
-    void openRiser();
+    void openRiser (bool downer = false);
+    double retimeSeenBpm = -1.0, retimeChangedAt = 0.0;   // riser/downer rifatti quando cambiano i BPM
+    bool retimePending = false;
     std::unique_ptr<juce::FileChooser> projectChooser;
     juce::ScopedMessageBox shareBox;
     void unfreezeChannel (int channel);

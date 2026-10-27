@@ -731,6 +731,17 @@ juce::String MainComponent::getKitLabel() const
 void MainComponent::timerCallback()
 {
     checkFreezer();
+    // Riser e downer seguono i BPM: quando il tempo resta fermo per un attimo, si rifanno a tempo
+    {
+        const double bpmNow = engine.getBpm(), nowMs = juce::Time::getMillisecondCounterHiRes();
+        if (bpmNow != retimeSeenBpm) { retimeSeenBpm = bpmNow; retimeChangedAt = nowMs; retimePending = true; }
+        else if (retimePending && nowMs - retimeChangedAt > 700.0)
+        {
+            retimePending = false;
+            if (! engine.sampleRecipes.empty() && riser::retimeAll (engine, sampleStore) > 0)
+                rebuildRows();
+        }
+    }
     // Rapporto prestazioni: aggiornamenti dello schermo arrivati in ritardo (la grafica non ce la fa)
     {
         const double nowMs = juce::Time::getMillisecondCounterHiRes();
@@ -953,6 +964,7 @@ void MainComponent::showFileMenu()
     menu.addItem (7, "Mixer...");
     menu.addItem (10, "Live (lancia i pattern)...");
     menu.addItem (13, "Riser automatico...");
+    menu.addItem (14, "Downer automatico...");
     menu.addItem (6, "Esporta audio (WAV / OGG)...");
     menu.addSeparator();
     menu.addSubMenu ("Impostazioni", createSettingsMenu());
@@ -1001,6 +1013,8 @@ void MainComponent::showFileMenu()
                                 self.openProjectFile();
                             else if (result == 13)
                                 self.openRiser();
+                            else if (result == 14)
+                                self.openRiser (true);
                             else if (result >= 3000 && result < 4000)
                                 self.loadDemo (result - 3000);
                             else if (result >= 5000 && result < 9000)
@@ -1575,12 +1589,12 @@ void MainComponent::askUnfreeze (int channel, std::function<void()> then)
 //==============================================================================
 // Condivisione dei progetti
 
-void MainComponent::openRiser()
+void MainComponent::openRiser (bool downer)
 {
     auto* top = overlayHost (*this);
     if (top == nullptr)
         top = this;
-    auto panel = std::make_unique<RiserPanel> (engine, sampleStore);
+    auto panel = std::make_unique<RiserPanel> (engine, sampleStore, downer);
     juce::Component::SafePointer<MainComponent> safe (this);
     panel->onCreated = [safe] (const riser::Result& r)
     {
@@ -1921,7 +1935,7 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
         }
 
     if (args.contains ("--riser"))   // test: finestra del riser automatico
-        openRiser();
+        openRiser (args.contains ("--downer"));
     if (args.contains ("--length-dialog"))   // test: lunghezza del pattern scritta a mano
         lengthChip.askValue();
     if (args.contains ("--bpm-dialog"))      // test: BPM scritti a mano
@@ -2013,6 +2027,7 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
         o.bars = args[i + 1].getIntValue();
         o.dropBar = args[i + 2].getIntValue();
         o.filter = true;
+        o.down = args.contains ("--downer");
         const auto r = riser::apply (engine, sampleStore, o);
         if (r.ok) { rebuildRows(); syncControlsFromEngine(); playlist.refresh(); }
     }

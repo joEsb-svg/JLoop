@@ -323,7 +323,8 @@ namespace riser
             }
         }
 
-        inline void rollLayer (float* y, int T, double sr, double bpm, double totalBeats, const Sound& s, juce::Random& rnd)
+        /** Rullata che accelera verso la fine; con 'reverse' e' specchiata: fitta all'inizio e rallenta (downer). */
+        inline void rollLayer (float* y, int T, double sr, double bpm, double totalBeats, const Sound& s, juce::Random& rnd, bool reverse = false)
         {
             static constexpr double every[4] { 1.0, 0.5, 0.25, 0.125 };
             const double beatSec = 60.0 / bpm;
@@ -334,10 +335,14 @@ namespace riser
             {
                 const double x = (b - startBeat) / juce::jmax (1.0e-6, totalBeats - startBeat);
                 const int section = juce::jlimit (0, sections - 1, (int) (x * sections));
-                const int start = (int) (b * beatSec * sr);
-                if (start >= T) break;
-                rollHit (y + start, T - start, sr, s.rollType, (0.25 + 0.75 * x) * s.rollGain, s.rollPitch * x, rnd);
-                b += every[from + section];
+                const double step = every[from + section];
+                const double at = reverse ? totalBeats - b - step : b;
+                const int start = (int) (juce::jmax (0.0, at) * beatSec * sr);
+                if (start < T)
+                    rollHit (y + start, T - start, sr, s.rollType, (0.25 + 0.75 * x) * s.rollGain, s.rollPitch * x, rnd);
+                else if (! reverse)
+                    break;
+                b += step;
             }
         }
 

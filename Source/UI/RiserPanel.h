@@ -13,8 +13,18 @@
 class RiserPanel : public juce::Component
 {
 public:
-    RiserPanel (SequencerEngine& e, SampleStore& s) : engine (e), store (s)
+    RiserPanel (SequencerEngine& e, SampleStore& s, bool startAsDowner = false) : engine (e), store (s)
     {
+        // Riser (sale fino al drop) o Downer (parte dal drop e scende)
+        for (auto* b : { &modeRiser, &modeDowner })
+        {
+            b->setClickingTogglesState (true);
+            b->setRadioGroupId (8103);
+            addAndMakeVisible (*b);
+        }
+        modeRiser.onClick = [this] { setDown (false); };
+        modeDowner.onClick = [this] { setDown (true); };
+
         static const int lengths[] { 1, 2, 4, 8, 16 };
         for (int b : lengths)
         {
@@ -22,7 +32,7 @@ public:
             btn->setClickingTogglesState (true);
             btn->setRadioGroupId (8101);
             btn->setToggleState (b == options.bars, juce::dontSendNotification);
-            btn->onClick = [this, b] { options.bars = b; if (! dropEdited) options.dropBar = riser::suggestDropBar (engine, b); options.dropBar = juce::jmax (options.dropBar, b); refresh(); };
+            btn->onClick = [this, b] { options.bars = b; if (! dropEdited) options.dropBar = riser::suggestDropBar (engine, b); options.dropBar = juce::jmax (options.dropBar, minDrop()); refresh(); };
             addAndMakeVisible (btn);
         }
 
@@ -60,7 +70,7 @@ public:
         toPattern.onClick = [this] { options.toPlaylist = false; refresh(); };
         for (auto* b : { &earlier, &later })
             addAndMakeVisible (*b);
-        earlier.onClick = [this] { dropEdited = true; options.dropBar = juce::jmax (options.bars, options.dropBar - 1); refresh(); };
+        earlier.onClick = [this] { dropEdited = true; options.dropBar = juce::jmax (minDrop(), options.dropBar - 1); refresh(); };
         later.onClick = [this] { dropEdited = true; options.dropBar = juce::jmin (SequencerEngine::maxBars - 1, options.dropBar + 1); refresh(); };
 
         create.setButtonText ("Crea");
@@ -68,7 +78,7 @@ public:
         addAndMakeVisible (create);
 
         options.dropBar = juce::jmax (options.bars, riser::suggestDropBar (engine, options.bars));
-        refresh();
+        setDown (startAsDowner);
     }
 
     ~RiserPanel() override   { stopPreview(); }
@@ -81,7 +91,7 @@ public:
         g.fillAll (Theme::panel);
         g.setColour (Theme::textBright);
         g.setFont (Theme::font (17.0f, true));
-        g.drawText ("Riser automatico", titleArea, juce::Justification::centredLeft, false);
+        g.drawText (options.down ? "Downer automatico" : "Riser automatico", titleArea, juce::Justification::centredLeft, false);
         Theme::drawCaption (g, "Durata", lengthCaption.toFloat(), juce::Justification::centredLeft);
         Theme::drawCaption (g, "Ingredienti", ingredientCaption.toFloat(), juce::Justification::centredLeft);
         Theme::drawCaption (g, "Suono", soundCaption.toFloat(), juce::Justification::centredLeft);
@@ -91,6 +101,9 @@ public:
         auto r = previewArea.toFloat();
         Theme::drawSunken (g, r);
         auto area = r.reduced (6.0f, 6.0f).withTrimmedRight (create.getWidth() + 8.0f);
+        g.saveState();
+        if (options.down)   // il downer e' la salita vista allo specchio
+            g.addTransform (juce::AffineTransform::scale (-1.0f, 1.0f, area.getCentreX(), 0.0f));
         const bool any = riser::hasAudio (options) || options.filter;
         if (any)
         {
@@ -139,15 +152,21 @@ public:
             g.setColour (Theme::textBright);
             g.fillRect (area.getRight() - 3.0f, area.getY(), 3.0f, area.getHeight());
         }
+        g.restoreState();
         g.setColour (Theme::textDim);
         g.setFont (Theme::font (12.0f));
-        g.drawText (status, area.withTrimmedLeft (2.0f).removeFromTop (16.0f), juce::Justification::topLeft, false);
+        g.drawText (status, area.withTrimmedLeft (options.down ? 10.0f : 2.0f).removeFromTop (16.0f), juce::Justification::topLeft, false);
     }
 
     void resized() override
     {
         auto r = getLocalBounds().reduced (14, 10);
         titleArea = r.removeFromTop (28);
+        {
+            auto modes = titleArea.withTrimmedLeft (200).removeFromLeft (220);
+            modeRiser.setBounds (modes.removeFromLeft (110).reduced (2, 0));
+            modeDowner.setBounds (modes.removeFromLeft (110).reduced (2, 0));
+        }
         const int rowH = juce::jlimit (30, 40, getHeight() / 11);
 
         lengthCaption = r.removeFromTop (18);
@@ -216,16 +235,34 @@ private:
         addAndMakeVisible (b);
     }
 
+    int minDrop() const   { return options.down ? 0 : options.bars; }
+
+    void setDown (bool down)
+    {
+        options.down = down;
+        modeRiser.setToggleState (! down, juce::dontSendNotification);
+        modeDowner.setToggleState (down, juce::dontSendNotification);
+        static const char* riserNames[] { "Rumore che sale", "Nota che sale", "Rullata", "Filtro sul master", "Impatto alla fine" };
+        static const char* downerNames[] { "Rumore che scende", "Nota che scende", "Rullata che rallenta", "Filtro sul master", "Impatto all'inizio" };
+        for (int i = 0; i < ingredientButtons.size(); ++i)
+            ingredientButtons[i]->setButtonText (down ? downerNames[i] : riserNames[i]);
+        options.dropBar = juce::jmax (options.dropBar, minDrop());
+        if (listening) startPreview();
+        refresh();
+    }
+
     void refresh()
     {
-        toPlaylist.setButtonText ("Prima della battuta " + juce::String (options.dropBar + 1) + " (playlist)");
+        toPlaylist.setButtonText (options.down ? "Dalla battuta " + juce::String (options.dropBar + 1) + " (playlist)"
+                                               : "Prima della battuta " + juce::String (options.dropBar + 1) + " (playlist)");
         earlier.setEnabled (options.toPlaylist);
         later.setEnabled (options.toPlaylist);
         const double secs = riser::riserSeconds (options, engine.getBpm());
         status = juce::String (options.bars) + (options.bars == 1 ? " battuta" : " battute") + " a " + juce::String (juce::roundToInt (engine.getBpm()))
                + " BPM = " + juce::String (secs, 1) + " s";
         if (options.filter && ! options.toPlaylist) status << "  (il filtro sul master funziona solo nella playlist)";
-        if (options.toPlaylist && options.dropBar < options.bars) status = "Il drop deve essere dopo la battuta " + juce::String (options.bars);
+        if (options.toPlaylist && options.dropBar < minDrop()) status = "Il drop deve essere dopo la battuta " + juce::String (options.bars);
+        status << "  -  si adatta da solo se cambi i BPM";
         create.setEnabled (riser::hasAudio (options) || (options.filter && options.toPlaylist));
         repaint();
     }
@@ -308,6 +345,7 @@ private:
     bool dropEdited = false;
     juce::OwnedArray<juce::TextButton> lengthButtons, ingredientButtons;
     juce::TextButton toPlaylist, toPattern { "Nuovo pattern" }, create;
+    juce::TextButton modeRiser { "Riser" }, modeDowner { "Downer" };
     juce::TextButton prevSound { juce::String (juce::CharPointer_UTF8 ("\xe2\x97\x80")) }, nextSound { juce::String (juce::CharPointer_UTF8 ("\xe2\x96\xb6")) };
     juce::TextButton soundButton, randomButton { "Casuale" }, listenButton { juce::String (juce::CharPointer_UTF8 ("\xe2\x96\xb6 Ascolta")) };
     int presetIndex = 0;

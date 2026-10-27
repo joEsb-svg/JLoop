@@ -14,7 +14,14 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.52)
+## Stato attuale (v0.53)
+
+**Novita' della 0.53**: Downer e riser che seguono i BPM
+- Downer automatico (MENU, o il pulsante Downer nella finestra del riser): l'effetto contrario al riser,
+  parte dalla battuta del drop con l'impatto, rumore e nota scendono, la rullata rallenta,
+  il filtro sul master (passa-basso) si chiude e si riapre alla fine
+- Riser e downer ricordano la loro "ricetta": se cambi i BPM, dopo un attimo vengono rifatti a tempo
+  (stessa durata in battute); tornando ai BPM di prima si riusa il file gia' fatto
 
 **Novita' della 0.52**: ZapFM (viola), laser, zap e glitch FM per Hi-tech e psy
 - 16 colpi a tempo: trascina su/giu' l'altezza (da dove cade il laser, si vede la curva), tocca = pausa,
