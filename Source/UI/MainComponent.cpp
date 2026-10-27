@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+#include "../Platform/OpenWith.h"
 #include "../Instruments/Common/NeonEditor.h"
 #include "RiserPanel.h"
 #include "Theme.h"
@@ -261,6 +262,7 @@ MainComponent::MainComponent()
 
     juce::Desktop::getInstance().addGlobalMouseListener (&touchWatcher);
     startTimerHz (30);
+    openWithPoll.startTimer (700);   // file aperti con "Apri con JLoop"
 
    #if JUCE_ANDROID
     // La grafica (sfumature, luci, testo) la calcola la GPU: sul telefono il processore resta libero per l'audio.
@@ -1626,21 +1628,29 @@ void MainComponent::openProjectFile()
     juce::Component::SafePointer<MainComponent> safe (this);
     projectChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe] (const juce::FileChooser& fc)
     {
-        if (safe == nullptr || fc.getURLResults().isEmpty())
-            return;
-        const auto url = fc.getURLResults()[0];
-        std::unique_ptr<juce::InputStream> in (url.createInputStream (juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inAddress)));
-        juce::String error;
-        auto fileName = url.getLocalFile().getFileName();
-        if (fileName.isEmpty()) fileName = juce::URL::removeEscapeChars (url.toString (false).fromLastOccurrenceOf ("/", false, false));
-        const auto name = in != nullptr ? ProjectShare::unpack (*in, fileName, error) : juce::String();
-        if (name.isEmpty())
-        {
-            safe->showMessage ("Apri progetto", error.isNotEmpty() ? error : juce::String ("Non riesco a leggere il file."));
-            return;
-        }
-        safe->openProject (name);
+        if (safe != nullptr && ! fc.getURLResults().isEmpty())
+            safe->openProjectFromUrl (fc.getURLResults()[0]);
     });
+}
+
+void MainComponent::openProjectFromUrl (const juce::URL& url)
+{
+    auto in = OpenWith::openStream (url);
+    juce::String error;
+    const auto name = in != nullptr ? ProjectShare::unpack (*in, OpenWith::fileName (url), error) : juce::String();
+    if (name.isEmpty())
+    {
+        showMessage ("Apri progetto", error.isNotEmpty() ? error : juce::String ("Non riesco a leggere il file."));
+        return;
+    }
+    openProject (name);
+}
+
+void MainComponent::checkOpenWith()
+{
+    const auto uri = OpenWith::takePendingUri();
+    if (uri.isNotEmpty())
+        openProjectFromUrl (juce::URL (uri));
 }
 
 void MainComponent::tapTempo()

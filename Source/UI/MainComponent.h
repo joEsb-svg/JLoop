@@ -211,6 +211,9 @@ private:
     void startFreeze (int channel);
     void shareProject();
     void openProjectFile();
+    void openProjectFromUrl (const juce::URL&);
+    void checkOpenWith();   // "Apri con JLoop" da un'altra app
+    juce::TimedCallback openWithPoll { [this] { checkOpenWith(); } };
     void openRiser();
     std::unique_ptr<juce::FileChooser> projectChooser;
     juce::ScopedMessageBox shareBox;

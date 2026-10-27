@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "../Platform/OpenWith.h"
 #include "LibraryIndex.h"
 
 //==============================================================================
@@ -46,7 +47,7 @@ public:
         if (name.isEmpty())
             name = "campione.wav";
 
-        auto in = url.createInputStream (juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inAddress));
+        auto in = OpenWith::openStream (url);
         if (in == nullptr)
         {
             error = "Non riesco a leggere il file.";
