@@ -14,7 +14,17 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.51)
+## Stato attuale (v0.52)
+
+**Novita' della 0.52**: ZapFM (viola), laser, zap e glitch FM per Hi-tech e psy
+- 16 colpi a tempo: trascina su/giu' l'altezza (da dove cade il laser, si vede la curva), tocca = pausa,
+  stelline per il glitch su un colpo preciso, CASUALE per una sequenza nuova; velocita' 1/8, 1/16 o 1/32
+- Ogni nota tiene accesa la sua battuta e decide la tonalita'; in modalita' TASTIERA ogni nota e' un colpo (velocity = altezza)
+- Voce FM a 2 operatori: RAPPORTO, INDICE, METALLO (quanto il metallo si spegne), FEEDBACK, CRUSH, STEREO
+- Knob grandi ZAP (quanto in alto parte il laser) e GLITCH (colpi che impazziscono a caso: ripetizioni veloci,
+  laser al contrario, salto di rapporto, suono rotto)
+- 10 preset: Laser Rain, Hi-tech Pew, Zap Machine, Metallo Liquido, Glitch Storm, Psy Bleep, Alien Talk,
+  Twister FX, Crush Laser, Campana Goa
 
 **Novita' della 0.51**: BPM scritti a mano
 - Tocca il numero del TEMPO: si apre il tastierino per scrivere i BPM (40-240, anche con un decimale);
