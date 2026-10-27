@@ -42,6 +42,75 @@ namespace PatternColours
 }
 
 //==============================================================================
+/** Voce di menu per un pattern: nome nel suo colore e, a destra, la mini anteprima dei 16 passi
+    (barrette dove ci sono note). I pattern vuoti hanno il nome attenuato e la scritta "vuoto". */
+class PatternMenuItem : public juce::PopupMenu::CustomComponent
+{
+public:
+    PatternMenuItem (const SequencerEngine& engine, int pattern, bool ticked, juce::String suffix = {})
+        : name (PatternColours::name (engine, pattern) + suffix), colour (PatternColours::get (pattern)),
+          preview (engine.getPatternPreview (pattern)), empty (engine.isPatternEmpty (pattern)), tick (ticked)
+    {
+    }
+
+    void getIdealSize (int& w, int& h) override
+    {
+        w = juce::jmax (300, juce::roundToInt (juce::GlyphArrangement::getStringWidth (Theme::font (17.0f), name)) + 34 + 130);
+        h = 42;
+    }
+
+    void paint (juce::Graphics& g) override
+    {
+        auto r = getLocalBounds().toFloat();
+        if (isItemHighlighted())
+        {
+            g.setColour (findColour (juce::PopupMenu::highlightedBackgroundColourId));
+            g.fillRect (r.reduced (2.0f, 0.0f));
+        }
+        auto left = r.removeFromLeft (34.0f);
+        if (tick)
+        {
+            juce::Path p;
+            const auto c = left.withSizeKeepingCentre (14.0f, 14.0f);
+            p.startNewSubPath (c.getX(), c.getCentreY());
+            p.lineTo (c.getX() + 5.0f, c.getBottom());
+            p.lineTo (c.getRight(), c.getY());
+            g.setColour (findColour (juce::PopupMenu::highlightedTextColourId).interpolatedWith (juce::Colour (0xffff9a3c), 0.8f));
+            g.strokePath (p, juce::PathStrokeType (2.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        }
+        r.removeFromRight (12.0f);
+        auto right = r.removeFromRight (112.0f);
+        g.setFont (Theme::font (17.0f));
+        g.setColour (empty ? colour.withMultipliedAlpha (0.45f) : colour);
+        g.drawText (name, r.withTrimmedRight (8.0f), juce::Justification::centredLeft, true);
+
+        if (empty)
+        {
+            g.setFont (Theme::font (13.0f));
+            g.setColour (juce::Colour (0xff6c7682));
+            g.drawText (juce::String (juce::CharPointer_UTF8 ("\xe2\x80\x94 vuoto \xe2\x80\x94")), right, juce::Justification::centredRight, false);
+            return;
+        }
+        const float w = 6.0f, gap = 1.0f, total = 16.0f * (w + gap) - gap;
+        float x = right.getRight() - total;
+        const float base = right.getCentreY() + 7.0f;
+        for (int i = 0; i < 16; ++i, x += w + gap)
+        {
+            const bool on = preview[(size_t) i];
+            g.setColour (on ? colour : juce::Colour (0xff333c46));
+            const float hgt = on ? 14.0f : 3.0f;
+            g.fillRect (x, base - hgt, w, hgt);
+        }
+    }
+
+private:
+    juce::String name;
+    juce::Colour colour;
+    std::array<bool, 16> preview;
+    bool empty, tick;
+};
+
+//==============================================================================
 /**
     La griglia della playlist: tracce in verticale, battute in orizzontale.
 
@@ -736,14 +805,16 @@ private:
         brushButton.setColour (juce::TextButton::buttonColourId, PatternColours::get (grid.getBrush()).darker (0.55f));
     }
 
+public:
+    void showBrushMenuForTest()   { showBrushMenu(); }
+private:
     void showBrushMenu()
     {
         juce::PopupMenu menu;
         menu.addSectionHeader ("Pattern da mettere nella playlist");
         const int shown = PatternColours::count (engine);
         for (int p = 0; p < shown; ++p)
-            menu.addColouredItem (p + 1, PatternColours::name (engine, p) + (engine.isPatternEmpty (p) ? "  (vuoto)" : ""),
-                                  PatternColours::get (p), true, p == grid.getBrush());
+            menu.addCustomItem (p + 1, std::make_unique<PatternMenuItem> (engine, p, p == grid.getBrush()), nullptr, PatternColours::name (engine, p));
         if (shown < SequencerEngine::numPatterns && grid.getBrush() < shown)
             menu.addColouredItem (shown + 1, "Pattern " + juce::String (shown + 1) + "  (nuovo)", PatternColours::get (shown), true, false);
 

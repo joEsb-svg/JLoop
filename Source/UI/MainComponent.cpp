@@ -1259,10 +1259,8 @@ void MainComponent::showPatternMenu()
 
     for (int p = 0; p < shown; ++p)
     {
-        // Il pallino indica i pattern che contengono note
-        const auto label = engine.getPatternName (p)
-                         + (engine.isPatternEmpty (p) ? juce::String() : juce::String (juce::CharPointer_UTF8 ("   \xe2\x97\x8f")));
-        select.addColouredItem (100 + p, label, PatternColours::get (p), true, p == cur);
+        // Mini anteprima dei passi accanto al nome; i vuoti sono attenuati
+        select.addCustomItem (100 + p, std::make_unique<PatternMenuItem> (engine, p, p == cur), nullptr, engine.getPatternName (p));
 
         if (p != cur)
             copyTo.addColouredItem (300 + p, engine.getPatternName (p), PatternColours::get (p));
@@ -2063,6 +2061,8 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
             playlist.showAutomationForTest();
         if (args.contains ("--automation-picker"))
             playlist.showTargetPickerForTest();
+        if (args.contains ("--brush-menu"))
+            { engine.setPatternName (6, "Drop"); juce::Timer::callAfterDelay (1500, [this] { playlist.showBrushMenuForTest(); }); }
     }
 
     if (args.contains ("--export"))

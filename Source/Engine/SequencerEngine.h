@@ -936,6 +936,23 @@ public:
     juce::String getCustomPatternName (int index) const        { return patternNames[(size_t) juce::jlimit (0, numPatterns - 1, index)]; }
     void setPatternName (int index, const juce::String& name)  { patternNames[(size_t) juce::jlimit (0, numPatterns - 1, index)] = name.trim(); }
 
+    /** Anteprima per i menu: la battuta divisa in 16 parti, true dove c'e' almeno uno step o una nota. */
+    std::array<bool, 16> getPatternPreview (int index) const
+    {
+        std::array<bool, 16> on {};
+        const auto& pat = patterns[(size_t) juce::jlimit (0, numPatterns - 1, index)];
+        const int len = juce::jlimit (1, maxSteps, pat.length.load());
+        auto mark = [&] (int step) { if (step >= 0 && step < len) on[(size_t) juce::jlimit (0, 15, step * 16 / len)] = true; };
+        for (int c = 0; c < getNumChannels(); ++c)
+        {
+            for (int s = 0; s < len; ++s)
+                if (pat.velocity[(size_t) c][(size_t) s].load() > 0) mark (s);
+            for (auto& slot : pat.notes[(size_t) c])
+                if (const auto v = slot.load(); v != 0) mark (unpackNote (v).start / ticksPerStep);
+        }
+        return on;
+    }
+
     bool isPatternEmpty (int index) const
     {
         for (int c = 0; c < getNumChannels(); ++c)

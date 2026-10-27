@@ -14,7 +14,11 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.48)
+## Stato attuale (v0.49)
+
+**Novita' della 0.49**: pattern vuoti a colpo d'occhio
+- Nella tendina PENNELLO della playlist e in "Vai a" del display PATTERN ogni pattern ha accanto una mini anteprima
+  dei suoi 16 passi (barrette dove ci sono note); i pattern vuoti hanno il nome attenuato e la scritta "vuoto"
 
 **Novita' della 0.48**: AcidLine (giallo acido), linee acide stile TB-303 per acid, psy e goa
 - Sequenza di 16 step: trascina le barre su/giu' per la nota, tocca per la pausa, puntini ACCENT e SLIDE,
