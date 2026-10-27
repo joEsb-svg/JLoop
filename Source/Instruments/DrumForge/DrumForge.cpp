@@ -1,6 +1,7 @@
 #include "../../Engine/Performance.h"
 #include "DrumForge.h"
 #include "DrumForgeEditor.h"
+#include "GeneratedKits.h"
 
 namespace df
 {
@@ -218,6 +219,7 @@ namespace df
                 { "x_snare_rim", "Rim", 0.0f, 1.00f, -3.0f, 0.2f, 20000, 0, 1.00f }, { "x_hat_dnb", "Hi-hat", 0.0f, 1.00f, -4.0f, 0.1f, 20000, 1, 0.00f }, { "x_hat_tick", "Tick", 0.0f, 1.00f, -5.0f, -0.1f, 20000, 1, 0.00f }, { "x_ohat_short", "Hi-hat aperto", 0.0f, 1.00f, -4.0f, 0.1f, 20000, 1, 0.00f },
                 { "x_bass_neuro_stab", "Basso", 0.0f, 1.00f, -2.0f, 0.0f, 20000, 1, 0.00f }, { "x_perc_industrial", "Industriale", 0.0f, 1.00f, -4.0f, 0.2f, 20000, 0, 1.00f }, { "x_perc_metal_hit", "Metallo", 0.0f, 1.00f, -5.0f, -0.2f, 20000, 0, 1.00f }, { "x_ride_techno", "Ride", 0.0f, 1.00f, -5.0f, 0.3f, 20000, 0, 1.00f },
                 { "x_crash_electro", "Crash", 0.0f, 1.00f, -5.0f, -0.3f, 20000, 0, 1.00f }, { "x_fx_glitch_burst", "Glitch", 0.0f, 1.00f, -5.0f, 0.0f, 20000, 1, 0.00f }, { "x_fx_reverse_snare", "Snare rev.", 0.0f, 1.00f, -4.0f, 0.0f, 20000, 1, 0.00f }, { "x_vox_robot_yeah", "Robot", 0.0f, 1.00f, -5.0f, 0.0f, 20000, 1, 0.00f } }} },
+            DRUMFORGE_KITS_2026
         };
         return kits;
     }

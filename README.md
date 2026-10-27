@@ -14,7 +14,17 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.54)
+## Stato attuale (v0.55)
+
+**Novita' della 0.55**: 37 kit DrumForge nuovi (58 in tutto), ognuno con i SUOI colpi
+- Ogni kit ha 9 suoni fatti apposta (kick, snare, clap, hi-hat, hi-hat aperto, tom, piatto, 2 percussioni)
+  piu' 4 pad presi dalla libreria (basso, FX, voce); libreria a 739 suoni
+- Psytrance (Full-on, Dark Forest, Goa 90s, Progressive, Twilight, Suomi, Night), Hi-tech (200, Glitch, Psycore),
+  Techno (Berlino, Industriale, Minimal, Acid, Hard), House (Deep, Tech House, Electro 2009, Big Room, Future),
+  Drum & Bass (Liquido, Jump Up, Neurofunk Scuro, Jungle), Dubstep e trap (Dubstep 2011, Riddim, Trap Scuro, Phonk, Drill),
+  Hardstyle e hardcore (Euphoric, Rawstyle, Gabber), Retro (UK Garage, Breakbeat, Synthwave, Lo-Fi Hip Hop, Electro Funk)
+- Ogni kit ha una sua variazione di carattere: due kit dello stesso genere non hanno mai lo stesso colpo
+- Nel browser dei kit le categorie sono per genere
 
 **Novita' della 0.54**: libreria allargata (309 -> 406 suoni, solo colpi e note: niente loop a BPM fissi)
 - Psytrance e Hi-tech: kick (Full-on, Forest, Goa, Progressive, Twilight, Hi-tech), hat metallici, percussioni FM,

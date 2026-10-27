@@ -23,6 +23,7 @@ import electronic     # noqa: E402,F401
 import drummachines  # noqa: E402,F401
 import electro2012    # noqa: E402,F401
 import genres2026     # noqa: E402,F401
+import kits2026       # noqa: E402,F401
 from registry import SOUNDS  # noqa: E402
 
 OUT = os.path.join(ROOT, "Resources", "Library")
@@ -239,6 +240,7 @@ def main():
                 os.remove(os.path.join(OUT, f))
         write_index()
         update_jucer()
+        kits2026.write_kits_header(ROOT)
     print("suoni: %d   totale: %.2f MB" % (len(results), sum(r[2] for r in results) / 1048576))
 
 

@@ -179,9 +179,21 @@ private:
         if (dynamic_cast<DrumForgeAudioProcessor*> (proc) != nullptr)
         {
             const auto n = name.toLowerCase();
-            if (n.contains ("acustic") || n.contains ("percuss")) return "Acustici";
-            if (n == "808" || n == "909" || n.contains ("lo-fi")) return "Drum machine";
-            return "Generi";
+            auto any = [&n] (std::initializer_list<const char*> words)
+            {
+                for (auto* w : words) if (n.contains (w)) return true;
+                return false;
+            };
+            if (any ({ "acustic", "percuss" }))                                  return "Acustici";
+            if (n == "808" || n == "909" || any ({ "lo-fi" }))                   return "Drum machine";
+            if (any ({ "hi-tech", "psycore" }))                                  return "Hi-tech";
+            if (any ({ "psy", "goa" }))                                          return "Psytrance";
+            if (any ({ "techno" }))                                              return "Techno";
+            if (any ({ "hardstyle", "rawstyle", "gabber", "hardcore" }))         return "Hardstyle e hardcore";
+            if (any ({ "dnb", "drum and bass", "jungle", "neuro" }))             return "Drum & Bass";
+            if (any ({ "dubstep", "brostep", "riddim", "trap", "phonk", "drill" })) return "Dubstep e trap";
+            if (any ({ "garage", "breakbeat", "synthwave", "funk" }))            return "Retro e breakbeat";
+            return "House ed electro";
         }
         if (name.contains (" - "))
             return name.upToFirstOccurrenceOf (" - ", false, false).trim();
