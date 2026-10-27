@@ -14,7 +14,11 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.50)
+## Stato attuale (v0.51)
+
+**Novita' della 0.51**: BPM scritti a mano
+- Tocca il numero del TEMPO: si apre il tastierino per scrivere i BPM (40-240, anche con un decimale);
+  nella stessa finestra c'e' il pulsante TAP per battere il tempo. Frecce e trascinamento restano come prima
 
 **Novita' della 0.50**: aprire i progetti .jloop
 - "Apri progetto da file..." legge il file tramite Android (prima il percorso diretto era bloccato dallo scoped storage)

@@ -77,7 +77,7 @@ MainComponent::MainComponent()
     bpmDisplay.getText = [this] { return juce::String (juce::roundToInt (engine.getBpm())); };
     bpmDisplay.onStep  = [this] (int d) { engine.setBpm (std::round (engine.getBpm()) + d); };
     bpmDisplay.onDrag  = [this] (double d) { engine.setBpm (engine.getBpm() + d); };
-    bpmDisplay.onCentreTap = [this] { tapTempo(); };   // tocca il numero a tempo: "tap tempo"
+    bpmDisplay.onCentreTap = [this] { askBpm(); };   // tocca il numero: scrivi i BPM (dentro c'e' anche il TAP)
     addAndMakeVisible (bpmDisplay);
 
     // --- Undo / redo / metronomo
@@ -1653,7 +1653,7 @@ void MainComponent::checkOpenWith()
         openProjectFromUrl (juce::URL (uri));
 }
 
-void MainComponent::tapTempo()
+double MainComponent::tapTempo()
 {
     const double now = juce::Time::getMillisecondCounterHiRes();
 
@@ -1664,12 +1664,56 @@ void MainComponent::tapTempo()
     if (tapTimes.size() > 5)
         tapTimes.remove (0);
 
-    if (tapTimes.size() >= 2)
+    if (tapTimes.size() < 2)
+        return 0.0;
+    const double avg = (tapTimes.getLast() - tapTimes.getFirst()) / (tapTimes.size() - 1);
+    return juce::jlimit (40.0, 240.0, std::round (60000.0 / avg));
+}
+
+/** Finestra dei BPM: si scrivono a mano (40-240, anche con un decimale) oppure si battono sul pulsante TAP. */
+void MainComponent::askBpm()
+{
+    auto format = [] (double b) { return std::abs (b - std::round (b)) < 0.05 ? juce::String (juce::roundToInt (b)) : juce::String (b, 1); };
+    auto* window = new juce::AlertWindow ("Tempo (BPM)", "Scrivi i BPM, da 40 a 240.\nOppure tocca TAP a tempo almeno 2 volte.",
+                                          juce::MessageBoxIconType::NoIcon, this);
+    window->setLookAndFeel (&getLookAndFeel());
+    window->addTextEditor ("bpm", format (engine.getBpm()));
+    auto* te = window->getTextEditor ("bpm");
+    te->setInputRestrictions (5, "0123456789.,");
+    te->setKeyboardType (juce::TextInputTarget::decimalKeyboard);
+    te->setFont (Theme::font (22.0f, true));
+    te->setJustification (juce::Justification::centred);
+    te->selectAll();
+
+    auto tap = std::make_unique<juce::TextButton>();
+    tap->setButtonText ("TAP");
+    tap->setSize (260, 52);
+    tapTimes.clear();
+    juce::Component::SafePointer<MainComponent> safe (this);
+    juce::Component::SafePointer<juce::TextEditor> editor (te);
+    tap->onClick = [safe, editor, format]
     {
-        const double avg = (tapTimes.getLast() - tapTimes.getFirst()) / (tapTimes.size() - 1);
-        engine.setBpm (std::round (60000.0 / avg));
-        holo.repaint();
-    }
+        if (safe == nullptr || editor == nullptr) return;
+        if (const double b = safe->tapTempo(); b > 0.0)
+            editor->setText (format (b), false);
+    };
+    tap->setTriggeredOnMouseDown (true);   // conta il momento in cui il dito tocca, non quando si alza
+    window->addCustomComponent (tap.get());
+    window->addButton ("OK", 1, juce::KeyPress (juce::KeyPress::returnKey));
+    window->addButton ("Annulla", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+
+    window->enterModalState (true, juce::ModalCallbackFunction::create ([window, safe, tapButton = tap.release()] (int result)
+    {
+        std::unique_ptr<juce::TextButton> owned (tapButton);
+        const double b = window->getTextEditorContents ("bpm").replaceCharacter (',', '.').getDoubleValue();
+        if (safe != nullptr && result == 1 && b > 0.0)
+        {
+            safe->engine.setBpm (std::round (b * 10.0) / 10.0);
+            safe->holo.repaint();
+            safe->bpmDisplay.repaint();
+        }
+    }), true);
+    te->grabKeyboardFocus();
 }
 
 //==============================================================================
@@ -1880,6 +1924,8 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
         openRiser();
     if (args.contains ("--length-dialog"))   // test: lunghezza del pattern scritta a mano
         lengthChip.askValue();
+    if (args.contains ("--bpm-dialog"))      // test: BPM scritti a mano
+        askBpm();
     if (const int i = args.indexOf ("--pattern-length"); i >= 0)   // test: lunghezza del pattern e scorrimento
     {
         engine.setPatternLength (args[i + 1].getIntValue());

@@ -127,7 +127,8 @@ private:
     int cpuCounter = 0, lastXRuns = 0, highLoadTicks = 0, glitchesThisSession = 0;
     juce::uint32 lastXRunTime = 0, dirtySince = 0;
     bool performanceHintShown = false, sessionDirty = false, recoveredFromBackup = false;
-    void tapTempo();
+    double tapTempo();   // ritorna i BPM battuti (0 = servono altri tocchi)
+    void askBpm();
 
     // Undo / redo: istantanee del progetto prese automaticamente dopo ogni modifica
     juce::String takeSnapshot();
