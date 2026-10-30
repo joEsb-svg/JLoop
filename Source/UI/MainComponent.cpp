@@ -575,7 +575,9 @@ void MainComponent::layoutRack (juce::Rectangle<int> full, bool portrait)
 
     const int n = juce::jmax (1, rows.size());
     const int gap = 4;
-    const int minH = portrait ? 56 : 34, maxH = portrait ? 84 : 90;
+    // Tablet (schermo alto almeno ~520 dp in orizzontale): righe piu' basse e 32 step (8 quarti) in vista
+    const bool tablet = ! portrait && getContentArea().getHeight() >= 520;
+    const int minH = portrait ? 56 : 34, maxH = portrait ? 84 : tablet ? 56 : 90;
     const int rowH = juce::jlimit (minH, maxH, (rack.getHeight() - gap * (n - 1)) / n);
     const int contentH = n * (rowH + gap) - gap;
     const int w = rack.getWidth() - (contentH > rack.getHeight() ? 9 : 0);   // spazio per la barra di scorrimento
@@ -584,7 +586,7 @@ void MainComponent::layoutRack (juce::Rectangle<int> full, bool portrait)
     int y = 0;
     for (auto* row : rows)
     {
-        row->setLayout (portrait ? 8 : 16, portrait);
+        row->setLayout (portrait ? 8 : tablet ? 32 : 16, portrait);
         row->setBounds (0, y, w, rowH);
         y += rowH + gap;
     }
