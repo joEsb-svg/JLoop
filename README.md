@@ -14,11 +14,13 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.57)
+## Stato attuale (v0.58)
 
-**Novita' della 0.57**: tablet
-- Su tablet (schermo alto almeno ~520 dp in orizzontale) le righe del channel rack sono alte la meta':
-  si vede il doppio dei canali (circa 13 invece di 6); sul telefono non cambia niente
+**Novita' della 0.58**: tablet
+- Su tablet (schermo alto almeno ~520 dp in orizzontale) ogni riga del channel rack mostra 32 step
+  (8 gruppi da 4) e le righe sono piu' basse (circa 9 canali in vista); sul telefono non cambia niente
+- Sul tablet i pattern nuovi nascono da 32 step: progetto nuovo, "Nuovo pattern vuoto" e "Clona"
+  (il clone di un pattern da 16 ripete il contenuto fino a 32); i pattern dei progetti vecchi restano come sono
 
 **Novita' della 0.55**: 37 kit DrumForge nuovi (58 in tutto), ognuno con i SUOI colpi
 - Ogni kit ha 9 suoni fatti apposta (kick, snare, clap, hi-hat, hi-hat aperto, tom, piatto, 2 percussioni)

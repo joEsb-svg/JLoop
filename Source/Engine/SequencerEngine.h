@@ -879,7 +879,37 @@ public:
                 n.store (0);
             p.noteCount[(size_t) c].store (0);
         }
-        p.length.store (16);
+        p.length.store (defaultPatternLength.load());
+    }
+
+    /** Lunghezza dei pattern nuovi (16 step sul telefono, 32 sul tablet). Solo thread UI. */
+    std::atomic<int> defaultPatternLength { 16 };
+
+    /** Allunga un pattern ripetendo il suo contenuto (step e note) fino a newLength step. */
+    void extendByRepeat (int index, int newLength)
+    {
+        auto& p = patterns[(size_t) juce::jlimit (0, numPatterns - 1, index)];
+        const int len = p.length.load();
+        newLength = juce::jlimit (1, maxSteps, newLength);
+        if (len <= 0 || newLength <= len)
+            return;
+        for (int c = 0; c < maxChannels; ++c)
+        {
+            for (int s = len; s < newLength; ++s)
+                copyStep (p, c, s % len, p, c, s);
+            auto notes = getNotes (index, c);
+            const auto original = notes;
+            for (int k = 1; k * len < newLength; ++k)
+                for (auto n : original)
+                    if ((n.start / ticksPerStep) + k * len < newLength)
+                    {
+                        n.start += k * len * ticksPerStep;
+                        notes.push_back (n);
+                    }
+            if (notes.size() != original.size())
+                setNotes (index, c, notes);
+        }
+        p.length.store (newLength);
     }
 
     void copyStep (Pattern& src, int srcC, int srcS, Pattern& dst, int dstC, int dstS)

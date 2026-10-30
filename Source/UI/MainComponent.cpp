@@ -577,7 +577,8 @@ void MainComponent::layoutRack (juce::Rectangle<int> full, bool portrait)
     const int gap = 4;
     // Tablet (schermo alto almeno ~520 dp in orizzontale): righe alte la meta', il doppio dei canali in vista
     const bool tablet = ! portrait && getContentArea().getHeight() >= 520;
-    const int minH = portrait ? 56 : 34, maxH = portrait ? 84 : tablet ? 46 : 90;
+    const int minH = portrait ? 56 : 34, maxH = portrait ? 84 : tablet ? 68 : 90;
+    setTabletMode (tablet);
     const int rowH = juce::jlimit (minH, maxH, (rack.getHeight() - gap * (n - 1)) / n);
     const int contentH = n * (rowH + gap) - gap;
     const int w = rack.getWidth() - (contentH > rack.getHeight() ? 9 : 0);   // spazio per la barra di scorrimento
@@ -586,7 +587,7 @@ void MainComponent::layoutRack (juce::Rectangle<int> full, bool portrait)
     int y = 0;
     for (auto* row : rows)
     {
-        row->setLayout (portrait ? 8 : 16, portrait);
+        row->setLayout (portrait ? 8 : tablet ? 32 : 16, portrait);
         row->setBounds (0, y, w, rowH);
         y += rowH + gap;
     }
@@ -604,6 +605,24 @@ void MainComponent::layoutRack (juce::Rectangle<int> full, bool portrait)
     if (synthPanel != nullptr)
         synthPanel->setBounds (getContentArea());   // BassForge usa tutto lo schermo
     presetBrowser.setBounds (getContentArea());
+}
+
+void MainComponent::setTabletMode (bool tablet)
+{
+    const int wanted = tablet ? 32 : 16;
+    if (engine.defaultPatternLength.load() == wanted || loadingDemo)
+        return;
+    engine.defaultPatternLength.store (wanted);
+    if (! tablet)
+        return;
+    // Passando al tablet i pattern ancora vuoti e senza nome (non usati nella playlist) diventano da 8 battute;
+    // quelli con dentro qualcosa restano come sono
+    std::vector<bool> inPlaylist (SequencerEngine::numPatterns, false);
+    for (auto& c : engine.getClips()) inPlaylist[(size_t) juce::jlimit (0, SequencerEngine::numPatterns - 1, c.pattern)] = true;
+    for (int p = 0; p < SequencerEngine::numPatterns; ++p)
+        if (engine.isPatternEmpty (p) && engine.getCustomPatternName (p).isEmpty() && ! inPlaylist[(size_t) p])
+            engine.getPattern (p).length.store (wanted);
+    lengthChip.setValue (engine.getPatternLength());
 }
 
 int MainComponent::getVisibleSteps() const
@@ -1165,6 +1184,10 @@ void MainComponent::loadDemo (int index)
 {
     if (index < 0 || index >= (int) demos::list().size())
         return;
+    // le demo sono scritte per pattern da 16 step: anche sul tablet si caricano cosi'
+    const int savedDefault = engine.defaultPatternLength.exchange (16);
+    const juce::ScopedValueSetter<bool> dummy (loadingDemo, true);
+    struct Restore { SequencerEngine& e; int v; ~Restore() { e.defaultPatternLength.store (v); } } restore { engine, savedDefault };
 
     engine.setPlaying (false);
     synthPanel->onClose();
@@ -1303,8 +1326,14 @@ void MainComponent::showPatternMenu()
 
                             auto& e = safeThis->engine;
                             if (result == 1)               e.clearPattern (cur);
-                            else if (result == 2)          e.selectPattern (fresh);
-                            else if (result == 3)          { e.copyPattern (cur, fresh); e.setPatternName (fresh, {}); e.selectPattern (fresh); }
+                            else if (result == 2)          { e.getPattern (fresh).length.store (e.defaultPatternLength.load()); e.selectPattern (fresh); }
+                            else if (result == 3)
+                            {
+                                e.copyPattern (cur, fresh); e.setPatternName (fresh, {});
+                                const int target = e.defaultPatternLength.load(), len = e.getPattern (fresh).length.load();
+                                if (len < target && target % len == 0) e.extendByRepeat (fresh, target);   // tablet: il clone arriva a 8 battute
+                                e.selectPattern (fresh);
+                            }
                             else if (result == 4)
                             {
                                 safeThis->askText ("Nome del pattern", e.getPatternName (cur), [safeThis, cur] (juce::String name)

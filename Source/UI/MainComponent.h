@@ -127,6 +127,8 @@ private:
     int cpuCounter = 0, lastXRuns = 0, highLoadTicks = 0, glitchesThisSession = 0;
     juce::uint32 lastXRunTime = 0, dirtySince = 0;
     bool performanceHintShown = false, sessionDirty = false, recoveredFromBackup = false;
+    void setTabletMode (bool tablet);   // tablet: pattern nuovi da 32 step
+    bool loadingDemo = false;
     double tapTempo();   // ritorna i BPM battuti (0 = servono altri tocchi)
     void askBpm();
 
