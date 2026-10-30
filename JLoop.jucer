@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <JUCERPROJECT name="JLoop" projectType="guiapp" bundleIdentifier="com.joesb.dawfl"
-              version="0.56.0" companyName="joEsb" id="DwFl01" useAppConfig="0"
+              version="0.57.0" companyName="joEsb" id="DwFl01" useAppConfig="0"
               addUsingNamespaceToJuceHeader="0" cppLanguageStandard="20" defines="JucePlugin_Name=&quot;BassForge&quot;&#10;JUCE_STRICT_REFCOUNTEDPOINTER=1"
               jucerFormatVersion="1">
   <MAINGROUP id="Mg0001" name="JLoop">
@@ -973,7 +973,7 @@
   </MAINGROUP>
   <EXPORTFORMATS>
     <ANDROIDSTUDIO targetFolder="Builds/Android" androidActivitySubClassName="com.joesb.dawfl.JLoopActivity" androidAdditionalJavaFolders="Source/Android/java" androidManifestCustomXmlElements="&lt;manifest&gt;&#10;  &lt;application&gt;&#10;    &lt;activity&gt;&#10;      &lt;intent-filter&gt;&#10;        &lt;action android:name=&quot;android.intent.action.MAIN&quot;/&gt;&#10;        &lt;category android:name=&quot;android.intent.category.LAUNCHER&quot;/&gt;&#10;      &lt;/intent-filter&gt;&#10;      &lt;intent-filter&gt;&#10;        &lt;action android:name=&quot;android.intent.action.VIEW&quot;/&gt;&#10;        &lt;category android:name=&quot;android.intent.category.DEFAULT&quot;/&gt;&#10;        &lt;category android:name=&quot;android.intent.category.BROWSABLE&quot;/&gt;&#10;        &lt;data android:scheme=&quot;content&quot;/&gt;&#10;        &lt;data android:scheme=&quot;file&quot;/&gt;&#10;        &lt;data android:mimeType=&quot;application/octet-stream&quot;/&gt;&#10;        &lt;data android:mimeType=&quot;application/zip&quot;/&gt;&#10;        &lt;data android:mimeType=&quot;application/x-zip-compressed&quot;/&gt;&#10;        &lt;data android:mimeType=&quot;application/x-jloop&quot;/&gt;&#10;      &lt;/intent-filter&gt;&#10;      &lt;intent-filter&gt;&#10;        &lt;action android:name=&quot;android.intent.action.VIEW&quot;/&gt;&#10;        &lt;category android:name=&quot;android.intent.category.DEFAULT&quot;/&gt;&#10;        &lt;category android:name=&quot;android.intent.category.BROWSABLE&quot;/&gt;&#10;        &lt;data android:scheme=&quot;content&quot;/&gt;&#10;        &lt;data android:scheme=&quot;file&quot;/&gt;&#10;        &lt;data android:host=&quot;*&quot;/&gt;&#10;        &lt;data android:mimeType=&quot;*/*&quot;/&gt;&#10;        &lt;data android:pathPattern=&quot;.*\\.jloop&quot;/&gt;&#10;        &lt;data android:pathPattern=&quot;.*\\..*\\.jloop&quot;/&gt;&#10;        &lt;data android:pathPattern=&quot;.*\\..*\\..*\\.jloop&quot;/&gt;&#10;      &lt;/intent-filter&gt;&#10;    &lt;/activity&gt;&#10;  &lt;/application&gt;&#10;&lt;/manifest&gt;" microphonePermissionNeeded="1" androidEnableContentSharing="1" androidBluetoothScanNeeded="1" androidBluetoothConnectNeeded="1" smallIcon="IcOn01" bigIcon="IcOn01"
-                   androidVersionCode="61" androidMinimumSDK="24" androidScreenOrientation="landscape"
+                   androidVersionCode="62" androidMinimumSDK="24" androidScreenOrientation="landscape"
                    androidInternetNeeded="0" androidExternalWriteNeeded="0" androidPushNotifications="0"
                    androidReadMediaAudioPermission="0" androidReadMediaImagesPermission="0"
                    androidReadMediaVideoPermission="0">
