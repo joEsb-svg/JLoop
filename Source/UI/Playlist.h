@@ -6,6 +6,7 @@
 #include "Theme.h"
 #include "Widgets.h"
 #include "AutomationView.h"
+#include "AutoFxPanel.h"
 
 //==============================================================================
 /** Colori dei pattern nella playlist (come in FL Studio, ogni pattern ha il suo). */
@@ -807,7 +808,7 @@ public:
     explicit Playlist (SequencerEngine& e)
         : engine (e), grid (e),
           autoView (e, [this] { return grid.getBarWidth(); }, [this] { return grid.getScrollX(); }, [this] (float x) { grid.setScrollX (x); }),
-          picker (e)
+          picker (e), fxPanel (e)
     {
         for (auto* b : { &brushButton, &zoomOut, &zoomIn, &clearButton, &closeButton })
             addAndMakeVisible (b);
@@ -819,6 +820,10 @@ public:
         addChildComponent (addLaneButton);
         addChildComponent (picker);
         addLaneButton.onClick = [this] { picker.setBounds (getLocalBounds()); picker.open(); };
+        addChildComponent (fxButton);
+        addChildComponent (fxPanel);
+        fxButton.onClick = [this] { fxPanel.setBounds (getLocalBounds()); fxPanel.open(); };
+        fxPanel.onApplied = [this] { autoView.repaint(); };
         picker.onChoose = [this] (automation::Target t)
         {
             const int lane = engine.addLane (t);
@@ -862,6 +867,7 @@ public:
     /** Solo per i test: mostra le automazioni. */
     void showAutomationForTest()    { modeSwitch.setSelected (1); updateMode(); }
     void showTargetPickerForTest()  { picker.setBounds (getLocalBounds()); picker.open(); }
+    void showFxPanelForTest (int fx, int where)  { fxPanel.setBounds (getLocalBounds()); fxPanel.open(); fxPanel.selectForTest (fx, where); }
 
     /** Il pennello parte dal pattern che si sta modificando. */
     void setBrush (int pattern)     { grid.setBrush (pattern); updateBrushButton(); if (onPatternChanged) onPatternChanged(); }
@@ -907,6 +913,9 @@ public:
         const auto right = bar.removeFromRight (juce::jmin (150, bar.getWidth()));
         brushButton.setBounds (right.reduced (0, 2));
         addLaneButton.setBounds (right.reduced (0, 2));
+        bar.removeFromRight (6);
+        fxButton.setButtonText (narrow ? "Effetti" : "Effetti pronti");
+        fxButton.setBounds (bar.removeFromRight (juce::jmin (150, bar.getWidth())).reduced (0, 2));
         brushCaption = bar.toFloat().withTrimmedRight (6.0f);
         if (narrow) brushCaption = {};
 
@@ -914,6 +923,7 @@ public:
         grid.setBounds (r);
         autoView.setBounds (r);
         picker.setBounds (getLocalBounds());
+        fxPanel.setBounds (getLocalBounds());
     }
 
 private:
@@ -925,7 +935,9 @@ private:
         brushButton.setVisible (! automationMode);
         clearButton.setVisible (! automationMode);
         addLaneButton.setVisible (automationMode);
+        fxButton.setVisible (automationMode);
         picker.setVisible (false);
+        fxPanel.setVisible (false);
         repaint();
     }
 
@@ -960,6 +972,8 @@ private:
     PlaylistGrid grid;
     AutomationView autoView;
     AutomationTargetPicker picker;
+    AutoFxPanel fxPanel;
+    juce::TextButton fxButton { "Effetti pronti" };
     SegmentedControl modeSwitch { { "Pattern", "Automazioni" } };
     juce::TextButton addLaneButton { "+ Automazione" };
     juce::TextButton brushButton, zoomOut { "-" }, zoomIn { "+" }, clearButton { "Svuota" }, closeButton { "Chiudi" };

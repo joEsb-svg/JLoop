@@ -2563,6 +2563,20 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
         engine.setTrackEffect (0, 0, mixer::compressor);
     }
 
+    if (const int i = args.indexOf ("--autofx-apply"); i >= 0)   // test: effetto pronto messo (effetto, traccia, battuta, battute)
+    {
+        autofx::apply (engine, args[i + 1].getIntValue(), args[i + 2].getIntValue(), args[i + 3].getIntValue(), args[i + 4].getIntValue());
+        openPlaylist();
+        playlist.showAutomationForTest();
+    }
+
+    if (const int i = args.indexOf ("--autofx"); i >= 0)   // test: pannello degli effetti pronti (effetto, dove)
+    {
+        openPlaylist();
+        playlist.showAutomationForTest();
+        playlist.showFxPanelForTest (args[i + 1].getIntValue(), args[i + 2].getIntValue());
+    }
+
     if (const int i = args.indexOf ("--fx-demo"); i >= 0)   // test: effetti nuovi sulla traccia 1 (tipo nel primo slot)
     {
         engine.setTrackEffect (1, 0, args[i + 1].getIntValue());

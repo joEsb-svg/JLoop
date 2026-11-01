@@ -14,7 +14,13 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.64)
+## Stato attuale (v0.65)
+
+**Novita' della 0.65**: Playlist > Automazioni > "Effetti pronti" (17 effetti in un tocco: JLoop mette l'effetto
+nel mixer e disegna le curve). Build-up col filtro, filtro che si apre/chiude, silenzio prima del drop, pitch che sale,
+stutter finale, tape stop, fade in/out, trance gate che entra, sidechain che cresce, stereo che si allarga,
+lancio di riverbero/delay, riverbero che cresce, lo-fi che sale, vinile che entra. Scegli dove (Master o traccia),
+da che battuta (proposta: finisce sul drop) e per quante battute.
 
 **0.64.1**: riser e downer fatti da JLoop non compaiono piu' tra i "Campioni importati" (restano usabili nei progetti)
 
