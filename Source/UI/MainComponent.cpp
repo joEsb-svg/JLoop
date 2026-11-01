@@ -494,11 +494,11 @@ void MainComponent::layoutLandscape (juce::Rectangle<int> full)
     deskMode = false;
    #endif
     deskBrowser.setVisible (deskMode);
-    deskMixer.setVisible (deskMode);
+    deskMixer.setVisible (false);   // il mixer si apre col tasto MIXER (F9), non sta fisso
     overlayArea = {};
     if (deskMode)
     {
-        auto left = full.removeFromLeft (juce::jlimit (330, 430, full.getWidth() * 26 / 100));
+        auto left = full.removeFromLeft (juce::jlimit (250, 310, full.getWidth() * 20 / 100));
         deskBrowser.setBounds (left.reduced (6, 2));
         if (! deskBrowserOpened && engine.getNumChannels() > 0)
         {
@@ -506,8 +506,6 @@ void MainComponent::layoutLandscape (juce::Rectangle<int> full)
             deskBrowser.openFor (juce::jlimit (0, engine.getNumChannels() - 1, juce::jmax (0, liveTarget.load())));
         }
         overlayArea = full;
-        auto mix = full.removeFromBottom (juce::jlimit (300, 380, full.getHeight() * 42 / 100));
-        deskMixer.setBounds (mix.reduced (6, 2));
     }
     layoutRack (full, false);
 }
@@ -1049,6 +1047,13 @@ void MainComponent::timerCallback()
     if (juce::Component::getCurrentlyFocusedComponent() == nullptr && isShowing() && juce::Process::isForegroundProcess()
         && juce::ModalComponentManager::getInstance()->getNumModalComponents() == 0)
         grabKeyboardFocus();
+    // Finestre degli strumenti: restano sopra JLoop finche' si usa JLoop (non sopra le altre app)
+    {
+        const bool front = juce::Process::isForegroundProcess();
+        for (auto& [ch, w] : synthWindows)
+            if (w != nullptr && w->isAlwaysOnTop() != front)
+                w->setAlwaysOnTop (front);
+    }
    #endif
     // Riser e downer seguono i BPM: quando il tempo resta fermo per un attimo, si rifanno a tempo
     {
@@ -1308,7 +1313,7 @@ void MainComponent::showFileMenu()
         menu.addSubMenu ("Dimensione interfaccia", sizes);
     }
     menu.addItem (16, "Tasti rapidi");
-    menu.addItem (18, "Banco di lavoro (libreria e mixer sempre aperti)", true, settings == nullptr || settings->getBoolValue ("deskLayout", true));
+    menu.addItem (18, "Banco di lavoro (libreria sempre aperta a sinistra)", true, settings == nullptr || settings->getBoolValue ("deskLayout", true));
     menu.addItem (19, "Strumenti in finestre separate", true, useSynthWindows());
    #endif
     menu.addItem (9, "Cronologia delle modifiche...");
@@ -1835,10 +1840,19 @@ namespace
             panel->onClose = [this] { close(); };
             setContentNonOwned (panel.get(), false);
             setResizable (true, true);
-            setResizeLimits (760, 400, 4000, 3000);
+            setResizeLimits (minW, minH, 4000, 3000);
             addKeyListener (&keys);
+            // Finestrella sopra JLoop (non a tutto schermo): grandezza ricordata, una un po' spostata dall'altra
             auto screen = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->userBounds.toNearestInt();
-            centreWithSize (juce::jmin (1180, screen.getWidth() * 85 / 100), juce::jmin (680, screen.getHeight() * 80 / 100));
+            int w = juce::jmin (900, screen.getWidth() * 62 / 100), h = juce::jmin (560, screen.getHeight() * 64 / 100);
+            if (auto* s = m.getSettings())
+            {
+                w = juce::jlimit (minW, screen.getWidth(), s->getIntValue ("synthWindowW", w));
+                h = juce::jlimit (minH, screen.getHeight(), s->getIntValue ("synthWindowH", h));
+            }
+            const int offset = 28 * (openCount++ % 6);
+            setBounds (juce::Rectangle<int> (w, h).withCentre (screen.getCentre()).translated (offset + screen.getWidth() / 10, offset + screen.getHeight() / 12)
+                         .constrainedWithin (screen));
             setVisible (true);
             panel->open (ch);
         }
@@ -1859,6 +1873,19 @@ namespace
 
         void closeButtonPressed() override   { close(); }
 
+        void resized() override
+        {
+            juce::DocumentWindow::resized();
+            if (isVisible())
+                if (auto* s = main.getSettings())
+                {
+                    s->setValue ("synthWindowW", getWidth());
+                    s->setValue ("synthWindowH", getHeight());
+                }
+        }
+
+        static constexpr int minW = 640, minH = 380;
+        static inline int openCount = 0;
         MainComponent& main;
         int channel;
         WindowKeys keys;

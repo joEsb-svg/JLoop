@@ -55,6 +55,7 @@ public:
     void closeSynthWindow (int channel);
     void closeAllSynthWindows();
     bool useSynthWindows() const;
+    juce::PropertiesFile* getSettings()                 { return settings.get(); }
 
 private:
     void timerCallback() override;

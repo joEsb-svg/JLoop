@@ -3,6 +3,7 @@
 #include <JuceHeader.h>
 #include <functional>
 #include <vector>
+#include <set>
 #include "../Engine/SequencerEngine.h"
 #include "../Engine/SampleStore.h"
 #include "../Instruments/Instruments.h"
@@ -136,6 +137,124 @@ private:
 
 //==============================================================================
 /**
+    PC, banco di lavoro: la libreria come albero in una colonna sola (stile FL Studio).
+    Cartelle principali -> sottocartelle -> suoni; si aprono in giu', senza allargare il pannello.
+*/
+class TreeList : public juce::Component
+{
+public:
+    struct Row
+    {
+        int level = 0;            // 0 = cartella principale, 1 = sottocartella, 2 = suono
+        bool folder = true, open = false, current = false;
+        int tab = 0, category = -1, sound = -1;
+        juce::String text, detail;
+        juce::Colour colour;
+    };
+
+    std::function<void (int row)> onClick, onDoubleClick;
+
+    void setRows (std::vector<Row> newRows)     { rows = std::move (newRows); updateSize(); repaint(); }
+    const std::vector<Row>& getRows() const     { return rows; }
+    void setSelected (int r)                    { selected = r; repaint(); }
+    int getSelected() const                     { return selected; }
+    void setVisibleWidth (int w)                { width = w; updateSize(); }
+    juce::Rectangle<int> getRowBounds (int i) const   { return { 0, i * rowH, width, rowH }; }
+
+    void paint (juce::Graphics& g) override
+    {
+        for (int i = 0; i < (int) rows.size(); ++i)
+        {
+            auto r = getRowBounds (i).toFloat();
+            if (! g.clipRegionIntersects (r.toNearestInt())) continue;
+            const auto& row = rows[(size_t) i];
+            auto box = r.reduced (1.0f, 1.5f).withTrimmedLeft ((float) row.level * 14.0f);
+
+            if (i == selected || row.current)
+            {
+                g.setColour (i == selected ? Theme::raisedHi : Theme::raised);
+                g.fillRoundedRectangle (box, 4.0f);
+                if (i == selected)
+                {
+                    g.setColour (Theme::accent);
+                    g.drawRoundedRectangle (box.reduced (0.5f), 4.0f, 1.4f);
+                }
+            }
+            else if (i == hover)
+            {
+                g.setColour (Theme::raised.withAlpha (0.6f));
+                g.fillRoundedRectangle (box, 4.0f);
+            }
+
+            auto content = box.reduced (6.0f, 0.0f);
+            if (row.folder)
+            {
+                // freccina e cartella
+                auto arrow = content.removeFromLeft (12.0f);
+                juce::Path p;
+                const auto c = arrow.getCentre();
+                if (row.open) p.addTriangle (c.x - 4.0f, c.y - 2.5f, c.x + 4.0f, c.y - 2.5f, c.x, c.y + 3.0f);
+                else          p.addTriangle (c.x - 2.5f, c.y - 4.0f, c.x - 2.5f, c.y + 4.0f, c.x + 3.0f, c.y);
+                g.setColour (row.open ? Theme::accent : Theme::textDim);
+                g.fillPath (p);
+                content.removeFromLeft (4.0f);
+                auto icon = content.removeFromLeft (16.0f).withSizeKeepingCentre (15.0f, 11.0f);
+                g.setColour (row.colour.withAlpha (row.open ? 0.95f : 0.7f));
+                g.fillRoundedRectangle (icon.withTrimmedTop (2.0f), 2.0f);
+                g.fillRoundedRectangle (icon.withHeight (4.0f).withWidth (7.0f), 1.5f);
+                content.removeFromLeft (6.0f);
+                g.setColour (row.level == 0 ? Theme::textBright : Theme::text);
+                g.setFont (Theme::font (row.level == 0 ? 14.0f : 13.0f, true));
+            }
+            else
+            {
+                g.setColour (row.colour);
+                g.fillRect (content.removeFromLeft (3.0f).reduced (0.0f, 6.0f));
+                content.removeFromLeft (7.0f);
+                g.setColour (i == selected ? Theme::textBright : Theme::text);
+                g.setFont (Theme::font (13.0f));
+            }
+            if (row.detail.isNotEmpty() && ! row.folder)
+            {
+                const float tw = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), row.text);
+                g.drawText (row.text, content, juce::Justification::centredLeft, true);
+                g.setColour (Theme::textDim);
+                g.setFont (Theme::font (10.5f));
+                g.drawText (row.detail, content.withTrimmedLeft (tw + 8.0f), juce::Justification::centredLeft, true);
+            }
+            else
+                g.drawText (row.text, content, juce::Justification::centredLeft, true);
+        }
+    }
+
+    void mouseMove (const juce::MouseEvent& e) override     { setHover (e.y / rowH); }
+    void mouseExit (const juce::MouseEvent&) override       { setHover (-1); }
+
+    void mouseUp (const juce::MouseEvent& e) override
+    {
+        if (e.getDistanceFromDragStart() > 10 || e.getLengthOfMousePress() > 800) return;
+        const int i = e.getMouseDownY() / rowH;
+        if (i >= 0 && i < (int) rows.size() && onClick) onClick (i);
+    }
+
+    void mouseDoubleClick (const juce::MouseEvent& e) override
+    {
+        const int i = e.y / rowH;
+        if (i >= 0 && i < (int) rows.size() && ! rows[(size_t) i].folder && onDoubleClick) onDoubleClick (i);
+    }
+
+    static constexpr int rowH = 28;
+
+private:
+    void setHover (int h)    { if (h != hover) { hover = h; repaint(); } }
+    void updateSize()        { setSize (width, juce::jmax (1, (int) rows.size() * rowH)); }
+
+    std::vector<Row> rows;
+    int selected = -1, hover = -1, width = 100;
+};
+
+//==============================================================================
+/**
     Il browser dei suoni: si apre sopra il channel rack per aggiungere uno strumento
     o cambiare il suono di un canale.
 
@@ -167,6 +286,14 @@ public:
             vp->setScrollBarThickness (6);
             addAndMakeVisible (vp);
         }
+
+        treeView.setScrollOnDragMode (juce::Viewport::ScrollOnDragMode::all);
+        treeView.setScrollBarsShown (true, false);
+        treeView.setScrollBarThickness (8);
+        treeView.setViewedComponent (&tree, false);
+        addChildComponent (treeView);
+        tree.onClick = [this] (int r) { treeClick (r); };
+        tree.onDoubleClick = [this] (int r) { treeClick (r); confirm(); };
 
         categoryView.setViewedComponent (&categoryList, false);
         tileView.setViewedComponent (&tileList, false);
@@ -213,13 +340,25 @@ public:
 
         tabs.setSelected (tab);
         showTab (tab, category);
+        if (embedded)
+            rebuildTree (false);   // all'inizio solo le cartelle principali: si aprono quando le tocchi
         repaint();
     }
 
     int getTargetChannel() const    { return targetChannel; }
 
     /** PC, banco di lavoro: la libreria resta aperta a sinistra; il suono va sul canale scelto nel rack. */
-    void setEmbedded (bool e)       { embedded = e; closeButton.setVisible (! e); resized(); repaint(); }
+    void setEmbedded (bool e)
+    {
+        embedded = e;
+        closeButton.setVisible (! e);
+        tabs.setVisible (! e);
+        categoryView.setVisible (! e);
+        tileView.setVisible (! e);
+        treeView.setVisible (e);
+        if (e) rebuildTree (false);
+        resized(); repaint();
+    }
     bool isEmbedded() const         { return embedded; }
     /** Cambia il canale a cui va il suono, senza cambiare la categoria in vista. */
     void setTarget (int channel)
@@ -227,6 +366,7 @@ public:
         if (channel == targetChannel) return;
         targetChannel = channel;
         confirmButton.setButtonText (channel < 0 ? "Aggiungi" : "Usa sul canale");
+        if (embedded) rebuildTree (false);
         repaint();
     }
     bool embedded = false;
@@ -264,6 +404,17 @@ public:
         auto top = r.removeFromTop (34);
         if (! embedded) closeButton.setBounds (top.removeFromRight (80).reduced (0, 2));
         titleArea = top.toFloat();
+
+        if (embedded)
+        {
+            auto footer = r.removeFromBottom (68);
+            footerText = footer.removeFromTop (26).toFloat();
+            confirmButton.setBounds (footer.reduced (0, 3));
+            r.removeFromBottom (4);
+            treeView.setBounds (r);
+            tree.setVisibleWidth (r.getWidth() - 10);
+            return;
+        }
 
         r.removeFromTop (4);
         tabs.setBounds (r.removeFromTop (30));
@@ -304,6 +455,13 @@ private:
     void showTab (int tab, int category)
     {
         lastTab = tab;
+        auto cats = categoriesFor (tab);
+        categoryList.setItems (cats, -1);
+        showCategory (juce::jlimit (0, (int) cats.size() - 1, category));
+    }
+
+    std::vector<TileList::Item> categoriesFor (int tab) const
+    {
         std::vector<TileList::Item> cats;
 
         if (tab <= 1)
@@ -323,9 +481,7 @@ private:
         {
             cats.push_back ({ "Campioni importati", {}, Theme::textDim, true });
         }
-
-        categoryList.setItems (cats, -1);
-        showCategory (juce::jlimit (0, (int) cats.size() - 1, category));
+        return cats;
     }
 
     void showCategory (int index)
@@ -333,8 +489,27 @@ private:
         const int tab = tabs.getSelected();
         lastCategory[(size_t) tab] = index;
         categoryList.setSelected (index);
-        choices.clear();
         std::vector<TileList::Item> tiles;
+        soundsFor (tab, index, choices, tiles);
+
+        // Evidenzia il suono attuale del canale
+        int current = -1;
+        if (targetChannel >= 0)
+            for (int i = 0; i < (int) choices.size(); ++i)
+                if (isCurrentSound (choices[(size_t) i]))
+                    current = i;
+
+        tileList.setItems (tiles, current);
+        tileView.setViewPosition (0, current >= 0 ? juce::jmax (0, tileList.getItemBounds (current).getY() - 40) : 0);
+        chosen = {};
+        confirmButton.setEnabled (false);
+        repaint();
+    }
+
+    void soundsFor (int tab, int index, std::vector<SoundChoice>& outChoices, std::vector<TileList::Item>& tiles) const
+    {
+        outChoices.clear();
+        tiles.clear();
 
         if (tab <= 1)
         {
@@ -351,7 +526,7 @@ private:
                 c.id = e.id;
                 c.name = juce::String (juce::CharPointer_UTF8 (e.name));
                 c.colour = e.colour;
-                choices.push_back (c);
+                outChoices.push_back (c);
                 tiles.push_back ({ c.name, {}, juce::Colour (e.colour), true });
             }
         }
@@ -366,7 +541,7 @@ private:
                 c.kit = k;
                 c.name = "Kit " + df::Presets::factoryName (k);
                 c.colour = 0xffff6b5b;
-                choices.push_back (c);
+                outChoices.push_back (c);
                 tiles.push_back ({ c.name, index == 1 ? juce::String ("16 pad in DrumForge") : juce::String (kitChannelPads.size()) + " canali",
                                    juce::Colour (c.colour), true });
             }
@@ -382,7 +557,7 @@ private:
                 c.kit = index;
                 c.name = SequencerEngine::getDrumTypeInfo (t).name;
                 c.colour = SequencerEngine::getDrumTypeInfo (t).colour;
-                choices.push_back (c);
+                outChoices.push_back (c);
                 tiles.push_back ({ c.name, SoundLibrary::getKitName (index), juce::Colour (c.colour), true });
             }
         }
@@ -395,7 +570,7 @@ private:
                 c.id = info.id;
                 c.name = info.name;
                 c.colour = info.colour;
-                choices.push_back (c);
+                outChoices.push_back (c);
                 tiles.push_back ({ info.name, juce::String (juce::CharPointer_UTF8 (info.detail)), juce::Colour (info.colour), true });
             }
         }
@@ -404,7 +579,7 @@ private:
             SoundChoice imp;
             imp.kind = SoundChoice::importFile;
             imp.name = "Importa un file audio...";
-            choices.push_back (imp);
+            outChoices.push_back (imp);
             tiles.push_back ({ "+ Importa...", "WAV, AIFF, FLAC, OGG, MP3", Theme::accent, true });
 
             for (auto& f : samples.listSamples())
@@ -414,22 +589,94 @@ private:
                 c.id = f;
                 c.name = SampleStore::displayName (f);
                 c.colour = 0xffc49360;
-                choices.push_back (c);
+                outChoices.push_back (c);
                 tiles.push_back ({ c.name, {}, juce::Colour (c.colour), true });
             }
         }
+    }
 
-        // Evidenzia il suono attuale del canale
-        int current = -1;
-        if (targetChannel >= 0)
-            for (int i = 0; i < (int) choices.size(); ++i)
-                if (isCurrentSound (choices[(size_t) i]))
-                    current = i;
+    //==============================================================================
+    // Albero (banco di lavoro sul PC)
 
-        tileList.setItems (tiles, current);
-        tileView.setViewPosition (0, current >= 0 ? juce::jmax (0, tileList.getItemBounds (current).getY() - 40) : 0);
-        chosen = {};
-        confirmButton.setEnabled (false);
+    static juce::Colour tabColour (int tab)
+    {
+        static const juce::uint32 cols[] { 0xffff8a5b, 0xff4fe3ff, 0xffb07cff, 0xffc49360 };
+        return juce::Colour (cols[juce::jlimit (0, 3, tab)]);
+    }
+
+    void rebuildTree (bool scrollToCurrent)
+    {
+        static const char* tabNames[] { "Batteria", "Suoni", "Sintesi", "Campioni" };
+        std::vector<TreeList::Row> rows;
+        treeChoices.clear();
+        int selectedRow = -1, currentRow = -1;
+        for (int tab = 0; tab < 4; ++tab)
+        {
+            TreeList::Row top;
+            top.level = 0; top.tab = tab; top.open = openTabs.count (tab) > 0;
+            top.text = tabNames[tab]; top.colour = tabColour (tab);
+            rows.push_back (top);
+            if (! top.open) continue;
+
+            const auto cats = categoriesFor (tab);
+            for (int c = 0; c < (int) cats.size(); ++c)
+            {
+                TreeList::Row sub;
+                sub.level = 1; sub.tab = tab; sub.category = c; sub.open = openCats.count ({ tab, c }) > 0;
+                sub.text = cats[(size_t) c].text;
+                sub.colour = cats[(size_t) c].colour == Theme::textDim ? tabColour (tab).withMultipliedSaturation (0.5f) : cats[(size_t) c].colour;
+                rows.push_back (sub);
+                if (! sub.open) continue;
+
+                std::vector<SoundChoice> ch;
+                std::vector<TileList::Item> items;
+                soundsFor (tab, c, ch, items);
+                for (int k = 0; k < (int) ch.size(); ++k)
+                {
+                    TreeList::Row leaf;
+                    leaf.level = 2; leaf.folder = false; leaf.tab = tab; leaf.category = c;
+                    leaf.sound = (int) treeChoices.size();
+                    leaf.text = items[(size_t) k].text; leaf.detail = items[(size_t) k].detail;
+                    leaf.colour = items[(size_t) k].colour;
+                    leaf.current = targetChannel >= 0 && isCurrentSound (ch[(size_t) k]);
+                    if (leaf.current) currentRow = (int) rows.size();
+                    if (sameChoice (ch[(size_t) k], chosen)) selectedRow = (int) rows.size();
+                    treeChoices.push_back (ch[(size_t) k]);
+                    rows.push_back (leaf);
+                }
+            }
+        }
+        tree.setRows (std::move (rows));
+        tree.setSelected (selectedRow);
+        if (scrollToCurrent && currentRow >= 0)
+            treeView.setViewPosition (0, juce::jmax (0, currentRow * TreeList::rowH - treeView.getHeight() / 3));
+    }
+
+    static bool sameChoice (const SoundChoice& a, const SoundChoice& b)
+    {
+        return a.kind != SoundChoice::none && a.kind == b.kind && a.id == b.id && a.kit == b.kit && a.drumType == b.drumType;
+    }
+
+    void treeClick (int r)
+    {
+        const auto& rows = tree.getRows();
+        if (r < 0 || r >= (int) rows.size()) return;
+        const auto row = rows[(size_t) r];
+        if (row.folder)
+        {
+            if (row.level == 0) { if (! openTabs.erase (row.tab)) openTabs.insert (row.tab); }
+            else if (! openCats.erase ({ row.tab, row.category })) openCats.insert ({ row.tab, row.category });
+            const int y = treeView.getViewPositionY();
+            rebuildTree (false);
+            treeView.setViewPosition (0, y);
+            return;
+        }
+        chosen = treeChoices[(size_t) row.sound];
+        tree.setSelected (r);
+        if (onTap) onTap();
+        if (chosen.kind == SoundChoice::importFile) { confirm(); return; }
+        preview (chosen);
+        confirmButton.setEnabled (true);
         repaint();
     }
 
@@ -528,7 +775,11 @@ private:
     SoundChoice chosen;
 
     SegmentedControl tabs { { "Batteria", "Suoni", "Sintesi", "Campioni" } };
-    juce::Viewport categoryView, tileView;
+    juce::Viewport categoryView, tileView, treeView;
+    TreeList tree;
+    std::set<int> openTabs;
+    std::set<std::pair<int, int>> openCats;
+    std::vector<SoundChoice> treeChoices;
     TileList categoryList, tileList;
     juce::TextButton closeButton { "Chiudi" }, confirmButton { "Aggiungi" };
     juce::Rectangle<float> titleArea, footerText;

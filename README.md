@@ -14,7 +14,13 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.63)
+## Stato attuale (v0.64)
+
+**Novita' della 0.64** (solo PC):
+- Banco di lavoro piu' pulito: il mixer non sta piu' fisso sotto il rack (si apre con MIXER / F9)
+- Libreria a sinistra piu' stretta, ad albero: solo le cartelle principali, si aprono in giu' (doppio clic = usa il suono)
+- Strumenti in una finestrella sopra JLoop (non a tutto schermo): grandezza ricordata, finestre sfalsate,
+  restano sopra JLoop mentre lo usi
 
 **Novita' della 0.63** (mixer, 12 effetti nuovi, menu diviso per categorie):
 - Movimento: Trance gate (griglia di 16 step + ritmi pronti), Tremolo / Auto-pan, Phaser, Flanger (anche a tempo)
