@@ -47,6 +47,14 @@ public:
 
     /** Solo per i test sul PC: "--editor N" apre l'editor del canale N, "--mode N" sceglie la modalita'. */
     void handleCommandLine (const juce::String& commandLine);
+    /** PC: tasti arrivati a una finestra separata (synth): scorciatoie e tastiera-pianoforte valgono anche li'. */
+    bool handleWindowKey (const juce::KeyPress& k)     { return keyPressed (k); }
+    bool handleWindowKeyState (bool down)               { return keyStateChanged (down); }
+    /** PC: gli strumenti si aprono in finestre separate (una per canale, anche piu' insieme). */
+    std::map<int, std::unique_ptr<juce::DocumentWindow>> synthWindows;
+    void closeSynthWindow (int channel);
+    void closeAllSynthWindows();
+    bool useSynthWindows() const;
 
 private:
     void timerCallback() override;
@@ -81,6 +89,7 @@ private:
     bool dropHighlight = false;
     void paintOverChildren (juce::Graphics&) override;
     void setUiScale (float scale);
+    void exportMidi (bool song);
     std::unique_ptr<juce::TooltipWindow> tooltips;
     void showMessage (const juce::String& title, const juce::String& message);
 
@@ -267,6 +276,11 @@ private:
     Playlist playlist { engine };
     ExportPanel exportPanel { engine, sampleStore };
     MixerPanel mixerPanel { engine };
+    // PC, "banco di lavoro": libreria dei suoni fissa a sinistra e mixer fisso sotto il channel rack
+    SoundBrowser deskBrowser { engine, sampleStore };
+    MixerPanel deskMixer { engine };
+    bool deskMode = false, deskBrowserOpened = false;
+    juce::Rectangle<int> overlayArea;   // dove si aprono playlist, piano roll... (col banco: a destra della libreria)
     PresetBrowser presetBrowser { engine };
     SegmentedControl songSwitch { { "PAT", "SONG" } };
 

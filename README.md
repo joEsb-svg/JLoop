@@ -14,7 +14,14 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.61)
+## Stato attuale (v0.62)
+
+**Novita' della 0.62**:
+- PC: "banco di lavoro" (schermo grande): libreria dei suoni fissa a sinistra (il suono va sul canale scelto, "Usa sul canale"),
+  channel rack al centro, mixer fisso sotto; playlist, piano roll ecc. si aprono a destra della libreria. MENU per spegnerlo
+- PC: strumenti in finestre separate (una per canale, anche piu' insieme, spostabili e ridimensionabili);
+  scorciatoie e tastiera-pianoforte funzionano anche dentro; MENU per tornare al pannello a tutto schermo
+- MENU > Esporta MIDI (.mid): pattern attuale o canzone intera, una traccia per canale (anche su Android)
 
 **Novita' della 0.61** (PC):
 - MENU > Dimensione interfaccia (75-150%); suggerimenti al passaggio del mouse

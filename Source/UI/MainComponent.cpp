@@ -1,5 +1,6 @@
 #include "MainComponent.h"
 #include "../Platform/OpenWith.h"
+#include "../Engine/MidiExport.h"
 #include "../Instruments/Common/NeonEditor.h"
 #include "RiserPanel.h"
 #include "Theme.h"
@@ -217,6 +218,16 @@ MainComponent::MainComponent()
     browser.onChoose = [this] (int channel, const SoundChoice& choice) { applySoundChoice (channel, choice); };
     addChildComponent (browser);
 
+    deskBrowser.setEmbedded (true);
+    deskBrowser.onChoose = [this] (int channel, const SoundChoice& choice)
+    {
+        applySoundChoice (channel, choice);
+        deskBrowser.setTarget (channel >= 0 ? channel : engine.getNumChannels() - 1);
+    };
+    addChildComponent (deskBrowser);
+    deskMixer.setEmbedded (true);
+    addChildComponent (deskMixer);
+
     editor.onChangeSound = [this] (int ch) { openBrowser (ch); };
     editor.onClose = [this] { editor.setVisible (false); };
     pianoRoll.onClose = [this] { pianoRoll.setVisible (false); };
@@ -316,6 +327,7 @@ MainComponent::MainComponent()
 
 MainComponent::~MainComponent()
 {
+    closeAllSynthWindows();   // prima degli strumenti: le finestre usano i loro editor
    #if JUCE_ANDROID
     openGL.detach();
    #endif
@@ -473,6 +485,30 @@ void MainComponent::layoutLandscape (juce::Rectangle<int> full)
     holo.setBounds (header);
 
     full.removeFromTop (6);
+
+    // PC con schermo grande: banco di lavoro (libreria a sinistra, mixer sotto il rack)
+   #if ! (JUCE_ANDROID || JUCE_IOS)
+    const bool wantDesk = settings == nullptr || settings->getBoolValue ("deskLayout", true);
+    deskMode = wantDesk && full.getWidth() >= 1100 && full.getHeight() >= 560;
+   #else
+    deskMode = false;
+   #endif
+    deskBrowser.setVisible (deskMode);
+    deskMixer.setVisible (deskMode);
+    overlayArea = {};
+    if (deskMode)
+    {
+        auto left = full.removeFromLeft (juce::jlimit (330, 430, full.getWidth() * 26 / 100));
+        deskBrowser.setBounds (left.reduced (6, 2));
+        if (! deskBrowserOpened && engine.getNumChannels() > 0)
+        {
+            deskBrowserOpened = true;   // la prima volta: categorie del suono del canale scelto
+            deskBrowser.openFor (juce::jlimit (0, engine.getNumChannels() - 1, juce::jmax (0, liveTarget.load())));
+        }
+        overlayArea = full;
+        auto mix = full.removeFromBottom (juce::jlimit (300, 380, full.getHeight() * 42 / 100));
+        deskMixer.setBounds (mix.reduced (6, 2));
+    }
     layoutRack (full, false);
 }
 
@@ -612,12 +648,13 @@ void MainComponent::layoutRack (juce::Rectangle<int> full, bool portrait)
     beatWatermark.setBounds (rack.getX(), rack.getY(), w, rack.getHeight());
     freezeStatus.setBounds (juce::Rectangle<int> (juce::jmin (360, getWidth() - 20), 34).withCentre ({ getWidth() / 2, rack.getY() + 30 }));
     editor.setBounds (rack.withTop (rulerArea.getY()).expanded (2, 2));
-    pianoRoll.setBounds (full);   // il piano roll copre tutto il channel rack, barra compresa
-    browser.setBounds (full);
-    playlist.setBounds (full);
-    exportPanel.setBounds (full);
-    mixerPanel.setBounds (full);
-    livePanel.setBounds (full);
+    const auto over = overlayArea.isEmpty() ? full : overlayArea;   // banco di lavoro: anche sopra il mixer
+    pianoRoll.setBounds (over);   // il piano roll copre tutto il channel rack, barra compresa
+    browser.setBounds (over);
+    playlist.setBounds (over);
+    exportPanel.setBounds (over);
+    mixerPanel.setBounds (over);
+    livePanel.setBounds (over);
     if (synthPanel != nullptr)
         synthPanel->setBounds (getContentArea());   // BassForge usa tutto lo schermo
     presetBrowser.setBounds (getContentArea());
@@ -678,6 +715,38 @@ void MainComponent::filesDropped (const juce::StringArray& files, int x, int y)
         c.colour = 0xffc49360;
         applySoundChoice (target, c);
     }
+}
+
+/** Esporta MIDI: il file si fa nella cartella delle esportazioni, poi si condivide (telefono) o si salva dove vuoi (PC). */
+void MainComponent::exportMidi (bool song)
+{
+    auto folder = ProjectIO::getRootFolder().getChildFile ("Exports");
+    folder.createDirectory();
+    const auto base = juce::File::createLegalFileName ((projectName == untitled ? juce::String ("JLoop") : projectName)
+                                                       + (song ? juce::String (" canzone") : " " + engine.getPatternName (engine.getCurrentPattern())));
+    const auto file = folder.getChildFile (base + ".mid");
+    juce::String error;
+    if (! midiexport::write (engine, song, file, error))
+    {
+        showMessage ("Esporta MIDI", error);
+        return;
+    }
+   #if JUCE_ANDROID || JUCE_IOS
+    shareBox = juce::ContentSharer::shareFilesScoped ({ juce::URL (file) }, [] (bool, const juce::String&) {}, this);
+   #else
+    projectChooser = std::make_unique<juce::FileChooser> ("Salva il file MIDI",
+                                                          juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile (file.getFileName()), "*.mid");
+    juce::Component::SafePointer<MainComponent> safe (this);
+    projectChooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting,
+                                 [safe, file] (const juce::FileChooser& fc)
+                                 {
+                                     const auto dest = fc.getResult();
+                                     if (safe == nullptr || dest == juce::File()) return;
+                                     const auto target = dest.hasFileExtension ("mid") ? dest : dest.withFileExtension ("mid");
+                                     if (file.copyFileTo (target)) target.revealToUser();
+                                     else safe->showMessage ("Esporta MIDI", "Non sono riuscito a salvare il file.");
+                                 });
+   #endif
 }
 
 void MainComponent::paintOverChildren (juce::Graphics& g)
@@ -1220,6 +1289,12 @@ void MainComponent::showFileMenu()
     menu.addItem (13, "Riser automatico...");
     menu.addItem (14, "Downer automatico...");
     menu.addItem (6, "Esporta audio (WAV / OGG)...");
+    {
+        juce::PopupMenu midiMenu;
+        midiMenu.addItem (2101, "Pattern attuale");
+        midiMenu.addItem (2102, "Canzone (playlist)", ! engine.getClips().empty());
+        menu.addSubMenu ("Esporta MIDI (.mid)", midiMenu);
+    }
     menu.addSeparator();
     menu.addSubMenu ("Impostazioni", createSettingsMenu());
     menu.addItem (4, "Info audio");
@@ -1233,6 +1308,8 @@ void MainComponent::showFileMenu()
         menu.addSubMenu ("Dimensione interfaccia", sizes);
     }
     menu.addItem (16, "Tasti rapidi");
+    menu.addItem (18, "Banco di lavoro (libreria e mixer sempre aperti)", true, settings == nullptr || settings->getBoolValue ("deskLayout", true));
+    menu.addItem (19, "Strumenti in finestre separate", true, useSynthWindows());
    #endif
     menu.addItem (9, "Cronologia delle modifiche...");
     menu.addItem (8, "Guida rapida");
@@ -1266,6 +1343,20 @@ void MainComponent::showFileMenu()
                                 self.showAudioSetup();
                             else if (result == 16)
                                 self.showShortcuts();
+                            else if (result == 18)
+                            {
+                                self.settings->setValue ("deskLayout", ! self.settings->getBoolValue ("deskLayout", true));
+                                self.settings->saveIfNeeded();
+                                self.resized();
+                            }
+                            else if (result == 19)
+                            {
+                                self.settings->setValue ("synthWindows", ! self.useSynthWindows());
+                                self.settings->saveIfNeeded();
+                                self.closeAllSynthWindows();
+                            }
+                            else if (result == 2101 || result == 2102)
+                                self.exportMidi (result == 2102);
                             else if (result > 1700 && result <= 1900)
                                 self.setUiScale ((float) (result - 1700) / 100.0f);
                             else if (result == 6)
@@ -1354,6 +1445,7 @@ void MainComponent::openProject (const juce::String& name)
     if (ProjectIO::loadFromFile (engine, ProjectIO::getProjectFile (name)))
     {
         synthPanel->onClose();
+    closeAllSynthWindows();
         resolveSamples();
         instruments->resolve();
         projectName = name;
@@ -1415,6 +1507,7 @@ void MainComponent::newProject()
 {
     engine.setPlaying (false);
     synthPanel->onClose();
+    closeAllSynthWindows();
     engine.resetProject();
     applyDefaultDrums();
     instruments->resolve();      // strumenti nuovi, al preset "Init"
@@ -1425,6 +1518,7 @@ void MainComponent::newProject()
     editor.setVisible (false);
     pianoRoll.setVisible (false);
     synthPanel->onClose();
+    closeAllSynthWindows();
     syncControlsFromEngine();
     saveSession();
     repaint();
@@ -1441,6 +1535,7 @@ void MainComponent::loadDemo (int index)
 
     engine.setPlaying (false);
     synthPanel->onClose();
+    closeAllSynthWindows();
     engine.resetProject();
     engine.setNumChannels (1);          // la demo parte da un canale solo (il primo viene riusato)
     engine.resetChannel (0);
@@ -1716,6 +1811,82 @@ void MainComponent::showMessage (const juce::String& title, const juce::String& 
 }
 
 //==============================================================================
+//==============================================================================
+// PC: strumenti in finestre separate
+
+namespace
+{
+    struct WindowKeys : juce::KeyListener
+    {
+        explicit WindowKeys (MainComponent& m) : main (m) {}
+        bool keyPressed (const juce::KeyPress& k, juce::Component*) override   { return main.handleWindowKey (k); }
+        bool keyStateChanged (bool down, juce::Component*) override            { return main.handleWindowKeyState (down); }
+        MainComponent& main;
+    };
+
+    struct SynthWindow : juce::DocumentWindow
+    {
+        SynthWindow (MainComponent& m, SequencerEngine& engine, int ch)
+            : juce::DocumentWindow (engine.getChannel (ch).name, juce::Colour (0xff12141a), juce::DocumentWindow::allButtons),
+              main (m), channel (ch), keys (m)
+        {
+            setUsingNativeTitleBar (true);
+            panel = std::make_unique<SynthPanel> (engine);
+            panel->onClose = [this] { close(); };
+            setContentNonOwned (panel.get(), false);
+            setResizable (true, true);
+            setResizeLimits (760, 400, 4000, 3000);
+            addKeyListener (&keys);
+            auto screen = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->userBounds.toNearestInt();
+            centreWithSize (juce::jmin (1180, screen.getWidth() * 85 / 100), juce::jmin (680, screen.getHeight() * 80 / 100));
+            setVisible (true);
+            panel->open (ch);
+        }
+
+        ~SynthWindow() override
+        {
+            if (panel != nullptr) panel->closeAll();
+            removeKeyListener (&keys);
+            clearContentComponent();
+        }
+
+        void close()
+        {
+            juce::Component::SafePointer<MainComponent> safe (&main);
+            const int ch = channel;
+            juce::MessageManager::callAsync ([safe, ch] { if (safe != nullptr) safe->closeSynthWindow (ch); });
+        }
+
+        void closeButtonPressed() override   { close(); }
+
+        MainComponent& main;
+        int channel;
+        WindowKeys keys;
+        std::unique_ptr<SynthPanel> panel;
+    };
+}
+
+bool MainComponent::useSynthWindows() const
+{
+    if (juce::SystemStats::getEnvironmentVariable ("JLOOP_SYNTH_WINDOWS", {}).isNotEmpty())   // test sul PC Linux
+        return true;
+   #if JUCE_WINDOWS || JUCE_MAC
+    return settings == nullptr || settings->getBoolValue ("synthWindows", true);
+   #else
+    return false;   // telefono e tablet: lo strumento a tutto schermo
+   #endif
+}
+
+void MainComponent::closeSynthWindow (int channel)
+{
+    synthWindows.erase (channel);
+}
+
+void MainComponent::closeAllSynthWindows()
+{
+    synthWindows.clear();
+}
+
 void MainComponent::openSynthPanel (int channel)
 {
     if (! engine.isSynth (channel))
@@ -1740,6 +1911,22 @@ void MainComponent::openSynthPanel (int channel)
             engine.liveNote (channel, df::firstNote + pad, 0.0f);
             return true;
         };
+    }
+    if (useSynthWindows())
+    {
+        if (auto it = synthWindows.find (channel); it != synthWindows.end())
+        {
+            it->second->toFront (true);
+            return;
+        }
+        if (synthPanel->isVisible() && synthPanel->getChannel() == channel)
+            synthPanel->onClose();
+        auto window = std::make_unique<SynthWindow> (*this, engine, channel);
+        auto* panel = window->panel.get();
+        panel->onShowPresets = [this, channel] (juce::Component& target) { showPresetMenu (channel, target); };
+        panel->onOpenMix = [this, channel] { closeSynthWindow (channel); if (engine.isSynth (channel)) openEditor (channel); };
+        synthWindows[channel] = std::move (window);
+        return;
     }
     synthPanel->open (channel);
     synthPanel->setVisible (true);
@@ -2589,6 +2776,7 @@ void MainComponent::setBufferSize (int samples)
 
 void MainComponent::setLiveTarget (int channel)
 {
+    if (deskMode && channel >= 0) deskBrowser.setTarget (channel);
     if (channel >= 0 && channel < engine.getNumChannels() && liveTarget.exchange (channel) != channel && engine.isRecording())
         repaint (logoArea.toNearestInt());
 }
@@ -3108,6 +3296,9 @@ void MainComponent::resolveSamples()
 void MainComponent::rebuildRows()
 {
     instruments->resolve();      // strumenti per i canali nuovi, clonati o caricati
+    deskMixer.open (-1);         // banco di lavoro: le strisce del mixer seguono i canali
+    for (auto it = synthWindows.begin(); it != synthWindows.end();)   // finestre di canali non piu' strumento
+        it = engine.isSynth (it->first) && engine.getInstrument (it->first) != nullptr ? std::next (it) : synthWindows.erase (it);
     shownStructure = engine.getStructureVersion();
     rows.clear();
 

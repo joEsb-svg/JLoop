@@ -904,13 +904,21 @@ public:
         g.drawFittedText (text, title.toNearestInt(), juce::Justification::centredLeft, 1);
     }
 
+    /** PC, banco di lavoro: il mixer sta fisso sotto il channel rack (niente "Chiudi"). */
+    void setEmbedded (bool e)        { embedded = e; resized(); }
+    bool embedded = false;
+
     void resized() override
     {
         auto r = getLocalBounds().reduced (8, 6);
         auto bar = r.removeFromTop (32);
         const bool narrow = getWidth() < 520;
-        closeButton.setBounds (bar.removeFromRight (narrow ? 64 : 76).reduced (0, 2));
-        bar.removeFromRight (6);
+        closeButton.setVisible (! embedded);
+        if (! embedded)
+        {
+            closeButton.setBounds (bar.removeFromRight (narrow ? 64 : 76).reduced (0, 2));
+            bar.removeFromRight (6);
+        }
         if (effectsTrack >= 0)
             backButton.setBounds (bar.removeFromRight (narrow ? 70 : 90).reduced (0, 2));
         else

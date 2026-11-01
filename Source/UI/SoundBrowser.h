@@ -218,6 +218,19 @@ public:
 
     int getTargetChannel() const    { return targetChannel; }
 
+    /** PC, banco di lavoro: la libreria resta aperta a sinistra; il suono va sul canale scelto nel rack. */
+    void setEmbedded (bool e)       { embedded = e; closeButton.setVisible (! e); resized(); repaint(); }
+    bool isEmbedded() const         { return embedded; }
+    /** Cambia il canale a cui va il suono, senza cambiare la categoria in vista. */
+    void setTarget (int channel)
+    {
+        if (channel == targetChannel) return;
+        targetChannel = channel;
+        confirmButton.setButtonText (channel < 0 ? "Aggiungi" : "Usa sul canale");
+        repaint();
+    }
+    bool embedded = false;
+
     /** Solo per i test: apre una scheda e una categoria. */
     void showTabForTest (int tab, int category)    { tabs.setSelected (tab); showTab (tab, category); }
 
@@ -232,7 +245,8 @@ public:
         title.removeFromLeft (8.0f);
         g.setColour (Theme::textBright);
         g.setFont (Theme::font (17.0f, true));
-        const auto heading = targetChannel < 0 ? juce::String ("Aggiungi strumento")
+        const auto heading = embedded ? (targetChannel < 0 ? juce::String ("Suoni") : "Suoni  " + juce::String (juce::CharPointer_UTF8 ("\xe2\x86\x92  ")) + engine.getChannel (targetChannel).name)
+                           : targetChannel < 0 ? juce::String ("Aggiungi strumento")
                                                : "Suono di \"" + engine.getChannel (targetChannel).name + "\"";
         g.drawFittedText (heading, title.toNearestInt(), juce::Justification::centredLeft, 1);
 
@@ -248,7 +262,7 @@ public:
     {
         auto r = getLocalBounds().reduced (10, 6);
         auto top = r.removeFromTop (34);
-        closeButton.setBounds (top.removeFromRight (80).reduced (0, 2));
+        if (! embedded) closeButton.setBounds (top.removeFromRight (80).reduced (0, 2));
         titleArea = top.toFloat();
 
         r.removeFromTop (4);
