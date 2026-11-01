@@ -23,6 +23,7 @@
     - PAN:  tocca a sinistra/destra dentro lo step per spostarlo nello stereo; doppio tocco = centro
 */
 class ChannelRow : public juce::Component,
+                   public juce::TooltipClient,
                    private juce::Timer
 {
 public:
@@ -47,6 +48,7 @@ public:
     void resized() override;
     void mouseDown (const juce::MouseEvent&) override;
     void pressDown (const juce::MouseEvent&);
+    juce::String getTooltip() override;
     void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
     void mouseDrag (const juce::MouseEvent&) override;
     void mouseUp (const juce::MouseEvent&) override;

@@ -266,6 +266,18 @@ MainComponent::MainComponent()
     openWithPoll.startTimer (700);
    #if ! (JUCE_ANDROID || JUCE_IOS)
     setWantsKeyboardFocus (true);   // sul PC: scorciatoie e tastiera-pianoforte
+    // Suggerimenti al passaggio del mouse
+    fileButton.setTooltip ("Menu: progetti, salva, esporta, riser/downer, impostazioni");
+    undoButton.setTooltip ("Annulla (Ctrl+Z). Tasto destro: cronologia delle modifiche");
+    redoButton.setTooltip ("Ripeti (Ctrl+Y)");
+    playButton.setTooltip ("Play / stop (Spazio)");
+    recordButton.setTooltip ("Registra le note suonate sul canale scelto (Ctrl+R)");
+    metroButton.setTooltip ("Metronomo (Ctrl+M)");
+    kitButton.setTooltip ("Kit della batteria dei canali");
+    mixerButton.setTooltip ("Mixer (F9)");
+    liveButton.setTooltip ("Live: lancia i pattern al volo");
+    addButton.setTooltip ("Aggiungi uno strumento o un suono");
+    lengthChip.setTooltip ("Lunghezza del pattern in quarti: frecce, oppure clic per scriverla");
    #endif   // file aperti con "Apri con JLoop"
 
    #if JUCE_ANDROID
@@ -612,6 +624,86 @@ void MainComponent::layoutRack (juce::Rectangle<int> full, bool portrait)
 }
 
 //==============================================================================
+// PC: file trascinati nella finestra
+
+static bool isAudioFile (const juce::String& path)
+{
+    for (auto* ext : { ".wav", ".aif", ".aiff", ".flac", ".ogg", ".mp3" })
+        if (path.endsWithIgnoreCase (ext)) return true;
+    return false;
+}
+
+bool MainComponent::isInterestedInFileDrag (const juce::StringArray& files)
+{
+    for (auto& f : files)
+        if (isAudioFile (f) || f.endsWithIgnoreCase (".jloop") || f.endsWithIgnoreCase (".dawfl"))
+            return true;
+    return false;
+}
+
+/** Un .jloop si apre; un audio lasciato su un canale ne diventa il suono, altrove diventa un canale nuovo
+    (piu' file insieme: un canale nuovo per ognuno). */
+void MainComponent::filesDropped (const juce::StringArray& files, int x, int y)
+{
+    dropHighlight = false;
+    repaint();
+    for (auto& f : files)
+        if (f.endsWithIgnoreCase (".jloop") || f.endsWithIgnoreCase (".dawfl"))
+        {
+            openProjectFromUrl (juce::URL (juce::File (f)));
+            return;
+        }
+
+    int target = -1;
+    const auto screenPos = localPointToGlobal (juce::Point<int> (x, y));
+    const bool rackOnTop = ! playlist.isVisible() && ! pianoRoll.isVisible() && ! mixerPanel.isVisible()
+                           && (synthPanel == nullptr || ! synthPanel->isVisible()) && ! browser.isVisible();
+    int audioCount = 0;
+    for (auto& f : files) if (isAudioFile (f)) ++audioCount;
+    if (rackOnTop && audioCount == 1)
+        for (auto* row : rows)
+            if (row->getScreenBounds().contains (screenPos))
+                target = row->getChannel();
+
+    for (auto& f : files)
+    {
+        if (! isAudioFile (f)) continue;
+        juce::String error;
+        const auto name = sampleStore.importFromUrl (juce::URL (juce::File (f)), error);
+        if (name.isEmpty()) { showMessage ("Campione", error); continue; }
+        SoundChoice c;
+        c.kind = SoundChoice::userSample;
+        c.id = name;
+        c.name = SampleStore::displayName (name);
+        c.colour = 0xffc49360;
+        applySoundChoice (target, c);
+    }
+}
+
+void MainComponent::paintOverChildren (juce::Graphics& g)
+{
+    if (! dropHighlight) return;
+    g.setColour (Theme::accent.withAlpha (0.12f));
+    g.fillRect (getLocalBounds());
+    g.setColour (Theme::accent);
+    g.drawRect (getLocalBounds(), 3);
+    g.setFont (Theme::font (16.0f, true));
+    g.drawText ("Lascia il file su un canale per usarlo come suono, altrove per un canale nuovo",
+                getLocalBounds().removeFromBottom (40), juce::Justification::centred, false);
+}
+
+void MainComponent::setUiScale (float scale)
+{
+   #if ! (JUCE_ANDROID || JUCE_IOS)
+    scale = juce::jlimit (0.6f, 2.0f, scale);
+    juce::Desktop::getInstance().setGlobalScaleFactor (scale);
+    if (settings != nullptr) { settings->setValue ("uiScale", (double) scale); settings->saveIfNeeded(); }
+   #else
+    juce::ignoreUnused (scale);
+   #endif
+}
+
+//==============================================================================
 // Tastiera del computer (Windows e PC): scorciatoie e tasti come pianoforte
 
 bool MainComponent::typingInText() const
@@ -632,6 +724,10 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
 {
     if (typingInText())
         return false;
+    if (pianoRoll.isVisible() && pianoRoll.handleKey (key))
+        return true;
+    if (playlist.isVisible() && playlist.handleKey (key))
+        return true;
     const auto mods = key.getModifiers();
     const int code = key.getKeyCode();
     const bool cmd = mods.isCommandDown();
@@ -655,6 +751,8 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
         if (c == 'N')                                        { newProject(); return true; }
         if (c == 'R')                                        { toggleRecording(); return true; }
         if (c == 'E')                                        { openExport(); return true; }
+        if (c == 'M')                                        { metroButton.setToggleState (! metroButton.getToggleState(), juce::sendNotification); return true; }
+        if (c == 'H')                                        { releasePcKeys(); engine.panic(); updateViews(); return true; }
         return false;
     }
 
@@ -671,6 +769,12 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
     if (key == juce::KeyPress::F5Key)                        { engine.setSongMode (true); songSwitch.setSelected (1); openPlaylist(); return true; }
     if (key == juce::KeyPress::F7Key)                        { const int t = liveTarget.load(); if (t >= 0 && engine.hasNotes (t)) openPianoRoll (t); return true; }
     if (key == juce::KeyPress::F9Key)                        { openMixer(); return true; }
+    if (key == juce::KeyPress::F6Key || key == juce::KeyPress::F12Key)   // F6: channel rack; F12: chiude tutte le finestre
+    {
+        for (int i = 0; i < 8 && handleBackButton(); ++i) {}
+        return true;
+    }
+    if (code == 'L' || code == 'l')                          { songSwitch.setSelected (engine.isSongMode() ? 0 : 1); if (songSwitch.onChange) songSwitch.onChange (engine.isSongMode() ? 0 : 1); return true; }
     if (code == '-' || code == juce::KeyPress::numberPadSubtract) { releasePcKeys(); pcOctave = juce::jmax (-3, pcOctave - 1); return true; }
     if (code == '=' || code == '+' || code == juce::KeyPress::numberPadAdd) { releasePcKeys(); pcOctave = juce::jmin (3, pcOctave + 1); return true; }
 
@@ -1121,6 +1225,13 @@ void MainComponent::showFileMenu()
     menu.addItem (4, "Info audio");
    #if ! (JUCE_ANDROID || JUCE_IOS)
     menu.addItem (15, "Scheda audio...");
+    {
+        juce::PopupMenu sizes;
+        const float cur = juce::Desktop::getInstance().getGlobalScaleFactor();
+        for (int pct : { 75, 85, 100, 110, 125, 150 })
+            sizes.addItem (1700 + pct, juce::String (pct) + "%", true, std::abs (cur * 100.0f - (float) pct) < 1.0f);
+        menu.addSubMenu ("Dimensione interfaccia", sizes);
+    }
     menu.addItem (16, "Tasti rapidi");
    #endif
     menu.addItem (9, "Cronologia delle modifiche...");
@@ -1155,6 +1266,8 @@ void MainComponent::showFileMenu()
                                 self.showAudioSetup();
                             else if (result == 16)
                                 self.showShortcuts();
+                            else if (result > 1700 && result <= 1900)
+                                self.setUiScale ((float) (result - 1700) / 100.0f);
                             else if (result == 6)
                                 self.openExport();
                             else if (result == 7)
@@ -1585,11 +1698,13 @@ void MainComponent::showShortcuts()
                  "Ctrl+O: apri progetto da file   Ctrl+N: nuovo progetto\n"
                  "Ctrl+R: registra   Ctrl+E: esporta audio\n"
                  "Frecce su/giu': BPM (con Maiusc di 10)   Frecce sinistra/destra: pattern\n"
-                 "F5: playlist   F7: piano roll   F9: mixer   Esc: chiude il pannello\n\n"
+                 "F5: playlist   F6: channel rack   F7: piano roll   F9: mixer   F12 / Esc: chiude\n"
+                 "L: PAT / SONG   Ctrl+M: metronomo   Ctrl+H: ferma tutti i suoni\n\n"
                  "Tastiera come pianoforte (suona il canale scelto, anche in registrazione):\n"
                  "Z S X D C V G B H N J M: ottava bassa   Q 2 W 3 E R 5 T 6 Y 7 U: ottava alta\n"
                  "- e +: ottava giu' / su\n\n"
-                 "Mouse: tasto destro = come tenere premuto; rotellina = scorre\n"
+                 "Mouse: tasto destro = come tenere premuto; rotellina = scorre; tasto centrale = sposta la vista\n"
+                 "File: trascina WAV/MP3 su un canale (o fuori per un canale nuovo), un .jloop per aprirlo\n"
                  "(Maiusc = in orizzontale, Ctrl = zoom nella playlist e nel piano roll)");
 }
 
@@ -2439,6 +2554,8 @@ void MainComponent::loadSettings()
     setAudioReserve (settings->getIntValue ("audioReserveMs", defaultReserve));
 
    #if ! (JUCE_ANDROID || JUCE_IOS)
+    juce::Desktop::getInstance().setGlobalScaleFactor ((float) settings->getDoubleValue ("uiScale", 1.0));
+    tooltips = std::make_unique<juce::TooltipWindow> (this, 600);   // suggerimenti al passaggio del mouse
     // Sul PC: la scheda audio scelta l'ultima volta
     if (auto xml = settings->getXmlValue ("audioDeviceState"))
         audioError = deviceManager.initialise (0, 2, xml.get(), true);

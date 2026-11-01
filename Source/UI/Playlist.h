@@ -137,6 +137,54 @@ public:
     void setBrush (int pattern)     { engine.selectPattern (juce::jlimit (0, SequencerEngine::numPatterns - 1, pattern)); repaint(); }
     int getBrush() const            { return engine.getCurrentPattern(); }
 
+    //==============================================================================
+    // Selezione (PC: Ctrl+clic) e tasti: Ctrl+A/D, Ctrl+C/X/V, Ctrl+B duplica a destra, Canc
+    bool isSelected (const SequencerEngine::Clip& c) const   { return std::find (selected.begin(), selected.end(), c) != selected.end(); }
+
+    bool handleKey (const juce::KeyPress& key)
+    {
+        const auto mods = key.getModifiers();
+        const int ch = juce::CharacterFunctions::toUpperCase ((juce::juce_wchar) key.getKeyCode());
+        auto clips = engine.getClips();
+        // tiene solo le clip selezionate che esistono ancora
+        selected.erase (std::remove_if (selected.begin(), selected.end(), [&clips] (auto& c) { return std::find (clips.begin(), clips.end(), c) == clips.end(); }), selected.end());
+
+        if (mods.isCommandDown() && ch == 'A')  { selected = clips; repaint(); return true; }
+        if (mods.isCommandDown() && ch == 'D')  { selected.clear(); repaint(); return true; }
+        if (mods.isCommandDown() && (ch == 'C' || ch == 'X'))
+        {
+            if (selected.empty()) return true;
+            clipClipboard() = selected;
+            if (ch == 'X') removeSelected (clips);
+            return true;
+        }
+        if (mods.isCommandDown() && ch == 'V')
+        {
+            // incolla dalla battuta di partenza della canzone (tocco sul righello)
+            auto& cb = clipClipboard();
+            if (cb.empty()) return true;
+            int first = cb.front().startStep();
+            for (auto& c : cb) first = juce::jmin (first, c.startStep());
+            placeCopies (clips, cb, engine.getSongStartBar() * SequencerEngine::stepsPerBar - first);
+            return true;
+        }
+        if (mods.isCommandDown() && ch == 'B')
+        {
+            if (selected.empty()) return true;
+            int first = selected.front().startStep(), last = 0;
+            for (auto& c : selected) { first = juce::jmin (first, c.startStep()); last = juce::jmax (last, c.startStep() + engine.getClipLength (c)); }
+            const int span = ((last - first + SequencerEngine::stepsPerBar - 1) / SequencerEngine::stepsPerBar) * SequencerEngine::stepsPerBar;
+            placeCopies (clips, selected, span);
+            return true;
+        }
+        if ((key == juce::KeyPress::deleteKey || key == juce::KeyPress::backspaceKey) && ! selected.empty())
+        {
+            removeSelected (clips);
+            return true;
+        }
+        return false;
+    }
+
     void setBarWidth (float w)
     {
         const float centreBar = (scrollX + gridWidth() * 0.5f) / barWidth;
@@ -322,6 +370,31 @@ public:
         dragging = scrolling = longPressed = false;
         dragIndex = clipAt (e.position);
         onRuler = e.position.y < (float) rulerHeight && e.position.x > (float) headerWidth;
+
+        // Mouse: Ctrl+clic su una clip la aggiunge/toglie dalla selezione (per copiare, duplicare, cancellare)
+        if (e.mods.isCommandDown())
+        {
+            if (dragIndex >= 0)
+            {
+                const auto c = engine.getClips()[(size_t) dragIndex];
+                if (isSelected (c)) selected.erase (std::remove (selected.begin(), selected.end(), c), selected.end());
+                else selected.push_back (c);
+            }
+            dragIndex = -1;
+            onRuler = false;
+            scrolling = true;
+            repaint();
+            return;
+        }
+
+        // Mouse: tasto centrale = sposta la vista; tasto destro fuori dalle clip non mette niente
+        if (e.mods.isMiddleButtonDown() || (e.mods.isPopupMenu() && dragIndex < 0))
+        {
+            dragIndex = -1;
+            onRuler = false;
+            scrolling = true;
+            return;
+        }
 
         // Vicino ai bordi di una clip: si allunga/accorcia (destra) o si taglia l'inizio (sinistra)
         edge = 0;
@@ -638,6 +711,11 @@ private:
         g.fillRoundedRectangle (r, 5.0f);
         g.setColour (colour.brighter (0.4f).withAlpha (ghost ? 0.9f : 0.85f));
         g.drawRoundedRectangle (r.reduced (0.5f), 5.0f, ghost ? 2.0f : 1.0f);
+        if (isSelected (clip))
+        {
+            g.setColour (juce::Colours::white);
+            g.drawRoundedRectangle (r.reduced (1.0f), 5.0f, 2.5f);
+        }
 
         // Anteprima: gli step del pattern (qualsiasi canale) come piccole tacche, dal punto di partenza;
         // se la clip e' piu' lunga del pattern, il pattern si ripete (una linea segna ogni ripartenza)
@@ -687,6 +765,37 @@ private:
     int dragIndex = -1, dragBar = 0, dragTrack = 0, shownStep = -2;
     int edge = 0, dragDeltaSteps = 0;   // bordo trascinato (-1 sinistro, 1 destro, 0 = si sposta la clip)
     bool dragging = false, scrolling = false, longPressed = false, onRuler = false;
+    std::vector<SequencerEngine::Clip> selected;
+    static std::vector<SequencerEngine::Clip>& clipClipboard()   { static std::vector<SequencerEngine::Clip> c; return c; }
+
+    void removeSelected (std::vector<SequencerEngine::Clip>& clips)
+    {
+        clips.erase (std::remove_if (clips.begin(), clips.end(), [this] (auto& c) { return isSelected (c); }), clips.end());
+        selected.clear();
+        engine.setClips (clips);
+        if (onEdit) onEdit();
+        repaint();
+    }
+
+    /** Copie delle clip spostate di 'shift' step; le copie diventano la nuova selezione. */
+    void placeCopies (std::vector<SequencerEngine::Clip>& clips, std::vector<SequencerEngine::Clip> source, int shift)
+    {
+        std::vector<SequencerEngine::Clip> made;
+        for (auto c : source)
+        {
+            const int start = c.startStep() + shift;
+            if (start < 0 || start >= SequencerEngine::maxBars * SequencerEngine::stepsPerBar || (int) clips.size() >= SequencerEngine::maxClips)
+                continue;
+            c.bar = start / SequencerEngine::stepsPerBar;
+            c.sub = start % SequencerEngine::stepsPerBar;
+            clips.push_back (c);
+            made.push_back (c);
+        }
+        engine.setClips (clips);
+        selected = made;
+        if (onEdit) onEdit();
+        repaint();
+    }
     juce::uint64 shownHash = 0;
 };
 
@@ -740,6 +849,7 @@ public:
 
     std::function<void()> onClose;
     PlaylistGrid& getGrid()         { return grid; }
+    bool handleKey (const juce::KeyPress& key)   { return modeSwitch.getSelected() == 0 && grid.handleKey (key); }
     AutomationView& getAutomationView()     { return autoView; }
 
     /** Playhead e modifiche fatte altrove (chiamato dal timer della schermata). */

@@ -375,7 +375,8 @@ private:
 
 //==============================================================================
 /** Lunghezza del pattern in quarti (1..64): ◂ 4q ▸, tocca il numero per scriverla. */
-class PatternLengthChip : public juce::Component
+class PatternLengthChip : public juce::Component,
+                          public juce::SettableTooltipClient
 {
 public:
     /** Il valore e' in step; si mostra e si sceglie in quarti (1 quarto = 4 step, da 1 a 64 quarti). */

@@ -126,8 +126,25 @@ jobs:
       - name: Genera il progetto Visual Studio
         run: JUCE\extras\Projucer\Builds\VisualStudio2022\x64\Release\App\Projucer.exe --resave JLoop.jucer
 
+      # ASIO (schede audio esterne a bassa latenza): SDK di Steinberg, ora con licenza GPLv3.
+      # Se il download non riesce si compila lo stesso, senza ASIO.
+      - name: ASIO SDK (facoltativo)
+        shell: pwsh
+        run: |
+          try {
+            Invoke-WebRequest -Uri "https://www.steinberg.net/asiosdk" -OutFile asio.zip -MaximumRedirection 10
+            Expand-Archive asio.zip -DestinationPath asiosdk -Force
+            $h = Get-ChildItem asiosdk -Recurse -Filter iasiodrv.h | Select-Object -First 1
+            if ($h) { "ASIO_INCLUDE=$($h.DirectoryName)" | Out-File $env:GITHUB_ENV -Append; Write-Host "ASIO trovato: $($h.DirectoryName)" }
+            else { Write-Host "ASIO SDK scaricato ma senza iasiodrv.h: compilo senza ASIO" }
+          } catch { Write-Host "ASIO SDK non scaricato: compilo senza ASIO ($_)" }
+
       - name: Compila JLoop.exe
-        run: msbuild Builds\VisualStudio2022\JLoop.sln /p:Configuration=Release /p:Platform=x64 /m /v:minimal
+        shell: pwsh
+        run: |
+          if ($env:ASIO_INCLUDE) { $env:CL = "/DJUCE_ASIO=1 /I`"$env:ASIO_INCLUDE`""; Write-Host "Con ASIO" }
+          msbuild Builds\VisualStudio2022\JLoop.sln /p:Configuration=Release /p:Platform=x64 /m /v:minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Installer (Inno Setup)
         shell: pwsh

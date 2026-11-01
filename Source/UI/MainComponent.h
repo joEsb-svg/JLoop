@@ -28,6 +28,7 @@
 //==============================================================================
 /** La schermata principale: barra del trasporto + channel rack. */
 class MainComponent : public juce::Component,
+                      public juce::FileDragAndDropTarget,
                       private juce::Timer,
                       private juce::MidiInputCallback
 {
@@ -72,6 +73,15 @@ private:
     void showAudioSetup();
     void saveAudioDevice();
     void showShortcuts();
+    // --- PC: file trascinati da Esplora risorse, dimensione dell'interfaccia, suggerimenti
+    bool isInterestedInFileDrag (const juce::StringArray& files) override;
+    void filesDropped (const juce::StringArray& files, int x, int y) override;
+    void fileDragEnter (const juce::StringArray&, int, int) override  { dropHighlight = true; repaint(); }
+    void fileDragExit (const juce::StringArray&) override              { dropHighlight = false; repaint(); }
+    bool dropHighlight = false;
+    void paintOverChildren (juce::Graphics&) override;
+    void setUiScale (float scale);
+    std::unique_ptr<juce::TooltipWindow> tooltips;
     void showMessage (const juce::String& title, const juce::String& message);
 
     void syncControlsFromEngine();

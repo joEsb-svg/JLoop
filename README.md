@@ -14,7 +14,17 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.60)
+## Stato attuale (v0.61)
+
+**Novita' della 0.61** (PC):
+- MENU > Dimensione interfaccia (75-150%); suggerimenti al passaggio del mouse
+- Trascina WAV/MP3/FLAC/OGG da Esplora risorse: su un canale = suo suono, altrove = canale nuovo; un .jloop si apre
+- Tasti FL: F6 rack, F12 chiude tutto, L PAT/SONG, Ctrl+M metronomo, Ctrl+H panico; tasto centrale = sposta la vista
+- Piano roll: Ctrl/Maiusc + trascina = selezione a riquadro, Ctrl+A/D/C/X/V/B, Canc, Ctrl/Maiusc + frecce = traspone,
+  tasto destro su una nota = la cancella
+- Playlist: Ctrl+clic seleziona piu' clip, Ctrl+A/D/C/X/V (incolla dalla battuta di partenza), Ctrl+B duplica a destra, Canc
+- ASIO nella scelta della scheda audio (se l'SDK di Steinberg si scarica durante la compilazione)
+- Nome del pattern sempre visibile nel display (0.60.1)
 
 **Novita' della 0.60**: nella playlist il pennello e' il pattern scelto nel display in alto (frecce del PATTERN):
 cambiandolo li' si cambia il pattern da posizionare; la tendina PENNELLO resta, sempre allineata

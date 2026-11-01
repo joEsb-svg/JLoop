@@ -15,9 +15,19 @@
     - dietro, lo spettro dell'audio in uscita, appena accennato
     Comandi come prima: frecce ◀ ▶, trascinamento verticale sul numero, tocco al centro.
 */
-class HoloDisplay : public juce::Component
+class HoloDisplay : public juce::Component,
+                    public juce::TooltipClient
 {
 public:
+    /** PC: suggerimento sotto il mouse. */
+    juce::String getTooltip() override
+    {
+        const auto p = getMouseXYRelative().toFloat();
+        if (tempoCell.contains (p))    return "Tempo (BPM): frecce +1/-1, trascina su/giu', clic per scriverlo o battere il TAP. Tastiera: frecce su/giu'";
+        if (patternCell.contains (p))  return "Pattern: frecce per cambiarlo (in playlist e' quello da mettere), clic per il menu (nuovo, clona, rinomina...)";
+        if (positionCell.contains (p)) return "Posizione: battuta.quarto.sedicesimo";
+        return {};
+    }
     struct Position { int bar = 1, beat = 1, sixteenth = 1, stepInBar = -1; bool playing = false; };
 
     // Tempo

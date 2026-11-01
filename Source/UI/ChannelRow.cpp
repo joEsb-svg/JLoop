@@ -371,6 +371,16 @@ void ChannelRow::mouseDown (const juce::MouseEvent& e)
     }
 }
 
+juce::String ChannelRow::getTooltip()
+{
+    const auto p = getMouseXYRelative().toFloat();
+    if (muteArea.expanded (2.0f).contains (p)) return "Accendi / spegni il canale (mute)";
+    if (menuArea.contains (p))                  return "Cambia suono o strumento";
+    if (nameArea.contains (p))                  return "Clic: ascolta. Tasto destro: menu del canale (rinomina, colore, piano roll, congela...). Trascina: sposta il canale";
+    if (getPadsArea().contains (p))             return "Clic: accendi/spegni lo step (trascina per dipingerne tanti). Tasto destro: riempimento automatico";
+    return {};
+}
+
 /** Rotellina: su/giu' scorre i canali; con Maiusc (o rotellina laterale) scorre gli step di un pattern lungo. */
 void ChannelRow::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& w)
 {

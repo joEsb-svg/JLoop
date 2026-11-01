@@ -414,6 +414,30 @@ public:
         startScrollX = scrollX;
         startScrollY = scrollY;
 
+        // Mouse: tasto centrale = sposta la vista; tasto destro su una nota = la cancella
+        if (e.mods.isMiddleButtonDown())
+        {
+            dragMode = DragMode::emptyArea;
+            moved = true;
+            return;
+        }
+        if (e.mods.isPopupMenu())
+        {
+            auto notes = engine.getNotes (channel);
+            for (int i = (int) notes.size(); --i >= 0;)
+                if (noteBounds (notes[(size_t) i]).expanded (0.0f, 2.0f).contains (e.position))
+                {
+                    selection.erase (std::remove (selection.begin(), selection.end(), notes[(size_t) i]), selection.end());
+                    notes.erase (notes.begin() + i);
+                    engine.setNotes (channel, notes);
+                    if (onEdit) onEdit();
+                    break;
+                }
+            dragMode = DragMode::scrollKeyboard;   // al rilascio non succede altro
+            repaint();
+            return;
+        }
+
         if (e.position.x < (float) keyboardWidth)
         {
             // Tastiera: tocca per sentire, trascina per scorrere
@@ -447,6 +471,9 @@ public:
             }
         }
 
+        // Ctrl (o Maiusc) + trascina sul vuoto: selezione a riquadro anche senza "Seleziona"
+        if (! selectMode && (e.mods.isCommandDown() || e.mods.isShiftDown()))
+            selectMode = true;
         dragMode = selectMode ? DragMode::band : DragMode::emptyArea;
     }
 
@@ -1014,6 +1041,32 @@ public:
     std::function<void()> onClose;
 
     void mouseUp (const juce::MouseEvent&) override     { updateTools(); }
+
+    /** Tasti del PC quando il piano roll e' aperto (Ctrl+A/C/X/V/B/D, Canc, Ctrl/Maiusc + frecce). */
+    bool handleKey (const juce::KeyPress& key)
+    {
+        const auto mods = key.getModifiers();
+        const int c = juce::CharacterFunctions::toUpperCase ((juce::juce_wchar) key.getKeyCode());
+        bool done = true;
+        if (mods.isCommandDown() && c == 'A')        { grid.setSelectMode (true); grid.selectAll(); }
+        else if (mods.isCommandDown() && c == 'D')   grid.clearSelection();
+        else if (mods.isCommandDown() && c == 'C')   grid.copySelection();
+        else if (mods.isCommandDown() && c == 'X')   { if (grid.getSelectionSize() > 0) { grid.copySelection(); grid.deleteSelection(); } }
+        else if (mods.isCommandDown() && c == 'V')   grid.paste();
+        else if (mods.isCommandDown() && c == 'B')   grid.duplicate();
+        else if (key == juce::KeyPress::deleteKey || key == juce::KeyPress::backspaceKey)
+        {
+            if (grid.getSelectionSize() > 0) grid.deleteSelection();   // senza selezione non cancella tutto per sbaglio
+        }
+        else if (key.isKeyCode (juce::KeyPress::upKey) && (mods.isCommandDown() || mods.isShiftDown()))
+            grid.transpose (mods.isCommandDown() ? 12 : 1);
+        else if (key.isKeyCode (juce::KeyPress::downKey) && (mods.isCommandDown() || mods.isShiftDown()))
+            grid.transpose (mods.isCommandDown() ? -12 : -1);
+        else
+            done = false;
+        if (done) updateTools();
+        return done;
+    }
 
     void updateTools()
     {
