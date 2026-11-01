@@ -295,13 +295,29 @@ private:
         }
         else
         {
-            drawGlowText (g, numText, dh, cyan, inner.getCentre());
-            // Solo il pallino col colore del pattern, sotto il numero
-            auto dot = juce::Rectangle<float> (6.0f, 6.0f).withCentre ({ inner.getCentreX(), inner.getBottom() - 5.0f });
-            g.setColour (colour.withAlpha (0.4f));
-            g.fillEllipse (dot.expanded (2.5f));
-            g.setColour (colour);
-            g.fillEllipse (dot);
+            // Poco spazio di lato: il numero un po' piu' piccolo e il nome (col pallino colorato) sotto
+            const float small = name.isNotEmpty() ? dh * 0.78f : dh;
+            const float lineH = 13.0f;
+            drawGlowText (g, numText, small, cyan, inner.getCentre().translated (0.0f, name.isNotEmpty() ? -lineH * 0.45f : 0.0f));
+            if (name.isNotEmpty())
+            {
+                g.setFont (Theme::font (11.0f));
+                const float textW = juce::jmin (inner.getWidth() - 14.0f, juce::GlyphArrangement::getStringWidth (Theme::font (11.0f), name) + 2.0f);
+                auto line = juce::Rectangle<float> (textW + 12.0f, lineH).withCentre ({ inner.getCentreX(), inner.getBottom() - lineH * 0.5f - 1.0f });
+                auto dot = line.removeFromLeft (12.0f).withSizeKeepingCentre (6.0f, 6.0f);
+                g.setColour (colour);
+                g.fillEllipse (dot);
+                g.setColour (Theme::textBright);
+                g.drawFittedText (name, line.toNearestInt(), juce::Justification::centredLeft, 1, 0.8f);
+            }
+            else
+            {
+                auto dot = juce::Rectangle<float> (6.0f, 6.0f).withCentre ({ inner.getCentreX(), inner.getBottom() - 5.0f });
+                g.setColour (colour.withAlpha (0.4f));
+                g.fillEllipse (dot.expanded (2.5f));
+                g.setColour (colour);
+                g.fillEllipse (dot);
+            }
         }
     }
 
