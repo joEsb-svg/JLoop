@@ -14,7 +14,19 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.58)
+## Stato attuale (v0.59)
+
+**Novita' della 0.59**: versione per Windows
+- Installer JLoop-Setup.exe (stesso link dell'APK): menu Start, icona sul desktop, .jloop aperti col doppio clic;
+  si installa anche senza permessi da amministratore
+- Finestra ridimensionabile (parte grande come un tablet), si salva tutto chiudendo la finestra
+- Tasti rapidi: Spazio play/stop, Ctrl+Z/Y, Ctrl+S, Ctrl+O, Ctrl+N, Ctrl+R, Ctrl+E, frecce (BPM e pattern),
+  F5 playlist, F7 piano roll, F9 mixer, Esc chiude; MENU > Tasti rapidi li elenca
+- Tastiera del PC come pianoforte (Z-M e Q-U, - e + per l'ottava) sul canale scelto, anche in registrazione
+- Mouse: tasto destro = pressione lunga (menu del canale, delle clip, riempimento degli step);
+  rotellina per scorrere, Maiusc in orizzontale, Ctrl per lo zoom di playlist e piano roll
+- MENU > Scheda audio (Windows Audio normale, esclusiva o a bassa latenza), si ricorda;
+  "Esporta progetto (.jloop)" al posto di Condividi; l'audio esportato si apre nella cartella
 
 **Novita' della 0.58**: tablet
 - Su tablet (schermo alto almeno ~520 dp in orizzontale) ogni riga del channel rack mostra 32 step
