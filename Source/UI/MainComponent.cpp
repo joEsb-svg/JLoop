@@ -262,7 +262,10 @@ MainComponent::MainComponent()
 
     juce::Desktop::getInstance().addGlobalMouseListener (&touchWatcher);
     startTimerHz (30);
-    openWithPoll.startTimer (700);   // file aperti con "Apri con JLoop"
+    openWithPoll.startTimer (700);
+   #if ! (JUCE_ANDROID || JUCE_IOS)
+    setWantsKeyboardFocus (true);   // sul PC: scorciatoie e tastiera-pianoforte
+   #endif   // file aperti con "Apri con JLoop"
 
    #if JUCE_ANDROID
     // La grafica (sfumature, luci, testo) la calcola la GPU: sul telefono il processore resta libero per l'audio.
@@ -607,6 +610,120 @@ void MainComponent::layoutRack (juce::Rectangle<int> full, bool portrait)
     presetBrowser.setBounds (getContentArea());
 }
 
+//==============================================================================
+// Tastiera del computer (Windows e PC): scorciatoie e tasti come pianoforte
+
+bool MainComponent::typingInText() const
+{
+    return dynamic_cast<juce::TextEditor*> (juce::Component::getCurrentlyFocusedComponent()) != nullptr;
+}
+
+void MainComponent::saveShortcut()
+{
+    juce::Component::SafePointer<MainComponent> safeThis (this);
+    if (projectName == untitled)
+        askProjectName ("Salva progetto", [safeThis] (juce::String n) { if (safeThis) safeThis->saveProjectAs (n, true); });
+    else
+        saveProjectAs (projectName, false);
+}
+
+bool MainComponent::keyPressed (const juce::KeyPress& key)
+{
+    if (typingInText())
+        return false;
+    const auto mods = key.getModifiers();
+    const int code = key.getKeyCode();
+    const bool cmd = mods.isCommandDown();
+
+    if (cmd)
+    {
+        const int c = juce::CharacterFunctions::toUpperCase ((juce::juce_wchar) code);
+        if (c == 'Z' && ! mods.isShiftDown())                { undo(); return true; }
+        if (c == 'Y' || (c == 'Z' && mods.isShiftDown()))    { redo(); return true; }
+        if (c == 'S')
+        {
+            if (mods.isShiftDown())
+            {
+                juce::Component::SafePointer<MainComponent> safeThis (this);
+                askProjectName ("Salva con nome", [safeThis] (juce::String n) { if (safeThis) safeThis->saveProjectAs (n, true); });
+            }
+            else saveShortcut();
+            return true;
+        }
+        if (c == 'O')                                        { openProjectFile(); return true; }
+        if (c == 'N')                                        { newProject(); return true; }
+        if (c == 'R')                                        { toggleRecording(); return true; }
+        if (c == 'E')                                        { openExport(); return true; }
+        return false;
+    }
+
+    if (key == juce::KeyPress::spaceKey)
+    {
+        playButton.triggerClick();
+        return true;
+    }
+    if (key == juce::KeyPress::escapeKey)                    { handleBackButton(); return true; }
+    if (key == juce::KeyPress::upKey)                        { bpmDisplay.onStep (mods.isShiftDown() ? 10 : 1); holo.repaint(); return true; }
+    if (key == juce::KeyPress::downKey)                      { bpmDisplay.onStep (mods.isShiftDown() ? -10 : -1); holo.repaint(); return true; }
+    if (key == juce::KeyPress::leftKey)                      { patternDisplay.onStep (-1); return true; }
+    if (key == juce::KeyPress::rightKey)                     { patternDisplay.onStep (1); return true; }
+    if (key == juce::KeyPress::F5Key)                        { engine.setSongMode (true); songSwitch.setSelected (1); openPlaylist(); return true; }
+    if (key == juce::KeyPress::F7Key)                        { const int t = liveTarget.load(); if (t >= 0 && engine.hasNotes (t)) openPianoRoll (t); return true; }
+    if (key == juce::KeyPress::F9Key)                        { openMixer(); return true; }
+    if (code == '-' || code == juce::KeyPress::numberPadSubtract) { releasePcKeys(); pcOctave = juce::jmax (-3, pcOctave - 1); return true; }
+    if (code == '=' || code == '+' || code == juce::KeyPress::numberPadAdd) { releasePcKeys(); pcOctave = juce::jmin (3, pcOctave + 1); return true; }
+
+    // le lettere della tastiera-pianoforte sono gestite in keyStateChanged: qui basta dire "e' nostro"
+    static const juce::String pianoKeys ("ZSXDCVGBHNJM,Q2W3ER5T6Y7UI9O0P");
+    return pianoKeys.containsChar ((juce::juce_wchar) juce::CharacterFunctions::toUpperCase ((juce::juce_wchar) code));
+}
+
+/** Righe Z-M (ottava bassa, nere su S D G H J) e Q-U (ottava alta, nere su 2 3 5 6 7), come in FL Studio.
+    Suonano il canale scelto (lo stesso delle tastiere MIDI); con la registrazione accesa le note vanno nel pattern. */
+bool MainComponent::keyStateChanged (bool)
+{
+    if (typingInText() || juce::ModifierKeys::currentModifiers.isCommandDown())
+        return false;
+    struct K { char key; int semis; };
+    static constexpr K keys[] {
+        { 'Z', 0 }, { 'S', 1 }, { 'X', 2 }, { 'D', 3 }, { 'C', 4 }, { 'V', 5 }, { 'G', 6 }, { 'B', 7 }, { 'H', 8 }, { 'N', 9 }, { 'J', 10 }, { 'M', 11 }, { ',', 12 },
+        { 'Q', 12 }, { '2', 13 }, { 'W', 14 }, { '3', 15 }, { 'E', 16 }, { 'R', 17 }, { '5', 18 }, { 'T', 19 }, { '6', 20 }, { 'Y', 21 }, { '7', 22 }, { 'U', 23 },
+        { 'I', 24 }, { '9', 25 }, { 'O', 26 }, { '0', 27 }, { 'P', 28 } };
+    if (liveTarget.load() < 0 || liveTarget.load() >= engine.getNumChannels())
+        liveTarget.store (juce::jmax (0, engine.getSynthChannel()));
+    const int target = liveTarget.load();
+    bool used = false;
+    for (auto& k : keys)
+    {
+        const int code = k.key;
+        const bool down = juce::KeyPress::isKeyCurrentlyDown (code) || (code >= 'A' && code <= 'Z' && juce::KeyPress::isKeyCurrentlyDown (code + 32));
+        auto it = pcKeysDown.find (code);
+        if (down && it == pcKeysDown.end())
+        {
+            const int note = juce::jlimit (0, 127, 48 + k.semis + 12 * pcOctave);
+            pcKeysDown[code] = note;
+            engine.liveNote (target, note, 0.8f);
+            midiActivity.store (true);
+            used = true;
+        }
+        else if (! down && it != pcKeysDown.end())
+        {
+            engine.liveNote (target, it->second, 0.0f);
+            pcKeysDown.erase (it);
+            used = true;
+        }
+    }
+    return used;
+}
+
+void MainComponent::releasePcKeys()
+{
+    const int target = liveTarget.load();
+    for (auto& [code, note] : pcKeysDown)
+        engine.liveNote (target, note, 0.0f);
+    pcKeysDown.clear();
+}
+
 void MainComponent::setTabletMode (bool tablet)
 {
     const int wanted = tablet ? 32 : 16;
@@ -752,6 +869,12 @@ juce::String MainComponent::getKitLabel() const
 void MainComponent::timerCallback()
 {
     checkFreezer();
+   #if ! (JUCE_ANDROID || JUCE_IOS)
+    // Sul PC la tastiera deve arrivare all'app (scorciatoie, tastiera-pianoforte) anche dopo un pannello chiuso
+    if (juce::Component::getCurrentlyFocusedComponent() == nullptr && isShowing() && juce::Process::isForegroundProcess()
+        && juce::ModalComponentManager::getInstance()->getNumModalComponents() == 0)
+        grabKeyboardFocus();
+   #endif
     // Riser e downer seguono i BPM: quando il tempo resta fermo per un attimo, si rifanno a tempo
     {
         const double bpmNow = engine.getBpm(), nowMs = juce::Time::getMillisecondCounterHiRes();
@@ -979,7 +1102,11 @@ void MainComponent::showFileMenu()
     menu.addItem (2, "Salva", true);
     menu.addItem (3, "Salva con nome...");
     menu.addSubMenu ("Elimina", deleteMenu, ! projects.isEmpty());
+   #if JUCE_ANDROID || JUCE_IOS
     menu.addItem (11, "Condividi progetto...");
+   #else
+    menu.addItem (11, "Esporta progetto (.jloop)...");
+   #endif
     menu.addItem (12, "Apri progetto da file...");
     menu.addSeparator();
     menu.addItem (7, "Mixer...");
@@ -990,6 +1117,10 @@ void MainComponent::showFileMenu()
     menu.addSeparator();
     menu.addSubMenu ("Impostazioni", createSettingsMenu());
     menu.addItem (4, "Info audio");
+   #if ! (JUCE_ANDROID || JUCE_IOS)
+    menu.addItem (15, "Scheda audio...");
+    menu.addItem (16, "Tasti rapidi");
+   #endif
     menu.addItem (9, "Cronologia delle modifiche...");
     menu.addItem (8, "Guida rapida");
     menu.addSeparator();
@@ -1018,6 +1149,10 @@ void MainComponent::showFileMenu()
                                 self.askProjectName ("Salva con nome", [safeThis] (juce::String n) { if (safeThis) safeThis->saveProjectAs (n, true); });
                             else if (result == 4)
                                 self.showAudioInfo();
+                            else if (result == 15)
+                                self.showAudioSetup();
+                            else if (result == 16)
+                                self.showShortcuts();
                             else if (result == 6)
                                 self.openExport();
                             else if (result == 7)
@@ -1399,6 +1534,63 @@ void MainComponent::showAudioInfo()
     showMessage ("Info audio", info);
 }
 
+/** Sul PC: scelta della scheda audio (Windows Audio, modalita' esclusiva o a bassa latenza...), si ricorda. */
+void MainComponent::showAudioSetup()
+{
+    auto* selector = new juce::AudioDeviceSelectorComponent (deviceManager, 0, 0, 2, 2, false, false, true, false);
+    selector->setSize (560, 380);
+    juce::DialogWindow::LaunchOptions o;
+    o.content.setOwned (selector);
+    o.dialogTitle = "Scheda audio";
+    o.dialogBackgroundColour = juce::Colour (0xff1a1f26);
+    o.escapeKeyTriggersCloseButton = true;
+    o.useNativeTitleBar = true;
+    o.resizable = false;
+    o.componentToCentreAround = this;
+    if (auto* window = o.launchAsync())
+    {
+        juce::Component::SafePointer<MainComponent> safe (this);
+        struct Saver : juce::ComponentListener
+        {
+            juce::Component::SafePointer<MainComponent> main;
+            void componentBeingDeleted (juce::Component& c) override
+            {
+                if (main != nullptr) main->saveAudioDevice();
+                c.removeComponentListener (this);
+                delete this;
+            }
+        };
+        auto* saver = new Saver();
+        saver->main = safe;
+        window->addComponentListener (saver);
+    }
+}
+
+void MainComponent::saveAudioDevice()
+{
+    if (settings == nullptr) return;
+    if (auto xml = deviceManager.createStateXml())
+        settings->setValue ("audioDeviceState", xml.get());
+    settings->saveIfNeeded();
+}
+
+void MainComponent::showShortcuts()
+{
+    showMessage ("Tasti rapidi",
+                 "Spazio: play / stop\n"
+                 "Ctrl+Z / Ctrl+Y: annulla / ripeti\n"
+                 "Ctrl+S: salva   Ctrl+Maiusc+S: salva con nome\n"
+                 "Ctrl+O: apri progetto da file   Ctrl+N: nuovo progetto\n"
+                 "Ctrl+R: registra   Ctrl+E: esporta audio\n"
+                 "Frecce su/giu': BPM (con Maiusc di 10)   Frecce sinistra/destra: pattern\n"
+                 "F5: playlist   F7: piano roll   F9: mixer   Esc: chiude il pannello\n\n"
+                 "Tastiera come pianoforte (suona il canale scelto, anche in registrazione):\n"
+                 "Z S X D C V G B H N J M: ottava bassa   Q 2 W 3 E R 5 T 6 Y 7 U: ottava alta\n"
+                 "- e +: ottava giu' / su\n\n"
+                 "Mouse: tasto destro = come tenere premuto; rotellina = scorre\n"
+                 "(Maiusc = in orizzontale, Ctrl = zoom nella playlist e nel piano roll)");
+}
+
 void MainComponent::showMessage (const juce::String& title, const juce::String& message)
 {
     juce::AlertWindow::showAsync (juce::MessageBoxOptions().withTitle (title).withMessage (message)
@@ -1664,7 +1856,23 @@ void MainComponent::shareProject()
         showMessage ("Condividi progetto", error);
         return;
     }
+   #if JUCE_ANDROID || JUCE_IOS
     shareBox = juce::ContentSharer::shareFilesScoped ({ juce::URL (file) }, [] (bool, const juce::String&) {}, this);
+   #else
+    // Sul PC: si sceglie dove salvare il .jloop (da mandare a chi vuoi, o da aprire sul telefono)
+    projectChooser = std::make_unique<juce::FileChooser> ("Salva il progetto da condividere",
+                                                          juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile (file.getFileName()), "*.jloop");
+    juce::Component::SafePointer<MainComponent> safe (this);
+    projectChooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting,
+                                 [safe, file] (const juce::FileChooser& fc)
+                                 {
+                                     const auto dest = fc.getResult();
+                                     if (safe == nullptr || dest == juce::File()) return;
+                                     const auto target = dest.hasFileExtension ("jloop") ? dest : dest.withFileExtension ("jloop");
+                                     if (file.copyFileTo (target)) target.revealToUser();
+                                     else safe->showMessage ("Condividi progetto", "Non sono riuscito a salvare il file.");
+                                 });
+   #endif
 }
 
 void MainComponent::openProjectFile()
@@ -1900,6 +2108,18 @@ void MainComponent::showUndoHistory()
 void MainComponent::handleCommandLine (const juce::String& commandLine)
 {
     auto args = juce::StringArray::fromTokens (commandLine, true);
+
+    // Doppio clic su un .jloop (Windows): il percorso arriva come argomento
+    for (auto& a : args)
+    {
+        const auto path = a.unquoted();
+        if (juce::File::isAbsolutePath (path) && (path.endsWithIgnoreCase (".jloop") || path.endsWithIgnoreCase (".dawfl")))
+            if (juce::File f (path); f.existsAsFile())
+            {
+                juce::Component::SafePointer<MainComponent> safe (this);
+                juce::MessageManager::callAsync ([safe, f] { if (safe != nullptr) safe->openProjectFromUrl (juce::URL (f)); });
+            }
+    }
 
     if (args.contains ("--no-splash") && splash != nullptr)   // test: niente presentazione
     {
@@ -2215,6 +2435,12 @@ void MainComponent::loadSettings()
     constexpr int defaultReserve = 0;
    #endif
     setAudioReserve (settings->getIntValue ("audioReserveMs", defaultReserve));
+
+   #if ! (JUCE_ANDROID || JUCE_IOS)
+    // Sul PC: la scheda audio scelta l'ultima volta
+    if (auto xml = settings->getXmlValue ("audioDeviceState"))
+        audioError = deviceManager.initialise (0, 2, xml.get(), true);
+   #endif
 }
 
 void MainComponent::setAudioReserve (int ms)
@@ -2592,7 +2818,8 @@ juce::PopupMenu MainComponent::createSettingsMenu()
     if (midi.getNumItems() == 0)
         midi.addItem (-1, "(nessuna tastiera MIDI collegata)", false);
     midi.addSeparator();
-    midi.addItem (5300, "Collega una tastiera Bluetooth...");
+    if (juce::BluetoothMidiDevicePairingDialogue::isAvailable())
+        midi.addItem (5300, "Collega una tastiera Bluetooth...");
     menu.addSubMenu ("Tastiere MIDI", midi);
     menu.addSubMenu ("Buffer audio (latenza)", buffers, buffers.getNumItems() > 0);
     return menu;

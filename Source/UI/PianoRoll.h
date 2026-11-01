@@ -683,6 +683,25 @@ private:
     int snapTick (int tick) const               { return (int) std::round ((double) tick / snap) * snap; }
     int snapTickDown (int tick) const           { return (tick / snap) * snap; }
 
+    /** Rotellina: su/giu' le note; Maiusc (o rotellina laterale) = avanti/indietro; Ctrl = righe piu' alte/basse. */
+    void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& w) override
+    {
+        if (e.mods.isCommandDown())
+        {
+            setRowHeight (getRowHeight() + (w.deltaY > 0.0f ? 3.0f : -3.0f));
+            return;
+        }
+        if (e.mods.isShiftDown() && w.deltaX == 0.0f)
+            scrollX -= w.deltaY * 300.0f;
+        else
+        {
+            scrollX -= w.deltaX * 300.0f;
+            scrollY -= w.deltaY * 250.0f;
+        }
+        clampScroll();
+        repaint();
+    }
+
     void clampScroll()
     {
         const float contentH = (float) (highestNote - lowestNote + 1) * rowHeight;

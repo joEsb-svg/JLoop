@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <map>
 #include "../Engine/SequencerEngine.h"
 #include "../Engine/RenderAhead.h"
 #include "../Engine/Freeze.h"
@@ -68,6 +69,9 @@ private:
     void jumpInHistory (int steps);
     void closeGuide (int demo);
     void showAudioInfo();
+    void showAudioSetup();
+    void saveAudioDevice();
+    void showShortcuts();
     void showMessage (const juce::String& title, const juce::String& message);
 
     void syncControlsFromEngine();
@@ -127,7 +131,15 @@ private:
     int cpuCounter = 0, lastXRuns = 0, highLoadTicks = 0, glitchesThisSession = 0;
     juce::uint32 lastXRunTime = 0, dirtySince = 0;
     bool performanceHintShown = false, sessionDirty = false, recoveredFromBackup = false;
-    void setTabletMode (bool tablet);   // tablet: pattern nuovi da 32 step
+    void setTabletMode (bool tablet);
+    // --- Tastiera del computer: scorciatoie e tasti come pianoforte
+    bool keyPressed (const juce::KeyPress&) override;
+    bool keyStateChanged (bool isKeyDown) override;
+    bool typingInText() const;
+    void saveShortcut();
+    int pcOctave = 0;                         // spostamento d'ottava della tastiera-pianoforte (-3..+3)
+    std::map<int, int> pcKeysDown;            // tasto -> nota suonata
+    void releasePcKeys();   // tablet: pattern nuovi da 32 step
     bool loadingDemo = false;
     double tapTempo();   // ritorna i BPM battuti (0 = servono altri tocchi)
     void askBpm();

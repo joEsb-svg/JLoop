@@ -23,6 +23,17 @@ public:
        #endif
     }
 
+    /** Sul PC: doppio clic su un .jloop con JLoop gia' aperto. */
+    void anotherInstanceStarted (const juce::String& commandLine) override
+    {
+        if (mainWindow != nullptr)
+            if (auto* main = dynamic_cast<MainComponent*> (mainWindow->getContentComponent()))
+            {
+                main->handleCommandLine (commandLine);
+                mainWindow->toFront (true);
+            }
+    }
+
     void shutdown() override
     {
         mainWindow = nullptr;
@@ -47,6 +58,9 @@ public:
 
     void systemRequestedQuit() override
     {
+        if (mainWindow != nullptr)
+            if (auto* main = dynamic_cast<MainComponent*> (mainWindow->getContentComponent()))
+                main->saveSession();   // sul PC: chiudendo la finestra non si perde niente
         quit();
     }
 
@@ -66,9 +80,10 @@ public:
            #if ! (JUCE_ANDROID || JUCE_IOS)
             setResizable (true, true);
 
-            // Sul PC: finestra delle dimensioni di un telefono in orizzontale, mai piu' grande dello schermo.
+            // Sul PC: finestra grande come un tablet (righe di 8 battute), mai piu' grande dello schermo
             auto screen = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->userBounds.toNearestInt();
-            centreWithSize (juce::jmin (900, screen.getWidth()), juce::jmin (440, screen.getHeight()));
+            setResizeLimits (860, 420, 10000, 10000);
+            centreWithSize (juce::jmin (1360, screen.getWidth() * 9 / 10), juce::jmin (820, screen.getHeight() * 9 / 10));
            #endif
 
             setVisible (true);

@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android e Windows
 
 on:
   push:
@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: android-build
+  group: build
   cancel-in-progress: true
 
 env:
@@ -18,7 +18,7 @@ env:
   CMAKE_VERSION: "3.22.1"
 
 jobs:
-  build:
+  android:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
 
@@ -96,7 +96,70 @@ jobs:
           name: JLoop-apk
           path: JLoop.apk
 
-      # Pubblica l'APK sempre allo stesso link: .../releases/download/latest-build/JLoop.apk
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Cache JUCE e Projucer (Windows)
+        id: juce-cache
+        uses: actions/cache@v4
+        with:
+          path: JUCE
+          key: juce-${{ env.JUCE_VERSION }}-projucer-win-v1
+
+      - name: Scarica JUCE
+        if: steps.juce-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: git clone --depth 1 --branch "$JUCE_VERSION" https://github.com/juce-framework/JUCE.git JUCE
+
+      - name: MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Compila Projucer
+        if: steps.juce-cache.outputs.cache-hit != 'true'
+        run: msbuild JUCE\extras\Projucer\Builds\VisualStudio2022\Projucer.sln /p:Configuration=Release /p:Platform=x64 /m /v:minimal
+
+      - name: Genera il progetto Visual Studio
+        run: JUCE\extras\Projucer\Builds\VisualStudio2022\x64\Release\App\Projucer.exe --resave JLoop.jucer
+
+      - name: Compila JLoop.exe
+        run: msbuild Builds\VisualStudio2022\JLoop.sln /p:Configuration=Release /p:Platform=x64 /m /v:minimal
+
+      - name: Installer (Inno Setup)
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress; $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
+          $version = ([xml](Get-Content JLoop.jucer)).JUCERPROJECT.version
+          $exe = (Resolve-Path "Builds\VisualStudio2022\x64\Release\App\JLoop.exe").Path
+          & $iscc "/DMyAppVersion=$version" "/DSourceExe=$exe" "ci\windows\jloop.iss"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-ChildItem dist
+
+      - name: Carica come artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: JLoop-windows
+          path: dist/JLoop-Setup.exe
+
+  publish:
+    needs: [android, windows]
+    if: always() && needs.android.result == 'success'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Scarica i file compilati
+        uses: actions/download-artifact@v4
+        with:
+          path: out
+
+      # Pubblica sempre agli stessi link: .../releases/download/latest-build/JLoop.apk e JLoop-Setup.exe
       # (solo se questo commit e' ancora l'ultimo di main: una build vecchia arrivata in ritardo non sovrascrive quella nuova)
       - name: Pubblica release "latest-build"
         env:
@@ -108,9 +171,15 @@ jobs:
             echo "Questo commit ($BUILT) non e' piu' l'ultimo ($LATEST): non pubblico."
             exit 0
           fi
+          FILES="out/JLoop-apk/JLoop.apk"
+          NOTE="APK per Android"
+          if [ -f out/JLoop-windows/JLoop-Setup.exe ]; then
+            FILES="$FILES out/JLoop-windows/JLoop-Setup.exe"
+            NOTE="$NOTE e installer per Windows (JLoop-Setup.exe)"
+          fi
           gh release delete latest-build --yes --cleanup-tag || true
-          gh release create latest-build JLoop.apk \
+          gh release create latest-build $FILES \
             --target "$BUILT" \
             --prerelease \
             --title "JLoop - ultima build (${BUILT::7})" \
-            --notes "APK compilato automaticamente dal commit ${BUILT::7}. Scarica JLoop.apk e installalo sul telefono."
+            --notes "$NOTE compilati automaticamente dal commit ${BUILT::7}."

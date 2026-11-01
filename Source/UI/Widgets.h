@@ -492,6 +492,12 @@ public:
     void mouseDown (const juce::MouseEvent& e) override
     {
         longPressFired = false;
+        if (onLongPress != nullptr && e.mods.isPopupMenu())   // tasto destro = pressione lunga
+        {
+            longPressFired = true;
+            onLongPress();
+            return;
+        }
         if (onLongPress != nullptr)
             startTimer (550);
         juce::Button::mouseDown (e);

@@ -451,7 +451,11 @@ private:
         if (! lastFile.existsAsFile())
             return;
 
+       #if JUCE_ANDROID || JUCE_IOS
         shareBox = juce::ContentSharer::shareFilesScoped ({ juce::URL (lastFile) }, [] (bool, const juce::String&) {}, this);
+       #else
+        lastFile.revealToUser();   // sul PC: apre la cartella con il file selezionato
+       #endif
     }
 
     void saveToPhone()
@@ -486,7 +490,8 @@ private:
                                   if (! ok && url.isLocalFile())
                                       ok = source.copyFileTo (url.getLocalFile());
 
-                                  safeThis->status = ok ? "Salvato nel telefono." : "Non sono riuscito a salvare il file.";
+                                  safeThis->status = ok ? juce::String (juce::SystemStats::getOperatingSystemType() == juce::SystemStats::Android ? "Salvato nel telefono." : "Salvato.")
+                                                        : juce::String ("Non sono riuscito a salvare il file.");
                                   safeThis->repaint();
                               });
     }
@@ -506,7 +511,11 @@ private:
     SegmentedControl whatSwitch   { { "Pattern selezionato", "Canzone (playlist)" } };
     SegmentedControl loopsSwitch  { { "1 volta", "2 volte", "4 volte", "8 volte" } };
     SegmentedControl formatSwitch { { "WAV (qualita' CD)", "OGG (leggero)" } };
+    #if JUCE_ANDROID || JUCE_IOS
     juce::TextButton exportButton { "Esporta" }, shareButton { "Condividi" }, saveButton { "Salva nel telefono" }, closeButton { "Chiudi" };
+   #else
+    juce::TextButton exportButton { "Esporta" }, shareButton { "Mostra nella cartella" }, saveButton { "Salva come..." }, closeButton { "Chiudi" };
+   #endif
     juce::Rectangle<float> titleArea, whatCaption, loopsCaption, formatCaption, statusArea;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ExportPanel)

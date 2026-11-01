@@ -362,6 +362,30 @@ void ChannelRow::paintOverChildren (juce::Graphics& g)
 //==============================================================================
 void ChannelRow::mouseDown (const juce::MouseEvent& e)
 {
+    pressDown (e);
+    // Mouse: il tasto destro fa subito quello che col dito fa la pressione lunga (menu del canale, riempimento)
+    if (e.mods.isPopupMenu() && isTimerRunning())
+    {
+        stopTimer();
+        timerCallback();
+    }
+}
+
+/** Rotellina: su/giu' scorre i canali; con Maiusc (o rotellina laterale) scorre gli step di un pattern lungo. */
+void ChannelRow::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& w)
+{
+    const float horizontal = w.deltaX != 0.0f ? w.deltaX : (e.mods.isShiftDown() ? w.deltaY : 0.0f);
+    if (horizontal != 0.0f && scrollable && onScrollSteps)
+    {
+        onScrollSteps (0.0f, 0);
+        onScrollSteps (horizontal * getStepPitch() * 8.0f, 2);
+        return;
+    }
+    juce::Component::mouseWheelMove (e, w);
+}
+
+void ChannelRow::pressDown (const juce::MouseEvent& e)
+{
     lastColumn = -1;
     pressOnName = false;
 

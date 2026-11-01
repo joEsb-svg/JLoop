@@ -335,6 +335,11 @@ public:
 
         if (dragIndex >= 0)
             startTimer (500);
+        if (dragIndex >= 0 && e.mods.isPopupMenu())   // tasto destro = pressione lunga (menu della clip)
+        {
+            stopTimer();
+            timerCallback();
+        }
     }
 
     void mouseDrag (const juce::MouseEvent& e) override
@@ -432,10 +437,22 @@ public:
         repaint();
     }
 
-    void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails& w) override
+    void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& w) override
     {
-        scrollX -= (w.deltaX != 0.0f ? w.deltaX : 0.0f) * 300.0f;
-        scrollY -= w.deltaY * 200.0f;
+        // Rotellina: su/giu' le tracce; Maiusc (o rotellina laterale) = avanti/indietro; Ctrl = zoom
+        if (e.mods.isCommandDown())
+        {
+            setBarWidth (getBarWidth() * (w.deltaY > 0.0f ? 1.15f : 1.0f / 1.15f));
+            if (onEdit) onEdit();
+            return;
+        }
+        if (e.mods.isShiftDown() && w.deltaX == 0.0f)
+            scrollX -= w.deltaY * 300.0f;
+        else
+        {
+            scrollX -= w.deltaX * 300.0f;
+            scrollY -= w.deltaY * 200.0f;
+        }
         clampScroll();
         repaint();
     }
