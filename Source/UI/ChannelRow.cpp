@@ -269,6 +269,39 @@ void ChannelRow::paint (juce::Graphics& g)
             continue;
         }
 
+        if (isLockMode (mode))
+        {
+            // Filtro / riverbero / delay per step: barra verticale; senza valore suo, una linea tratteggiata al valore del canale
+            Theme::drawSunken (g, pad, off.darker (0.35f), 4.0f);
+            if (vel > 0)
+            {
+                const int lock = lockOf (mode);
+                const float v = engine.getStepLock (lock, channel, step);
+                auto inner = pad.reduced (4.0f);
+                const auto c1 = chColour.interpolatedWith (mode == EditMode::filter ? Theme::accent : Theme::cyan, 0.5f);
+                if (v >= 0.0f)
+                {
+                    auto bar = inner.removeFromBottom (juce::jmax (2.0f, inner.getHeight() * v));
+                    g.setGradientFill (juce::ColourGradient (c1.brighter (0.5f), bar.getX(), bar.getY(), c1.darker (0.2f), bar.getX(), bar.getBottom(), false));
+                    g.fillRoundedRectangle (bar, 2.5f);
+                    g.setColour (juce::Colours::white.withAlpha (0.85f));
+                    g.fillRoundedRectangle (bar.removeFromTop (2.0f), 1.0f);
+                }
+                else
+                {
+                    auto& ch = engine.getChannel (channel);
+                    const float base = mode == EditMode::filter ? ch.filter.load() : mode == EditMode::reverb ? ch.reverb.load() : ch.delay.load();
+                    const float y = inner.getBottom() - inner.getHeight() * base;
+                    g.setColour (c1.withAlpha (0.55f));
+                    for (float x = inner.getX(); x < inner.getRight(); x += 5.0f)
+                        g.fillRect (x, y - 1.0f, juce::jmin (3.0f, inner.getRight() - x), 2.0f);
+                }
+            }
+            if (isCurrent)
+                Theme::drawActiveGlow (g, pad, 4.0f, Theme::cyan);
+            continue;
+        }
+
         if (mode == EditMode::velocity || mode == EditMode::probability)
         {
             // Barra verticale: velocity o probabilita', col colore del canale
@@ -457,6 +490,18 @@ void ChannelRow::pressDown (const juce::MouseEvent& e)
             applyVerticalValueAt (e.position);
             return;
 
+        case EditMode::filter:
+        case EditMode::reverb:
+        case EditMode::delay:
+            if (e.getNumberOfClicks() >= 2)   // doppio tocco: torna come il canale
+            {
+                engine.setStepLock (lockOf (mode), channel, step, -1.0f);
+                repaint();
+                return;
+            }
+            applyVerticalValueAt (e.position);
+            return;
+
         case EditMode::pitch:
         case EditMode::pan:
             valueDragStep = -1;
@@ -553,7 +598,7 @@ void ChannelRow::mouseDrag (const juce::MouseEvent& e)
         return;   // finche' non si capisce se e' uno scorrimento, niente "pittura"
     }
 
-    if (mode == EditMode::velocity || mode == EditMode::probability)
+    if (mode == EditMode::velocity || mode == EditMode::probability || isLockMode (mode))
     {
         applyVerticalValueAt (e.position);
         return;
@@ -704,6 +749,11 @@ void ChannelRow::applyVerticalValueAt (juce::Point<float> p)
             engine.setStepRatchet (channel, step, 1);
         }
         engine.setStepVelocity (channel, step, juce::jlimit (1, 127, juce::roundToInt (norm * 127.0f)));
+    }
+    else if (isLockMode (mode))
+    {
+        if (engine.isStepOn (channel, step))
+            engine.setStepLock (lockOf (mode), channel, step, juce::roundToInt (norm * 50.0f) / 50.0f);   // a scatti del 2%
     }
     else if (engine.isStepOn (channel, step))
     {
@@ -904,6 +954,8 @@ void ChannelRow::showRowMenu()
                                     clipboard.ratchet[s]     = (uint8_t) e.getStepRatchet (c, s);
                                     clipboard.semis[s]       = (int8_t) e.getStepPitch (c, s);
                                     clipboard.pan[s]         = (int8_t) e.getStepPan (c, s);
+                                    for (int k = 0; k < SequencerEngine::numStepLocks; ++k)
+                                        clipboard.locks[k][s] = e.getStepLock (k, c, s);
                                 }
                                 clipboard.valid = true;
                             }
@@ -916,6 +968,8 @@ void ChannelRow::showRowMenu()
                                     e.setStepRatchet (c, s, clipboard.ratchet[s]);
                                     e.setStepPitch (c, s, clipboard.semis[s]);
                                     e.setStepPan (c, s, clipboard.pan[s]);
+                                    for (int k = 0; k < SequencerEngine::numStepLocks; ++k)
+                                        e.setStepLock (k, c, s, clipboard.locks[k][s]);
                                 }
                             }
                             else if (result == 7)   { e.clearRow (c); e.setNotes (c, {}); }

@@ -231,7 +231,11 @@ private:
     int spectrumCounter = 0;
     juce::String getKitChipText() const;
     bool hasDrumSynthChannels() const;
-    SegmentedControl modeSwitch  { { "STEP", "VEL", "PROB", "ROLL", "PITCH", "PAN" } };
+    SegmentedControl modeSwitch  { { "STEP", "VEL", "PROB", "ROLL", "PITCH", "PAN", "FX" } };
+    int stepFxMode = 0;                 // l'ultima corsia "FX": 0 filtro, 1 riverbero, 2 delay
+    int lastModeSelected = 0;
+    void chooseStepFx();
+    ChannelRow::EditMode currentEditMode() const;
     IconButton undoButton { IconButton::Icon::undo }, redoButton { IconButton::Icon::redo },
                metroButton { IconButton::Icon::metronome };
     ChannelEditor editor { engine };

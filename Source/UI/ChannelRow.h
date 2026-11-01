@@ -27,7 +27,9 @@ class ChannelRow : public juce::Component,
                    private juce::Timer
 {
 public:
-    enum class EditMode { step, velocity, probability, ratchet, pitch, pan };
+    enum class EditMode { step, velocity, probability, ratchet, pitch, pan, filter, reverb, delay };
+    static bool isLockMode (EditMode m)     { return m == EditMode::filter || m == EditMode::reverb || m == EditMode::delay; }
+    static int lockOf (EditMode m)          { return m == EditMode::filter ? SequencerEngine::lockFilter : m == EditMode::reverb ? SequencerEngine::lockReverb : SequencerEngine::lockDelay; }
 
     /** Comandi del menu che gestisce la schermata principale. */
     enum Command
@@ -137,6 +139,7 @@ private:
         bool valid = false;
         uint8_t velocity[SequencerEngine::maxSteps] {}, probability[SequencerEngine::maxSteps] {}, ratchet[SequencerEngine::maxSteps] {};
         int8_t semis[SequencerEngine::maxSteps] {}, pan[SequencerEngine::maxSteps] {};
+        float locks[SequencerEngine::numStepLocks][SequencerEngine::maxSteps] {};
     };
     static RowClipboard clipboard;
 

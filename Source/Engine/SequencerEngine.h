@@ -50,7 +50,9 @@ public:
     static constexpr int defaultVelocity  = 100;
     static constexpr int maxRatchet       = 4;
     static constexpr int ticksPerStep     = 12;    // risoluzione del piano roll: 1/12 di sedicesimo
-    static constexpr int maxNotes         = 256;   // note per canale e per pattern
+    static constexpr int maxNotes         = 256;
+    /** Corsie per step oltre a velocity/prob/roll/pitch/pan: filtro, mandata riverbero, mandata delay. */
+    enum StepLock { lockFilter = 0, lockReverb, lockDelay, numStepLocks };   // note per canale e per pattern
     static constexpr int rootNote         = 60;
     static constexpr int stepsPerBar      = 16;
     static constexpr int numTracks        = 12;    // tracce della playlist
@@ -171,6 +173,8 @@ public:
         std::array<Row, maxChannels> ratchet;       // 1..4 colpi nello step
         std::array<Row, maxChannels> semis;         // altezza dello step in semitoni (int8: -24..24, 0 = naturale)
         std::array<Row, maxChannels> panStep;       // pan dello step (int8: -64..64, 0 = quello del canale)
+        // Valori per step (filtro, mandata riverbero, mandata delay): 0 = come il canale, 1..255 = valore 0..1
+        std::array<std::array<Row, maxChannels>, numStepLocks> locks;
         std::atomic<int> length { 16 };
 
         // Note del piano roll, impacchettate in 64 bit (0 = slot vuoto):
@@ -889,6 +893,18 @@ public:
     int getStepPan (int channel, int step) const           { return (int8_t) current().panStep[(size_t) channel][(size_t) step].load(); }
     void setStepPan (int channel, int step, int pan)       { current().panStep[(size_t) channel][(size_t) step].store ((uint8_t) (int8_t) juce::jlimit (-64, 64, pan)); }
 
+    /** Valore per step di filtro/riverbero/delay: -1 = come il canale, altrimenti 0..1. */
+    float getStepLock (int lock, int channel, int step) const
+    {
+        const int raw = current().locks[(size_t) juce::jlimit (0, numStepLocks - 1, lock)][(size_t) channel][(size_t) step].load();
+        return raw == 0 ? -1.0f : (float) (raw - 1) / 254.0f;
+    }
+    void setStepLock (int lock, int channel, int step, float value)
+    {
+        current().locks[(size_t) juce::jlimit (0, numStepLocks - 1, lock)][(size_t) channel][(size_t) step]
+            .store (value < 0.0f ? (uint8_t) 0 : (uint8_t) (1 + juce::roundToInt (juce::jlimit (0.0f, 1.0f, value) * 254.0f)));
+    }
+
     void clearStep (Pattern& p, int c, int s)
     {
         p.velocity[(size_t) c][(size_t) s].store (0);
@@ -896,6 +912,7 @@ public:
         p.ratchet[(size_t) c][(size_t) s].store (1);
         p.semis[(size_t) c][(size_t) s].store (0);
         p.panStep[(size_t) c][(size_t) s].store (0);
+        for (auto& l : p.locks) l[(size_t) c][(size_t) s].store (0);
     }
 
     void clearPattern (int index)
@@ -950,6 +967,8 @@ public:
         dst.ratchet[(size_t) dstC][(size_t) dstS].store (src.ratchet[(size_t) srcC][(size_t) srcS].load());
         dst.semis[(size_t) dstC][(size_t) dstS].store (src.semis[(size_t) srcC][(size_t) srcS].load());
         dst.panStep[(size_t) dstC][(size_t) dstS].store (src.panStep[(size_t) srcC][(size_t) srcS].load());
+        for (int k = 0; k < numStepLocks; ++k)
+            dst.locks[(size_t) k][(size_t) dstC][(size_t) dstS].store (src.locks[(size_t) k][(size_t) srcC][(size_t) srcS].load());
     }
 
     void copyPattern (int from, int to)
@@ -1095,6 +1114,7 @@ public:
         auto& p = current();
         const int len = p.length.load();
         Pattern::Row v, pr, r, se, pa;
+        std::array<Pattern::Row, numStepLocks> lk;
 
         for (int s = 0; s < len; ++s)
         {
@@ -1104,6 +1124,8 @@ public:
             r[(size_t) s].store (p.ratchet[(size_t) channel][(size_t) from].load());
             se[(size_t) s].store (p.semis[(size_t) channel][(size_t) from].load());
             pa[(size_t) s].store (p.panStep[(size_t) channel][(size_t) from].load());
+            for (int k = 0; k < numStepLocks; ++k)
+                lk[(size_t) k][(size_t) s].store (p.locks[(size_t) k][(size_t) channel][(size_t) from].load());
         }
 
         for (int s = 0; s < len; ++s)
@@ -1113,6 +1135,8 @@ public:
             p.ratchet[(size_t) channel][(size_t) s].store (r[(size_t) s].load());
             p.semis[(size_t) channel][(size_t) s].store (se[(size_t) s].load());
             p.panStep[(size_t) channel][(size_t) s].store (pa[(size_t) s].load());
+            for (int k = 0; k < numStepLocks; ++k)
+                p.locks[(size_t) k][(size_t) channel][(size_t) s].store (lk[(size_t) k][(size_t) s].load());
         }
     }
 
@@ -1135,6 +1159,7 @@ public:
             swap (p.ratchet[(size_t) channel]);
             swap (p.semis[(size_t) channel]);
             swap (p.panStep[(size_t) channel]);
+            for (auto& l : p.locks) swap (l[(size_t) channel]);
         }
     }
 
@@ -1526,8 +1551,8 @@ public:
             const float g = silent ? 0.0f : ch.volume.load();
             gainBase[(size_t) c] = g;
             updateChannelPanGain (c);
-            sendRev[(size_t) c] = g * ch.reverb.load();
-            sendDel[(size_t) c] = g * ch.delay.load();
+            sendRev[(size_t) c] = g * locked (lockReverb, c, ch.reverb.load());
+            sendDel[(size_t) c] = g * locked (lockDelay, c, ch.delay.load());
             humanizeAmt[(size_t) c] = ch.humanize.load();
         }
 
@@ -1575,6 +1600,7 @@ private:
         struct PatternRows
         {
             uint8_t velocity[maxSteps], probability[maxSteps], ratchet[maxSteps], semis[maxSteps], panStep[maxSteps];
+            uint8_t locks[numStepLocks][maxSteps];
             uint64_t notes[maxNotes];
             int noteCount;
         };
@@ -1594,7 +1620,8 @@ private:
                 for (int s = 0; s < maxSteps; ++s)
                     if (pat.velocity[(size_t) ch][(size_t) s].load() != 0 || pat.probability[(size_t) ch][(size_t) s].load() != 100
                         || pat.ratchet[(size_t) ch][(size_t) s].load() != 1 || pat.semis[(size_t) ch][(size_t) s].load() != 0
-                        || pat.panStep[(size_t) ch][(size_t) s].load() != 0)
+                        || pat.panStep[(size_t) ch][(size_t) s].load() != 0 || pat.locks[0][(size_t) ch][(size_t) s].load() != 0
+                        || pat.locks[1][(size_t) ch][(size_t) s].load() != 0 || pat.locks[2][(size_t) ch][(size_t) s].load() != 0)
                         return p + 1;
             }
         }
@@ -1631,6 +1658,7 @@ private:
                 r.ratchet[s]     = pat.ratchet[(size_t) c][(size_t) s].load();
                 r.semis[s]       = pat.semis[(size_t) c][(size_t) s].load();
                 r.panStep[s]     = pat.panStep[(size_t) c][(size_t) s].load();
+                for (int k = 0; k < numStepLocks; ++k) r.locks[k][s] = pat.locks[(size_t) k][(size_t) c][(size_t) s].load();
             }
             for (int n = 0; n < maxNotes; ++n)
                 r.notes[n] = pat.notes[(size_t) c][(size_t) n].load();
@@ -1668,6 +1696,7 @@ private:
                 pat.ratchet[(size_t) c][(size_t) s].store (r.ratchet[s]);
                 pat.semis[(size_t) c][(size_t) s].store (r.semis[s]);
                 pat.panStep[(size_t) c][(size_t) s].store (r.panStep[s]);
+                for (int k = 0; k < numStepLocks; ++k) pat.locks[(size_t) k][(size_t) c][(size_t) s].store (r.locks[k][s]);
             }
             for (int n = 0; n < maxNotes; ++n)
                 pat.notes[(size_t) c][(size_t) n].store (r.notes[n]);
@@ -1798,7 +1827,7 @@ private:
                 samplers[(size_t) c].setSample (smp, shape);
             }
 
-            const float f = ch.filter.load();
+            const float f = locked (lockFilter, c, ch.filter.load());
             if (std::abs (f - appliedFilter[(size_t) c]) > 0.0005f)
             {
                 appliedFilter[(size_t) c] = f;
@@ -1810,7 +1839,13 @@ private:
 
     void renderChunk (double sr, int n)
     {
+        currentRate = sr;
         const bool isOn = playing.load();
+        if (! isOn && locksActive)   // fermo: i valori per step tornano quelli del canale
+        {
+            for (auto& r : lockNow) r.fill (-1.0f);
+            locksActive = false;
+        }
 
         // Durata di un sedicesimo in campioni: (60 / BPM) secondi per quarto, / 4.
         const double samplesPerStep = sr * 60.0 / bpm.load() / 4.0;
@@ -2397,8 +2432,36 @@ private:
         const float pan = juce::jlimit (-1.0f, 1.0f, ch.pan.load() + stepPanNow[(size_t) c]);
         const float gl  = g * juce::jmin (1.0f, 1.0f - pan);   // bilanciamento stereo
         const float gr  = g * juce::jmin (1.0f, 1.0f + pan);
-        const float sr2 = g * ch.reverb.load() * 0.5f;
-        const float sd2 = g * ch.delay.load() * 0.5f;
+        const float sr2 = g * locked (lockReverb, c, ch.reverb.load()) * 0.5f;
+        const float sd2 = g * locked (lockDelay, c, ch.delay.load()) * 0.5f;
+        // Filtro per step anche sugli strumenti (passa-basso, solo mentre uno step ha il suo valore)
+        if (const float fl = lockNow[(size_t) lockFilter][(size_t) c]; fl >= 0.0f && fl < 0.999f && view.getNumChannels() >= 2)
+        {
+            auto& flt = instFilters[(size_t) c];
+            if (std::abs (fl - instFilterApplied[(size_t) c]) > 0.0005f)
+            {
+                instFilterApplied[(size_t) c] = fl;
+                const double fc = 120.0 * std::pow (20000.0 / 120.0, (double) fl);
+                flt[0].set (currentRate, fc, 0.75);
+                flt[1].set (currentRate, fc, 0.75);
+            }
+            for (int chn = 0; chn < 2; ++chn)
+            {
+                float* d = view.getWritePointer (chn);
+                for (int i = 0; i < n; ++i)
+                {
+                    float lp, bp, hp;
+                    flt[(size_t) chn].process (d[i], lp, bp, hp);
+                    d[i] = lp;
+                }
+            }
+        }
+        else if (instFilterApplied[(size_t) c] != -1.0f)
+        {
+            instFilterApplied[(size_t) c] = -1.0f;
+            instFilters[(size_t) c][0].reset();
+            instFilters[(size_t) c][1].reset();
+        }
         const float* sl = view.getReadPointer (0);
         const float* sr_ = view.getReadPointer (1);
         const int t = trackOf[(size_t) c];
@@ -2726,6 +2789,12 @@ private:
                 stepPanNow[(size_t) c] = stepPan;
                 updateChannelPanGain (c);
             }
+            for (int k = 0; k < numStepLocks; ++k)
+            {
+                const int raw = pattern.locks[(size_t) k][(size_t) c][(size_t) stepIndex].load();
+                lockNow[(size_t) k][(size_t) c] = raw == 0 ? -1.0f : (float) (raw - 1) / 254.0f;
+                locksActive = locksActive || raw != 0;
+            }
             triggerChannel (c, v, humanizeAmt[(size_t) c], -1, ticksPerStep / count, false, semi);
 
             auto& r = ratchets[(size_t) c];
@@ -3035,7 +3104,14 @@ private:
 
     // Stato usato SOLO dal thread audio
     struct RatchetState { int remaining = 0, interval = 1, countdown = 0; float velocity = 0.0f, semis = 0.0f; };
-    std::array<float, maxChannels> gainBase {}, stepPanNow {};   // pan dell'ultimo step suonato (si somma a quello del canale)
+    std::array<float, maxChannels> gainBase {}, stepPanNow {};
+    /** Valori per step attivi (filtro, riverbero, delay) dell'ultimo step suonato: -1 = quelli del canale. */
+    std::array<std::array<float, maxChannels>, numStepLocks> lockNow = [] { std::array<std::array<float, maxChannels>, numStepLocks> a {}; for (auto& r : a) r.fill (-1.0f); return a; }();
+    std::array<std::array<SVFilter, 2>, maxChannels> instFilters;   // filtro per step sugli strumenti (synth)
+    std::array<float, maxChannels> instFilterApplied = [] { std::array<float, maxChannels> a {}; a.fill (-1.0f); return a; }();
+    bool locksActive = false;
+    double currentRate = 48000.0;
+    float locked (int k, int c, float channelValue) const noexcept   { const float v = lockNow[(size_t) k][(size_t) c]; return v >= 0.0f ? v : channelValue; }   // pan dell'ultimo step suonato (si somma a quello del canale)
 
     /** Guadagni sinistra/destra di un canale: volume, pan del canale e pan dell'ultimo step. */
     void updateChannelPanGain (int c) noexcept

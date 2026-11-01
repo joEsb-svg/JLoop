@@ -139,7 +139,12 @@ MainComponent::MainComponent()
     scopeSamples.resize ((size_t) SpectrumAnalyser::size);
 
     // --- Modalita' di modifica, lunghezza e pagina
-    modeSwitch.onChange   = [this] (int) { updateViews(); };
+    modeSwitch.onChange   = [this] (int i)
+    {
+        if (i == 6) { chooseStepFx(); return; }   // FX: menu filtro / riverbero / delay
+        lastModeSelected = i;
+        updateViews();
+    };
     lengthChip.onChange = [this] (int len)
     {
         engine.setPatternLength (len);
@@ -576,7 +581,7 @@ void MainComponent::layoutRack (juce::Rectangle<int> full, bool portrait)
     };
 
     const bool tight = ! portrait && bar.getWidth() < 900;   // telefono in orizzontale
-    modeSwitch.setBounds (bar.removeFromLeft (juce::jmin (portrait ? 250 : (tight ? 252 : 330), bar.getWidth() - 110)).reduced (0, 1));
+    modeSwitch.setBounds (bar.removeFromLeft (juce::jmin (portrait ? 252 : (tight ? 280 : 380), bar.getWidth() - 110)).reduced (0, 1));
     bar.removeFromLeft (6);
     lengthChip.setBounds (bar.removeFromLeft (tight ? 70 : 84).reduced (0, 1));
     bar.removeFromLeft (6);
@@ -937,9 +942,44 @@ void MainComponent::setScroll (float pos, bool animate)
     applyScroll();
 }
 
+ChannelRow::EditMode MainComponent::currentEditMode() const
+{
+    const int sel = modeSwitch.getSelected();
+    if (sel < 6) return (ChannelRow::EditMode) sel;
+    return stepFxMode == 0 ? ChannelRow::EditMode::filter : stepFxMode == 1 ? ChannelRow::EditMode::reverb : ChannelRow::EditMode::delay;
+}
+
+/** "FX" nella barra delle corsie: si sceglie quale (filtro, riverbero, delay per step). */
+void MainComponent::chooseStepFx()
+{
+    juce::PopupMenu menu;
+    menu.addSectionHeader ("Un valore diverso per ogni step");
+    menu.addItem (1, "Filtro (si apre / si chiude)", true, stepFxMode == 0);
+    menu.addItem (2, "Riverbero (quanto ne manda)", true, stepFxMode == 1);
+    menu.addItem (3, "Delay (quanto ne manda)", true, stepFxMode == 2);
+    juce::Component::SafePointer<MainComponent> safe (this);
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&modeSwitch), [safe] (int r)
+    {
+        if (safe == nullptr) return;
+        if (r <= 0)
+        {
+            // niente scelta: se non era gia' su FX si torna alla corsia di prima
+            if (safe->lastModeSelected != 6) safe->modeSwitch.setSelected (safe->lastModeSelected);
+            safe->updateViews();
+            return;
+        }
+        safe->stepFxMode = r - 1;
+        safe->lastModeSelected = 6;
+        static const char* names[] { "FILT", "RIV", "DEL" };
+        safe->modeSwitch.setOptions ({ "STEP", "VEL", "PROB", "ROLL", "PITCH", "PAN", names[r - 1] });
+        safe->modeSwitch.setSelected (6);
+        safe->updateViews();
+    });
+}
+
 void MainComponent::applyScroll()
 {
-    const auto mode = (ChannelRow::EditMode) modeSwitch.getSelected();
+    const auto mode = currentEditMode();
     for (auto* row : rows)
         row->setView (scrollPos, mode);
     beatWatermark.length = engine.getPatternLength();
@@ -2774,9 +2814,18 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
     if (const int i = args.indexOf ("--scroll"); i >= 0)
         rackView.setViewPosition (0, args[i + 1].getIntValue());
 
+    if (args.contains ("--lock-demo"))   // test: valori per step di filtro e riverbero sull'hi-hat
+        for (int st = 0; st < 16; ++st)
+        {
+            engine.setStepLock (SequencerEngine::lockFilter, 3, st, st % 4 == 0 ? -1.0f : (float) st / 16.0f);
+            engine.setStepLock (SequencerEngine::lockReverb, 1, st, st == 12 ? 1.0f : -1.0f);
+        }
+
     if (const int i = args.indexOf ("--mode"); i >= 0)
     {
-        modeSwitch.setSelected (juce::jlimit (0, 5, args[i + 1].getIntValue()));
+        const int m = juce::jlimit (0, 8, args[i + 1].getIntValue());
+        if (m >= 6) { stepFxMode = m - 6; modeSwitch.setOptions ({ "STEP", "VEL", "PROB", "ROLL", "PITCH", "PAN", m == 6 ? "FILT" : m == 7 ? "RIV" : "DEL" }); }
+        modeSwitch.setSelected (juce::jmin (6, m));
         updateViews();
     }
 }

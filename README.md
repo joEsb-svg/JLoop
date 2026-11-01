@@ -14,7 +14,11 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.67)
+## Stato attuale (v0.68)
+
+**Novita' della 0.68**: channel rack, nuova corsia "FX" accanto a PAN: un valore per ogni step di
+Filtro (anche sui synth), Riverbero e Delay (quanto manda). Tocca/trascina per alzare o abbassare, doppio tocco
+= torna come il canale (linea tratteggiata). Salvati nel progetto, copiati con "Copia riga".
 
 **Novita' della 0.67** (automazioni, nuove cose da muovere):
 - Canzone: tempo (BPM 60-200, anche l'export segue i cambi di tempo) e swing

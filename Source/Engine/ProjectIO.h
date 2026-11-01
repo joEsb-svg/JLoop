@@ -160,6 +160,8 @@ namespace ProjectIO
             }
 
             juce::Array<juce::var> rows, probs, ratchets, semis, pans;
+            std::array<juce::Array<juce::var>, SequencerEngine::numStepLocks> locks;
+            std::array<bool, SequencerEngine::numStepLocks> anyLock {};
             bool anySemis = false, anyPan = false;
             for (int c = 0; c < numChannels; ++c)
             {
@@ -168,6 +170,12 @@ namespace ProjectIO
                 ratchets.add (encodeRow (pat.ratchet[(size_t) c], 1));
                 semis.add (encodeRow (pat.semis[(size_t) c]));
                 pans.add (encodeRow (pat.panStep[(size_t) c]));
+                for (int k = 0; k < SequencerEngine::numStepLocks; ++k)
+                {
+                    locks[(size_t) k].add (encodeRow (pat.locks[(size_t) k][(size_t) c]));
+                    for (int s = 0; s < SequencerEngine::maxSteps && ! anyLock[(size_t) k]; ++s)
+                        anyLock[(size_t) k] = pat.locks[(size_t) k][(size_t) c][(size_t) s].load() != 0;
+                }
                 for (int s = 0; s < SequencerEngine::maxSteps; ++s)
                 {
                     anySemis = anySemis || pat.semis[(size_t) c][(size_t) s].load() != 0;
@@ -194,6 +202,9 @@ namespace ProjectIO
             o->setProperty ("ratchet", ratchets);
             if (anySemis) o->setProperty ("stepPitch", semis);   // altezza e pan per step (solo se usati)
             if (anyPan)   o->setProperty ("stepPan", pans);
+            static const char* lockKeys[] { "stepFilter", "stepReverb", "stepDelay" };
+            for (int k = 0; k < SequencerEngine::numStepLocks; ++k)
+                if (anyLock[(size_t) k]) o->setProperty (lockKeys[k], locks[(size_t) k]);
             patterns.add (juce::var (o));
         }
         root->setProperty ("patterns", patterns);
@@ -419,6 +430,9 @@ namespace ProjectIO
                 readRows ("ratchet",     pat.ratchet,     1, SequencerEngine::maxRatchet);
                 readRows ("stepPitch",   pat.semis,       0, 255);   // int8 salvati come byte
                 readRows ("stepPan",     pat.panStep,     0, 255);
+                readRows ("stepFilter",  pat.locks[0],    0, 255);
+                readRows ("stepReverb",  pat.locks[1],    0, 255);
+                readRows ("stepDelay",   pat.locks[2],    0, 255);
 
                 if (auto* notes = o.getProperty ("notes", {}).getArray())
                 {
