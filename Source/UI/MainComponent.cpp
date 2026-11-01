@@ -2536,6 +2536,18 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
         engine.setTrackEffect (0, 0, mixer::compressor);
     }
 
+    if (const int i = args.indexOf ("--fx-demo"); i >= 0)   // test: effetti nuovi sulla traccia 1 (tipo nel primo slot)
+    {
+        engine.setTrackEffect (1, 0, args[i + 1].getIntValue());
+        engine.setTrackEffect (1, 1, mixer::peq);
+        engine.setTrackEffect (1, 2, mixer::shimmer);
+        if (args[i + 1].getIntValue() == mixer::peq)
+        {
+            auto& pr = engine.getTrack (1).slots[0].params;
+            pr[0].store (60.0f); pr[3].store (-6.0f); pr[4].store (350.0f); pr[6].store (5.0f); pr[9].store (3.0f);
+        }
+    }
+
     if (const int i = args.indexOf ("--mixer"); i >= 0)   // test: mixer (traccia degli effetti, -1 = strisce)
         openMixer (args.size() > i + 1 ? args[i + 1].getIntValue() : -1);
 

@@ -407,6 +407,208 @@ private:
 };
 
 //==============================================================================
+/**
+    Griglia del Trance gate: 16 step accesi (il suono passa) o spenti (il suono si abbassa).
+    Tocca/trascina per accendere o spegnere; "Pronti" ha i ritmi classici.
+*/
+class GateGridView : public juce::Component,
+                     private juce::Timer
+{
+public:
+    GateGridView (SequencerEngine& e, int trackIndex, int slotIndex) : engine (e), track (trackIndex), slot (slotIndex)
+    {
+        startTimerHz (25);
+    }
+
+    std::function<void()> onChanged;
+
+    void paint (juce::Graphics& g) override
+    {
+        auto pb = presetBounds();
+        Theme::drawRaised (g, pb, Theme::raisedHi, 5.0f);
+        g.setColour (Theme::accent);
+        g.setFont (Theme::font (11.0f, true));
+        g.drawFittedText ("Pronti " + juce::String (juce::CharPointer_UTF8 ("\xe2\x96\xbe")), pb.toNearestInt(), juce::Justification::centred, 1);
+
+        const float v = param();
+        for (int s = 0; s < 16; ++s)
+        {
+            auto cell = stepBounds (s);
+            const bool on = ((juce::uint32) juce::roundToInt (v) >> s) & 1u;
+            if (on)
+            {
+                g.setGradientFill (juce::ColourGradient (Theme::cyan.brighter (0.3f), cell.getX(), cell.getY(), Theme::cyan.darker (0.5f), cell.getX(), cell.getBottom(), false));
+                g.fillRoundedRectangle (cell, 4.0f);
+            }
+            else
+                Theme::drawSunken (g, cell, (s / 4) % 2 == 0 ? Theme::stepOffA : Theme::stepOffB, 4.0f);
+            if (s == playing)
+                Theme::drawActiveGlow (g, cell, 4.0f, Theme::accent);
+        }
+    }
+
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        if (presetBounds().contains (e.position)) { showPresets(); return; }
+        const int s = stepAt (e.position);
+        if (s < 0) return;
+        paintOn = ! (((juce::uint32) juce::roundToInt (param()) >> s) & 1u);
+        lastStep = -1;
+        paintStep (s);
+    }
+
+    void mouseDrag (const juce::MouseEvent& e) override
+    {
+        if (const int s = stepAt (e.position); s >= 0 && s != lastStep)
+            paintStep (s);
+    }
+
+    void mouseUp (const juce::MouseEvent&) override    { if (lastStep >= 0 && onChanged) onChanged(); lastStep = -1; }
+
+private:
+    float param() const      { return engine.getTrack (track).slots[(size_t) slot].params[0].load(); }
+
+    juce::Rectangle<float> presetBounds() const { return getLocalBounds().toFloat().removeFromRight (82.0f).withSizeKeepingCentre (82.0f, juce::jmin (34.0f, (float) getHeight())); }
+    juce::Rectangle<float> stepBounds (int s) const
+    {
+        auto r = getLocalBounds().toFloat().withTrimmedRight (90.0f);
+        const float group = 6.0f, gap = 2.0f;
+        const float w = (r.getWidth() - group * 3.0f - gap * 12.0f) / 16.0f;
+        const float x = r.getX() + (float) s * w + (float) (s / 4) * group + (float) (s - s / 4) * gap;
+        const float h = juce::jmin (r.getHeight(), 70.0f);
+        return { x, r.getCentreY() - h * 0.5f, w, h };
+    }
+    int stepAt (juce::Point<float> p) const
+    {
+        for (int s = 0; s < 16; ++s)
+            if (stepBounds (s).expanded (1.5f, 8.0f).contains (p)) return s;
+        return -1;
+    }
+
+    void paintStep (int s)
+    {
+        auto& sl = engine.getTrack (track).slots[(size_t) slot];
+        sl.params[0].store (mixer::gateGrid::set (sl.params[0].load(), s, paintOn));
+        lastStep = s;
+        repaint();
+    }
+
+    void setGrid (const char* pattern)   // 16 caratteri: x = passa, . = taglia
+    {
+        float v = 0.0f;
+        for (int s = 0; s < 16; ++s)
+            v = mixer::gateGrid::set (v, s, pattern[s] == 'x');
+        engine.getTrack (track).slots[(size_t) slot].params[0].store (v);
+        repaint();
+        if (onChanged) onChanged();
+    }
+
+    void showPresets()
+    {
+        struct P { const char* name; const char* grid; };
+        static const P presets[] {
+            { "Trance classico",        "xx.xx.xx.xx.xx.x" },
+            { "Sedicesimi alterni",     "x.x.x.x.x.x.x.x." },
+            { "Levare",                 ".x.x.x.x.x.x.x.x" },
+            { "Galoppo",                "x.xxx.xxx.xxx.xx" },
+            { "Psy rolling",            ".xxx.xxx.xxx.xxx" },
+            { "Spezzato",               "xx..x.xx..x.x.xx" },
+            { "Sincopato",              "x..x..x..x..x.x." },
+            { "Tutto acceso",           "xxxxxxxxxxxxxxxx" },
+        };
+        juce::PopupMenu m;
+        for (int i = 0; i < (int) std::size (presets); ++i)
+            m.addItem (i + 1, presets[i].name);
+        juce::Component::SafePointer<GateGridView> safe (this);
+        m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this), [safe] (int r)
+        {
+            if (safe != nullptr && r > 0)
+                safe->setGrid (presets[r - 1].grid);
+        });
+    }
+
+    void timerCallback() override
+    {
+        int step = -1;
+        if (const int abs = engine.isPlaying() ? engine.getPlayStep() : -1; abs >= 0)
+        {
+            const int rate = juce::jlimit (0, 2, juce::roundToInt (engine.getTrack (track).slots[(size_t) slot].params[1].load()));
+            const int spb = mixer::gateGrid::stepsPerBeat[rate];          // step del gate per quarto
+            step = (abs * spb / 4) % 16;                                    // abs e' in sedicesimi
+        }
+        if (step != playing) { playing = step; repaint(); }
+    }
+
+    SequencerEngine& engine;
+    const int track, slot;
+    bool paintOn = true;
+    int lastStep = -1, playing = -1;
+};
+
+//==============================================================================
+/** La curva dell'EQ parametrico (si aggiorna da sola mentre giri le manopole). */
+class EqCurveView : public juce::Component,
+                    private juce::Timer
+{
+public:
+    EqCurveView (SequencerEngine& e, int trackIndex, int slotIndex) : engine (e), track (trackIndex), slot (slotIndex)
+    {
+        startTimerHz (20);
+    }
+
+    void paint (juce::Graphics& g) override
+    {
+        auto r = getLocalBounds().toFloat();
+        Theme::drawSunken (g, r, Theme::lcdBg, 6.0f);
+        r = r.reduced (4.0f);
+        auto xOf = [r] (double f) { return r.getX() + (float) (std::log (f / 20.0) / std::log (1000.0)) * r.getWidth(); };
+        auto yOf = [r] (float db) { return r.getCentreY() - juce::jlimit (-20.0f, 20.0f, db) / 20.0f * r.getHeight() * 0.5f; };
+
+        g.setColour (Theme::cyan.withAlpha (0.12f));
+        for (double f : { 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0 })
+            g.drawVerticalLine (juce::roundToInt (xOf (f)), r.getY(), r.getBottom());
+        g.drawHorizontalLine (juce::roundToInt (yOf (0.0f)), r.getX(), r.getRight());
+        g.setColour (Theme::textDim);
+        g.setFont (Theme::font (9.0f));
+        for (auto [f, t] : { std::pair<double, const char*> { 100.0, "100" }, { 1000.0, "1k" }, { 10000.0, "10k" } })
+            g.drawText (t, juce::Rectangle<float> (xOf (f) + 2.0f, r.getBottom() - 11.0f, 30.0f, 10.0f), juce::Justification::left);
+
+        float p[mixer::maxParams];
+        auto& sl = engine.getTrack (track).slots[(size_t) slot];
+        for (int i = 0; i < mixer::maxParams; ++i) p[i] = sl.params[(size_t) i].load();
+        juce::Path curve;
+        for (int x = 0; x <= (int) r.getWidth(); x += 2)
+        {
+            const double f = 20.0 * std::pow (1000.0, x / (double) r.getWidth());
+            const float y = yOf (mixer::ParamEq::responseDb (p, 48000.0, f));
+            if (x == 0) curve.startNewSubPath (r.getX(), y); else curve.lineTo (r.getX() + (float) x, y);
+        }
+        juce::Path fill (curve);
+        fill.lineTo (r.getRight(), yOf (0.0f));
+        fill.lineTo (r.getX(), yOf (0.0f));
+        fill.closeSubPath();
+        g.setColour (Theme::accent.withAlpha (0.15f));
+        g.fillPath (fill);
+        g.setColour (Theme::accent);
+        g.strokePath (curve, juce::PathStrokeType (2.0f));
+    }
+
+private:
+    void timerCallback() override
+    {
+        auto& sl = engine.getTrack (track).slots[(size_t) slot];
+        bool changed = false;
+        for (int i = 0; i < mixer::maxParams; ++i)
+            if (const float v = sl.params[(size_t) i].load(); v != shown[(size_t) i]) { shown[(size_t) i] = v; changed = true; }
+        if (changed) repaint();
+    }
+
+    SequencerEngine& engine;
+    const int track, slot;
+    std::array<float, mixer::maxParams> shown {};
+};
+
+//==============================================================================
 /** Effetti ed EQ di una traccia: 6 slot in fila, e le manopole dello slot scelto. */
 class TrackEffectsView : public juce::Component
 {
@@ -696,8 +898,22 @@ private:
         const int current = engine.getTrack (track).slots[(size_t) slot].type.load();
         juce::PopupMenu menu;
         menu.addSectionHeader ("Slot " + juce::String (slot + 1));
-        for (int t = 1; t < mixer::numFxTypes; ++t)
-            menu.addItem (t + 1, mixer::info (t).name, true, t == current);
+        using namespace mixer;
+        struct Group { const char* name; std::initializer_list<int> types; };
+        const Group groups[] {
+            { "Dinamica",          { compressor, ott, transient, limiter, sidechain } },
+            { "Tono ed EQ",        { filter, peq, exciter, vowel } },
+            { "Spazio",            { reverb, shimmer, delay, chorus, stereo } },
+            { "Movimento",         { gate, tremolo, phaser, flanger } },
+            { "Sporco e lo-fi",    { saturation, bitcrusher, trash, vinyl } },
+            { "Creativi",          { glitch, pitch, ringmod } },
+        };
+        for (auto& gr : groups)
+        {
+            menu.addSectionHeader (gr.name);
+            for (int t : gr.types)
+                menu.addItem (t + 1, mixer::info (t).name, true, t == current);
+        }
         menu.addSeparator();
         menu.addItem (1, "Togli l'effetto", current != mixer::none);
 
@@ -741,10 +957,14 @@ private:
         const auto& inf = mixer::info (shownType);
 
         glitchView.reset();
+        gateView.reset();
+        eqView.reset();
         for (int p = 0; p < inf.numParams; ++p)
         {
             if (shownType == mixer::glitch && p > 0)
                 break;   // la griglia sostituisce i parametri 2 e 3
+            if (shownType == mixer::gate && p == 0)
+                continue;   // il ritmo si disegna nella griglia
             const auto& def = inf.params[(size_t) p];
             if (def.unit == mixer::Unit::choice || def.unit == mixer::Unit::track)
             {
@@ -774,6 +994,17 @@ private:
             glitchView->onChanged = [this] { if (onChanged) onChanged(); };
             addAndMakeVisible (*glitchView);
         }
+        if (shownType == mixer::gate)
+        {
+            gateView = std::make_unique<GateGridView> (engine, track, selectedSlot);
+            gateView->onChanged = [this] { if (onChanged) onChanged(); };
+            addAndMakeVisible (*gateView);
+        }
+        if (shownType == mixer::peq)
+        {
+            eqView = std::make_unique<EqCurveView> (engine, track, selectedSlot);
+            addAndMakeVisible (*eqView);
+        }
 
         for (auto* row : slotRows)
             row->refresh();
@@ -794,13 +1025,30 @@ private:
             glitchView->setBounds (area.reduced (4, 0));
             return;
         }
-        const int cols = paramsArea.getWidth() >= paramsArea.getHeight() * 2 ? n : juce::jmin (n, 3);
+        auto area = paramsArea;
+        if (gateView != nullptr)
+        {
+            gateView->setBounds (area.removeFromTop (juce::jlimit (40, 76, area.getHeight() * 2 / 5)));
+            area.removeFromTop (6);
+        }
+        if (eqView != nullptr)
+        {
+            const bool room = area.getHeight() >= 300;
+            eqView->setVisible (room);
+            if (room)
+            {
+                eqView->setBounds (area.removeFromTop (juce::jlimit (60, 110, area.getHeight() / 3)).reduced (3, 0));
+                area.removeFromTop (6);
+            }
+        }
+        int cols = area.getWidth() >= area.getHeight() * 2 ? n : juce::jmin (n, 3);
+        if (n > 6) cols = juce::jmin (n, juce::jmax (4, area.getWidth() / 80), 6);
         const int rows = (n + cols - 1) / cols;
-        const int w = paramsArea.getWidth() / cols, h = juce::jmin (120, paramsArea.getHeight() / rows);
+        const int w = area.getWidth() / cols, h = juce::jmin (120, area.getHeight() / rows);
         int button = 0;
         for (int i = 0; i < n; ++i)
         {
-            const juce::Rectangle<int> cell (paramsArea.getX() + (i % cols) * w, paramsArea.getY() + (i / cols) * h, w, h);
+            const juce::Rectangle<int> cell (area.getX() + (i % cols) * w, area.getY() + (i / cols) * h, w, h);
             if (auto* k = paramKnobs[i])
                 k->setBounds (cell.reduced (3, 0));
             else if (auto* b = paramButtons[button++])
@@ -819,6 +1067,8 @@ private:
     std::vector<int> paramIndex;
     juce::OwnedArray<SlotRow> slotRows;
     std::unique_ptr<GlitchGridView> glitchView;
+    std::unique_ptr<GateGridView> gateView;
+    std::unique_ptr<EqCurveView> eqView;
     juce::Rectangle<float> eqCaption, slotsCaption, paramsCaption, detailArea;
     juce::Rectangle<int> paramsArea;
 };

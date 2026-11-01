@@ -698,9 +698,10 @@ private:
                     add ({ automation::trackParam, t, p, 0 }, "Traccia");
             for (int s = 0; s < mixer::numSlots; ++s)
             {
-                const auto& inf = mixer::info (engine.getTrack (t).slots[(size_t) s].type.load());
+                const int type = engine.getTrack (t).slots[(size_t) s].type.load();
+                const auto& inf = mixer::info (type);
                 for (int p = 0; p < inf.numParams; ++p)
-                    if (inf.params[(size_t) p].unit != mixer::Unit::track)
+                    if (inf.params[(size_t) p].unit != mixer::Unit::track && ! (type == mixer::gate && p == 0))
                         add ({ automation::effectParam, t, s, p }, "Effetto " + juce::String (s + 1));
             }
         }

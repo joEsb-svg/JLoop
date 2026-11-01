@@ -14,7 +14,15 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.62)
+## Stato attuale (v0.63)
+
+**Novita' della 0.63** (mixer, 12 effetti nuovi, menu diviso per categorie):
+- Movimento: Trance gate (griglia di 16 step + ritmi pronti), Tremolo / Auto-pan, Phaser, Flanger (anche a tempo)
+- Tono: EQ parametrico (4 bande + taglia bassi/alti, con la curva), Exciter
+- Dinamica: Transient shaper, Limiter / Maximizer (con anticipo, mai oltre il tetto)
+- Lo-fi: Vinile / nastro (fruscio, crepitio, wow e flutter, tono, eta')
+- Creativi: Pitch shifter (+-24 semitoni, con ottava/quinta in armonia), Ring mod / Frequency shifter
+- Spazio: Shimmer reverb (la coda sale di ottava)
 
 **Novita' della 0.62**:
 - PC: "banco di lavoro" (schermo grande): libreria dei suoni fissa a sinistra (il suono va sul canale scelto, "Usa sul canale"),

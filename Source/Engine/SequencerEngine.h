@@ -1040,6 +1040,13 @@ public:
     /** Posizione di riproduzione in tick dall'inizio del pattern (-1 se fermo). */
     int getCurrentTick() const          { return playing.load() ? currentTick.load() : -1; }
 
+    /** Sedicesimo che sta suonando dall'inizio (pattern o canzone); -1 se fermo. */
+    int getPlayStep() const
+    {
+        if (! playing.load()) return -1;
+        return songMode.load() ? currentSongStep.load() : currentStep.load();
+    }
+
     /** Sedicesimo della battuta che sta suonando (0..15), per la griglia del Glitch; -1 se fermo. */
     int getPlayStepInBar() const
     {

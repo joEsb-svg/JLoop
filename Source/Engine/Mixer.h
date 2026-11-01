@@ -5,6 +5,7 @@
 #include <array>
 #include <atomic>
 #include <cmath>
+#include <complex>
 #include <memory>
 #include <vector>
 
@@ -29,14 +30,15 @@ namespace mixer
     inline constexpr int numInserts = 32;
     inline constexpr int numTracks  = numInserts + 1;   // 0 = Master
     inline constexpr int numSlots   = 6;
-    inline constexpr int maxParams  = 6;
+    inline constexpr int maxParams  = 12;
 
     //==========================================================================
     // Tipi di effetto e i loro parametri
 
-    enum FxType { none = 0, compressor, saturation, filter, delay, reverb, chorus, bitcrusher, sidechain, stereo, ott, glitch, trash, vowel, numFxTypes };
+    enum FxType { none = 0, compressor, saturation, filter, delay, reverb, chorus, bitcrusher, sidechain, stereo, ott, glitch, trash, vowel,
+                  gate, tremolo, phaser, flanger, peq, transient, exciter, vinyl, limiter, pitch, ringmod, shimmer, numFxTypes };
 
-    enum class Unit { percent, dB, ms, hz, ratio, choice, track, bits, times };
+    enum class Unit { percent, dB, ms, hz, ratio, choice, track, bits, times, semis };
 
     struct ParamDef
     {
@@ -126,6 +128,79 @@ namespace mixer
                 { "Tempo LFO", 0.0f, 4.0f, 2.0f, Unit::choice, 0.0f, "1/1|1/2|1/4|1/8|1/16" },
                 { "Risonanza", 0.0f, 1.0f, 0.5f, Unit::percent },
                 { "Mix", 0.0f, 1.0f, 1.0f, Unit::percent } }} },
+            { "gate", "Trance gate", "Taglia il suono a tempo con un ritmo di 16 step (pad e accordi che pulsano)", 4, {{
+                { "Ritmo", 0.0f, 65535.0f, 46811.0f, Unit::times },
+                { "Velocita'", 0.0f, 2.0f, 1.0f, Unit::choice, 0.0f, "1/8|1/16|1/32" },
+                { "Profondita'", 0.0f, 1.0f, 1.0f, Unit::percent },
+                { "Morbidezza", 0.0f, 1.0f, 0.25f, Unit::percent } }} },
+            { "tremolo", "Tremolo / Auto-pan", "Volume o posizione destra-sinistra che ondeggiano a tempo", 4, {{
+                { "Modo", 0.0f, 1.0f, 0.0f, Unit::choice, 0.0f, "Tremolo|Auto-pan" },
+                { "Tempo", 0.0f, 6.0f, 3.0f, Unit::choice, 0.0f, "1/1|1/2|1/4|1/8|1/16|1/4T|1/8T" },
+                { "Profondita'", 0.0f, 1.0f, 0.7f, Unit::percent },
+                { "Forma", 0.0f, 2.0f, 0.0f, Unit::choice, 0.0f, "Sinusoide|Triangolo|Quadra" } }} },
+            { "phaser", "Phaser", "Il \"fruscio che gira\": da lento e profondo a velocissimo", 5, {{
+                { "Velocita'", 0.05f, 8.0f, 0.5f, Unit::hz, 0.8f },
+                { "Profondita'", 0.0f, 1.0f, 0.7f, Unit::percent },
+                { "Feedback", 0.0f, 0.9f, 0.5f, Unit::percent },
+                { "Stadi", 0.0f, 3.0f, 1.0f, Unit::choice, 0.0f, "4|6|8|12" },
+                { "Mix", 0.0f, 1.0f, 0.5f, Unit::percent } }} },
+            { "flanger", "Flanger", "Effetto jet, metallico; anche a tempo", 6, {{
+                { "Velocita'", 0.02f, 5.0f, 0.25f, Unit::hz, 0.5f },
+                { "Profondita'", 0.0f, 1.0f, 0.7f, Unit::percent },
+                { "Feedback", -0.95f, 0.95f, 0.6f, Unit::percent },
+                { "Ritardo", 0.5f, 10.0f, 2.0f, Unit::ms, 2.5f },
+                { "Mix", 0.0f, 1.0f, 0.5f, Unit::percent },
+                { "A tempo", 0.0f, 4.0f, 0.0f, Unit::choice, 0.0f, "Libero|2/1|1/1|1/2|1/4" } }} },
+            { "peq", "EQ parametrico", "4 bande + tagli: togli il fango, alza il click, pulisci i bassi", 12, {{
+                { "Taglia bassi", 20.0f, 1000.0f, 20.0f, Unit::hz, 120.0f },
+                { "Bassi", -18.0f, 18.0f, 0.0f, Unit::dB },
+                { "Freq. bassi", 30.0f, 500.0f, 100.0f, Unit::hz, 120.0f },
+                { "Medi 1", -18.0f, 18.0f, 0.0f, Unit::dB },
+                { "Freq. medi 1", 80.0f, 5000.0f, 400.0f, Unit::hz, 600.0f },
+                { "Q medi 1", 0.3f, 10.0f, 1.0f, Unit::ratio, 1.5f },
+                { "Medi 2", -18.0f, 18.0f, 0.0f, Unit::dB },
+                { "Freq. medi 2", 300.0f, 12000.0f, 2500.0f, Unit::hz, 2500.0f },
+                { "Q medi 2", 0.3f, 10.0f, 1.0f, Unit::ratio, 1.5f },
+                { "Alti", -18.0f, 18.0f, 0.0f, Unit::dB },
+                { "Freq. alti", 1500.0f, 16000.0f, 8000.0f, Unit::hz, 6000.0f },
+                { "Taglia alti", 1000.0f, 20000.0f, 20000.0f, Unit::hz, 6000.0f } }} },
+            { "transient", "Transient shaper", "Piu' attacco o piu' coda a cassa, rullante e bassi (senza compressore)", 4, {{
+                { "Attacco", -1.0f, 1.0f, 0.4f, Unit::percent },
+                { "Coda", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "Velocita'", 0.0f, 1.0f, 0.5f, Unit::percent },
+                { "Uscita", -12.0f, 12.0f, 0.0f, Unit::dB } }} },
+            { "exciter", "Exciter", "Brillantezza e presenza: armoniche nuove sugli acuti", 4, {{
+                { "Quantita'", 0.0f, 1.0f, 0.35f, Unit::percent },
+                { "Da", 800.0f, 12000.0f, 3000.0f, Unit::hz, 3000.0f },
+                { "Carattere", 0.0f, 1.0f, 0.0f, Unit::choice, 0.0f, "Morbido|Brillante" },
+                { "Ampiezza", 0.0f, 1.0f, 0.5f, Unit::percent } }} },
+            { "vinyl", "Vinile / nastro", "Lo-fi: fruscio, crepitio, nastro che ondeggia, toni scuri", 6, {{
+                { "Fruscio", 0.0f, 1.0f, 0.2f, Unit::percent },
+                { "Crepitio", 0.0f, 1.0f, 0.3f, Unit::percent },
+                { "Nastro", 0.0f, 1.0f, 0.3f, Unit::percent },
+                { "Tono", 1000.0f, 20000.0f, 7000.0f, Unit::hz, 5000.0f },
+                { "Eta'", 0.0f, 1.0f, 0.3f, Unit::percent },
+                { "Mix", 0.0f, 1.0f, 1.0f, Unit::percent } }} },
+            { "limiter", "Limiter / Maximizer", "Alza il volume senza superare il tetto (sul Master, per ultimo)", 3, {{
+                { "Guadagno", 0.0f, 24.0f, 3.0f, Unit::dB },
+                { "Tetto", -12.0f, 0.0f, -0.3f, Unit::dB },
+                { "Rilascio", 10.0f, 1000.0f, 120.0f, Unit::ms, 120.0f } }} },
+            { "pitch", "Pitch shifter", "Sposta l'intonazione di semitoni, anche aggiungendo un'ottava o una quinta", 4, {{
+                { "Semitoni", -24.0f, 24.0f, 12.0f, Unit::semis },
+                { "Armonia", 0.0f, 3.0f, 0.0f, Unit::choice, 0.0f, "No|Ottava sotto|Ottava sopra|Quinta sopra" },
+                { "Grana", 15.0f, 120.0f, 50.0f, Unit::ms, 50.0f },
+                { "Mix", 0.0f, 1.0f, 1.0f, Unit::percent } }} },
+            { "ringmod", "Ring mod / Freq shifter", "Suoni metallici, robotici, fuori di testa (psy, hi-tech)", 5, {{
+                { "Modo", 0.0f, 1.0f, 0.0f, Unit::choice, 0.0f, "Ring mod|Frequency shifter" },
+                { "Frequenza", 1.0f, 5000.0f, 300.0f, Unit::hz, 250.0f },
+                { "Movimento", 0.0f, 1.0f, 0.0f, Unit::percent },
+                { "Velocita' LFO", 0.05f, 10.0f, 0.5f, Unit::hz, 1.0f },
+                { "Mix", 0.0f, 1.0f, 0.5f, Unit::percent } }} },
+            { "shimmer", "Shimmer reverb", "Riverbero che sale di ottava: code eteree per pad e break", 4, {{
+                { "Stanza", 0.0f, 1.0f, 0.8f, Unit::percent },
+                { "Shimmer", 0.0f, 1.0f, 0.5f, Unit::percent },
+                { "Smorzamento", 0.0f, 1.0f, 0.4f, Unit::percent },
+                { "Mix", 0.0f, 1.0f, 0.35f, Unit::percent } }} },
         }};
         return infos[(size_t) juce::jlimit (0, numFxTypes - 1, type)];
     }
@@ -151,7 +226,7 @@ namespace mixer
         juce::NormalisableRange<float> r (p.minValue, p.maxValue);
         if (p.centre > p.minValue && p.centre < p.maxValue) r.setSkewForCentre (p.centre);
         float v = r.convertFrom0to1 (juce::jlimit (0.0f, 1.0f, n));
-        if (p.unit == Unit::choice || p.unit == Unit::track || p.unit == Unit::bits)
+        if (p.unit == Unit::choice || p.unit == Unit::track || p.unit == Unit::bits || p.unit == Unit::semis)
             v = std::round (v);
         return v;
     }
@@ -166,6 +241,7 @@ namespace mixer
             case Unit::hz:      return v >= 1000.0f ? juce::String (v / 1000.0f, v >= 10000.0f ? 1 : 2) + " kHz" : juce::String (v, v < 10.0f ? 2 : 0) + " Hz";
             case Unit::ratio:   return juce::String (v, v < 10.0f ? 1 : 0) + ":1";
             case Unit::times:   return juce::String (juce::roundToInt (v)) + "x";
+            case Unit::semis:   return (v > 0.5f ? "+" : "") + juce::String (juce::roundToInt (v)) + " st";
             case Unit::bits:    return juce::String (juce::roundToInt (v)) + " bit";
             case Unit::track:   return "Insert " + juce::String (juce::roundToInt (v));
             case Unit::choice:
@@ -1011,6 +1087,680 @@ namespace mixer
         std::array<Svf, 4> bands;
     };
 
+    //==========================================================================
+    // Effetti aggiunti nella 0.63
+
+    /** Dove siamo (in quarti) al campione i del blocco: a tempo col progetto se suona, altrimenti un orologio libero. */
+    struct TempoClock
+    {
+        double freeBeat = 0.0;
+        double beatAt (const Context& ctx, double sr, int i) const
+        {
+            const double b = ctx.bpm / 60.0 * i / sr;
+            return ctx.playing ? ctx.ppq + b : freeBeat + b;
+        }
+        void advance (const Context& ctx, double sr, int n)
+        {
+            if (! ctx.playing) freeBeat = std::fmod (freeBeat + ctx.bpm / 60.0 * n / sr, 64.0);
+        }
+    };
+
+    inline float frac01 (double x) noexcept   { return (float) (x - std::floor (x)); }
+
+    /** Il ritmo (16 step) del Trance gate, salvato come bit nel parametro 0. */
+    namespace gateGrid
+    {
+        inline bool get (const float* p, int step)   { return ((juce::uint32) juce::roundToInt (p[0]) >> (step & 15)) & 1u; }
+        inline float set (float v, int step, bool on)
+        {
+            auto bits = (juce::uint32) juce::roundToInt (v);
+            bits = on ? (bits | (1u << step)) : (bits & ~(1u << step));
+            return (float) (bits & 0xffffu);
+        }
+        inline constexpr int stepsPerBeat[3] { 2, 4, 8 };
+    }
+
+    class Gate : public Effect
+    {
+    public:
+        void prepare (double sampleRate) override   { sr = sampleRate; reset(); }
+        void reset() override                        { gain = 1.0f; clock = {}; }
+
+        void process (float* L, float* R, int n, const float* p, const Context& ctx) override
+        {
+            const int spb = gateGrid::stepsPerBeat[juce::jlimit (0, 2, juce::roundToInt (p[1]))];
+            const auto bits = (juce::uint32) juce::roundToInt (p[0]);
+            const float low = 1.0f - p[2];
+            const float coef = 1.0f - std::exp (-1.0f / ((0.0007f + p[3] * p[3] * 0.04f) * (float) sr));
+            for (int i = 0; i < n; ++i)
+            {
+                const double beat = clock.beatAt (ctx, sr, i);
+                int step = (int) std::floor (beat * spb) % 16;
+                if (step < 0) step += 16;
+                const float target = ((bits >> step) & 1u) ? 1.0f : low;
+                gain += (target - gain) * coef;
+                L[i] *= gain; R[i] *= gain;
+            }
+            clock.advance (ctx, sr, n);
+        }
+
+    private:
+        double sr = 48000.0;
+        float gain = 1.0f;
+        TempoClock clock;
+    };
+
+    class Tremolo : public Effect
+    {
+    public:
+        void prepare (double sampleRate) override   { sr = sampleRate; reset(); }
+        void reset() override                        { clock = {}; }
+
+        void process (float* L, float* R, int n, const float* p, const Context& ctx) override
+        {
+            static constexpr double beatsPer[7] { 4.0, 2.0, 1.0, 0.5, 0.25, 2.0 / 3.0, 1.0 / 3.0 };
+            const double beats = beatsPer[juce::jlimit (0, 6, juce::roundToInt (p[1]))];
+            const bool pan = p[0] > 0.5f;
+            const int shape = juce::jlimit (0, 2, juce::roundToInt (p[3]));
+            const float depth = p[2];
+            for (int i = 0; i < n; ++i)
+            {
+                const float ph = frac01 (clock.beatAt (ctx, sr, i) / beats);
+                float lfo;   // -1..1
+                if (shape == 0)      lfo = perf::fastSin (ph);
+                else if (shape == 1) lfo = 4.0f * std::abs (ph - 0.5f) - 1.0f;
+                else                 lfo = std::tanh (perf::fastSin (ph) * 7.0f);
+                if (pan)
+                {
+                    const float a = (lfo * depth + 1.0f) * juce::MathConstants<float>::pi * 0.25f;
+                    L[i] *= std::cos (a) * juce::MathConstants<float>::sqrt2;
+                    R[i] *= std::sin (a) * juce::MathConstants<float>::sqrt2;
+                }
+                else
+                {
+                    const float g = 1.0f - depth * (0.5f - 0.5f * lfo);
+                    L[i] *= g; R[i] *= g;
+                }
+            }
+            clock.advance (ctx, sr, n);
+        }
+
+    private:
+        double sr = 48000.0;
+        TempoClock clock;
+    };
+
+    class Phaser : public Effect
+    {
+    public:
+        void prepare (double sampleRate) override   { sr = sampleRate; reset(); }
+        void reset() override
+        {
+            for (auto& c : state) for (auto& s : c) s = 0.0f;
+            fb[0] = fb[1] = 0.0f; phase = 0.0;
+        }
+
+        void process (float* L, float* R, int n, const float* p, const Context&) override
+        {
+            static constexpr int stagesFor[4] { 4, 6, 8, 12 };
+            const int stages = stagesFor[juce::jlimit (0, 3, juce::roundToInt (p[3]))];
+            const float depth = p[1], feedback = p[2], mix = p[4], norm = 1.0f / (1.0f + mix);
+            float a[2] {};
+            for (int i = 0; i < n; ++i)
+            {
+                if ((i & 7) == 0)
+                {
+                    for (int ch = 0; ch < 2; ++ch)
+                    {
+                        const float lfo = 0.5f + 0.5f * perf::fastSin ((float) phase + 0.25f * (float) ch);
+                        const double f = juce::jmin (sr * 0.45, 180.0 * std::pow (2.0, (double) (lfo * depth * 6.0f)));
+                        const double t = std::tan (juce::MathConstants<double>::pi * f / sr);
+                        a[ch] = (float) ((t - 1.0) / (t + 1.0));
+                    }
+                }
+                phase += p[0] / sr;
+                if (phase >= 1.0) phase -= 1.0;
+                for (int ch = 0; ch < 2; ++ch)
+                {
+                    float& x = ch == 0 ? L[i] : R[i];
+                    float y = x + std::tanh (fb[ch] * feedback);
+                    for (int s = 0; s < stages; ++s)
+                    {
+                        const float out = a[ch] * y + state[ch][(size_t) s];
+                        state[ch][(size_t) s] = y - a[ch] * out;
+                        y = out;
+                    }
+                    fb[ch] = y;
+                    x = (x + mix * y) * norm;
+                }
+            }
+        }
+
+    private:
+        double sr = 48000.0, phase = 0.0;
+        std::array<float, 12> state[2] {};
+        float fb[2] {};
+    };
+
+    /** Linea di ritardo stereo con lettura interpolata (per flanger, nastro e pitch shifter). */
+    struct DelayLine
+    {
+        std::vector<float> buf[2];
+        int pos = 0, mask = 0;
+
+        void prepare (int minSize)
+        {
+            int size = 1;
+            while (size < minSize) size <<= 1;
+            buf[0].assign ((size_t) size, 0.0f);
+            buf[1].assign ((size_t) size, 0.0f);
+            mask = size - 1; pos = 0;
+        }
+        void clear()                                { for (auto& b : buf) std::fill (b.begin(), b.end(), 0.0f); }
+        void write (float l, float r) noexcept      { buf[0][(size_t) pos] = l; buf[1][(size_t) pos] = r; pos = (pos + 1) & mask; }
+        /** Legge il campione di 'delay' campioni fa (delay >= 1). */
+        float read (int ch, float delay) const noexcept
+        {
+            const float idx = (float) pos - delay;
+            const int i0 = (int) std::floor (idx);
+            const float fr = idx - (float) i0;
+            const float a = buf[ch][(size_t) (i0 & mask)], b = buf[ch][(size_t) ((i0 + 1) & mask)];
+            return a + fr * (b - a);
+        }
+    };
+
+    class Flanger : public Effect
+    {
+    public:
+        void prepare (double sampleRate) override   { sr = sampleRate; line.prepare ((int) (sr * 0.03) + 8); reset(); }
+        void reset() override                        { line.clear(); fb[0] = fb[1] = 0.0f; phase = 0.0; clock = {}; }
+
+        void process (float* L, float* R, int n, const float* p, const Context& ctx) override
+        {
+            static constexpr double beatsPer[5] { 0.0, 8.0, 4.0, 2.0, 1.0 };
+            const int sync = juce::jlimit (0, 4, juce::roundToInt (p[5]));
+            const float maxD = p[3] * 0.001f * (float) sr, depth = p[1], feedback = p[2], mix = p[4];
+            const float minD = juce::jmax (1.5f, 0.0001f * (float) sr);
+            const float norm = 1.0f / (1.0f + mix * 0.6f);
+            for (int i = 0; i < n; ++i)
+            {
+                double ph;
+                if (sync > 0) ph = clock.beatAt (ctx, sr, i) / beatsPer[sync];
+                else { phase += p[0] / sr; if (phase >= 1.0) phase -= 1.0; ph = phase; }
+                float out[2];
+                for (int ch = 0; ch < 2; ++ch)
+                {
+                    const float lfo = 0.5f + 0.5f * perf::fastSin ((float) ph + 0.12f * (float) ch);
+                    const float d = juce::jmax (minD, maxD * (1.0f - depth * lfo));
+                    out[ch] = line.read (ch, d);
+                }
+                line.write (L[i] + std::tanh (out[0] * feedback), R[i] + std::tanh (out[1] * feedback));
+                const float wetGain = 1.0f - std::abs (feedback) * 0.45f;
+                L[i] = (L[i] + mix * out[0] * wetGain) * norm;
+                R[i] = (R[i] + mix * out[1] * wetGain) * norm;
+            }
+            clock.advance (ctx, sr, n);
+        }
+
+    private:
+        double sr = 48000.0, phase = 0.0;
+        DelayLine line;
+        float fb[2] {};
+        TempoClock clock;
+    };
+
+    /** Filtri passa-alto / passa-basso (Butterworth 12 dB) per l'EQ parametrico e gli altri. */
+    inline void setPass (Biquad& b, double sr, double f, bool high)
+    {
+        const double w = juce::MathConstants<double>::twoPi * juce::jlimit (10.0, sr * 0.45, f) / sr;
+        const double c = std::cos (w), alpha = std::sin (w) / (2.0 * 0.7071);
+        if (high) b.set ((1 + c) / 2, -(1 + c), (1 + c) / 2, 1 + alpha, -2 * c, 1 - alpha);
+        else      b.set ((1 - c) / 2, 1 - c, (1 - c) / 2, 1 + alpha, -2 * c, 1 - alpha);
+    }
+
+    class ParamEq : public Effect
+    {
+    public:
+        void prepare (double sampleRate) override   { sr = sampleRate; reset(); }
+        void reset() override                        { for (auto& b : bands) b.reset(); for (auto& c : cache) c = -999.0f; }
+
+        void process (float* L, float* R, int n, const float* p, const Context&) override
+        {
+            bool changed = false;
+            for (int k = 0; k < 12; ++k)
+                if (cache[(size_t) k] != p[k]) { cache[(size_t) k] = p[k]; changed = true; }
+            if (changed)
+            {
+                const double top = sr * 0.45;
+                on[0] = p[0] > 20.5f;                 setPass (bands[0], sr, p[0], true);
+                on[1] = std::abs (p[1]) > 0.05f;      bands[1].setLowShelf (sr, juce::jmin (top, (double) p[2]), p[1]);
+                on[2] = std::abs (p[3]) > 0.05f;      bands[2].setPeak (sr, juce::jmin (top, (double) p[4]), juce::jmax (0.1f, p[5]), p[3]);
+                on[3] = std::abs (p[6]) > 0.05f;      bands[3].setPeak (sr, juce::jmin (top, (double) p[7]), juce::jmax (0.1f, p[8]), p[6]);
+                on[4] = std::abs (p[9]) > 0.05f;      bands[4].setHighShelf (sr, juce::jmin (top, (double) p[10]), p[9]);
+                on[5] = p[11] < 19900.0f && p[11] < top;   setPass (bands[5], sr, p[11], false);
+            }
+            for (int b = 0; b < 6; ++b)
+            {
+                if (! on[b]) continue;
+                auto& f = bands[(size_t) b];
+                for (int i = 0; i < n; ++i) { L[i] = f.process (L[i], 0); R[i] = f.process (R[i], 1); }
+            }
+        }
+
+        /** Risposta in dB a una frequenza (per il disegno della curva). */
+        static float responseDb (const float* p, double sr, double f)
+        {
+            Biquad b[6];
+            bool active[6];
+            const double top = sr * 0.45;
+            active[0] = p[0] > 20.5f;            setPass (b[0], sr, p[0], true);
+            active[1] = std::abs (p[1]) > 0.05f; b[1].setLowShelf (sr, juce::jmin (top, (double) p[2]), p[1]);
+            active[2] = std::abs (p[3]) > 0.05f; b[2].setPeak (sr, juce::jmin (top, (double) p[4]), juce::jmax (0.1f, p[5]), p[3]);
+            active[3] = std::abs (p[6]) > 0.05f; b[3].setPeak (sr, juce::jmin (top, (double) p[7]), juce::jmax (0.1f, p[8]), p[6]);
+            active[4] = std::abs (p[9]) > 0.05f; b[4].setHighShelf (sr, juce::jmin (top, (double) p[10]), p[9]);
+            active[5] = p[11] < 19900.0f;        setPass (b[5], sr, p[11], false);
+            const double w = juce::MathConstants<double>::twoPi * f / sr;
+            const std::complex<double> z1 = std::polar (1.0, -w), z2 = z1 * z1;
+            double mag = 1.0;
+            for (int k = 0; k < 6; ++k)
+            {
+                if (! active[k]) continue;
+                const auto num = (double) b[k].b0 + (double) b[k].b1 * z1 + (double) b[k].b2 * z2;
+                const auto den = 1.0 + (double) b[k].a1 * z1 + (double) b[k].a2 * z2;
+                mag *= std::abs (num / den);
+            }
+            return (float) (20.0 * std::log10 (juce::jmax (1.0e-6, mag)));
+        }
+
+    private:
+        double sr = 48000.0;
+        std::array<Biquad, 6> bands;
+        std::array<float, 12> cache {};
+        bool on[6] {};
+    };
+
+    class Transient : public Effect
+    {
+    public:
+        void prepare (double sampleRate) override   { sr = sampleRate; reset(); }
+        void reset() override                        { fastA = slowA = fastS = slowS = det = 0.0f; }
+
+        void process (float* L, float* R, int n, const float* p, const Context&) override
+        {
+            const float speed = 1.5f - p[2];   // 0.5 (veloce) .. 1.5 (lento)
+            auto c = [this] (float ms) { return 1.0f - std::exp (-1.0f / (ms * 0.001f * (float) sr)); };
+            const float aFast = c (0.6f * speed), aSlow = c (25.0f * speed), relLong = c (400.0f);
+            const float relFast = c (40.0f * speed), relSlow = c (350.0f * speed), att = c (1.0f);
+            const float detAtt = c (0.3f), detRel = c (12.0f);
+            const float out = juce::Decibels::decibelsToGain (p[3]);
+            for (int i = 0; i < n; ++i)
+            {
+                const float in = juce::jmax (std::abs (L[i]), std::abs (R[i]));
+                det += (in - det) * (in > det ? detAtt : detRel);   // livello liscio (niente "rumore" nel rumore)
+                const float x = det + 1.0e-6f;
+                // attacco: inseguitore veloce contro lento (salgono a velocita' diverse)
+                fastA += (x - fastA) * (x > fastA ? aFast : relLong);
+                slowA += (x - slowA) * (x > slowA ? aSlow : relLong);
+                // coda: stessa salita, discese diverse
+                fastS += (x - fastS) * (x > fastS ? att : relFast);
+                slowS += (x - slowS) * (x > slowS ? att : relSlow);
+                const float atkDb = juce::jlimit (0.0f, 24.0f, 20.0f * std::log10 (fastA / slowA));
+                const float susDb = juce::jlimit (0.0f, 24.0f, 20.0f * std::log10 (slowS / fastS));
+                const float gDb = juce::jlimit (-30.0f, 12.0f, p[0] * atkDb * 1.2f + p[1] * susDb * 0.9f);
+                const float g = juce::Decibels::decibelsToGain (gDb) * out;
+                L[i] *= g; R[i] *= g;
+            }
+        }
+
+    private:
+        double sr = 48000.0;
+        float fastA = 0, slowA = 0, fastS = 0, slowS = 0, det = 0;
+    };
+
+    class Exciter : public Effect
+    {
+    public:
+        void prepare (double sampleRate) override   { sr = sampleRate; reset(); }
+        void reset() override                        { hp1.reset(); hp2.reset(); lastF = -1.0f; }
+
+        void process (float* L, float* R, int n, const float* p, const Context&) override
+        {
+            if (p[1] != lastF)
+            {
+                lastF = p[1];
+                setPass (hp1, sr, p[1], true);
+                setPass (hp2, sr, p[1] * 0.8, true);
+            }
+            const float amount = p[0], drive = 2.0f + amount * 12.0f;
+            const bool bright = p[2] > 0.5f;
+            const float width = p[3] * 2.0f;
+            for (int i = 0; i < n; ++i)
+            {
+                float e[2];
+                for (int ch = 0; ch < 2; ++ch)
+                {
+                    const float h = hp1.process (ch == 0 ? L[i] : R[i], ch) * drive;
+                    const float s = bright ? std::tanh (h + 0.45f * h * std::abs (h)) : std::tanh (h);
+                    e[ch] = hp2.process (s / drive * 2.0f, ch);
+                }
+                const float m = 0.5f * (e[0] + e[1]), sd = 0.5f * (e[0] - e[1]) * width;
+                L[i] += amount * (m + sd);
+                R[i] += amount * (m - sd);
+            }
+        }
+
+    private:
+        double sr = 48000.0;
+        Biquad hp1, hp2;
+        float lastF = -1.0f;
+    };
+
+    /** Rumore bianco veloce (per vinile e simili): il thread audio non usa juce::Random condiviso. */
+    struct Noise
+    {
+        juce::uint32 s = 0x12345678u;
+        float next() noexcept    { s = s * 1664525u + 1013904223u; return (float) (s >> 8) * (2.0f / 16777216.0f) - 1.0f; }
+        float uni() noexcept     { return 0.5f + 0.5f * next(); }
+    };
+
+    class Vinyl : public Effect
+    {
+    public:
+        void prepare (double sampleRate) override   { sr = sampleRate; line.prepare ((int) (sr * 0.03) + 8); reset(); }
+        void reset() override
+        {
+            line.clear(); wow = flutter = 0.0;
+            for (auto& v : lp1) v = 0.0f;
+            for (auto& v : lp2) v = 0.0f;
+            for (auto& v : hs) v = 0.0f;
+            for (auto& v : click) v = 0.0f;
+            for (auto& v : hissLp) v = 0.0f;
+            hp.reset(); lastHp = -1.0f;
+        }
+
+        void process (float* L, float* R, int n, const float* p, const Context&) override
+        {
+            const float hiss = p[0] * p[0] * 0.035f, crackle = p[1], tape = p[2], age = p[4], mix = p[5];
+            const float tone = 1.0f - std::exp (-juce::MathConstants<float>::twoPi * juce::jmin (p[3], (float) sr * 0.45f) / (float) sr);
+            const float hpF = 25.0f + age * 140.0f;
+            if (hpF != lastHp) { lastHp = hpF; setPass (hp, sr, hpF, true); }
+            const float clickRate = crackle * crackle * 60.0f / (float) sr;   // fino a ~60 al secondo
+            const float base = 0.006f * (float) sr;
+            const float drive = 1.0f + age * 3.0f, driveNorm = 1.0f / std::tanh (drive);
+            for (int i = 0; i < n; ++i)
+            {
+                wow += 0.55 / sr;     if (wow >= 1.0) wow -= 1.0;
+                flutter += 6.3 / sr;  if (flutter >= 1.0) flutter -= 1.0;
+                const float mod = tape * (0.0022f * perf::fastSin ((float) wow) + 0.00018f * perf::fastSin ((float) flutter)) * (float) sr;
+                line.write (L[i], R[i]);
+                float w[2];
+                for (int ch = 0; ch < 2; ++ch)
+                {
+                    const float dry = ch == 0 ? L[i] : R[i];
+                    float y = tape > 0.001f ? line.read (ch, base + mod) : dry;
+                    // eta': saturazione e meno stereo
+                    y = std::tanh (y * drive) * driveNorm;
+                    // tono: due poli
+                    lp1[ch] += (y - lp1[ch]) * tone;
+                    lp2[ch] += (lp1[ch] - lp2[ch]) * tone;
+                    y = hp.process (lp2[ch], ch);
+                    // fruscio
+                    const float nz = noise.next();
+                    hissLp[ch] += (nz - hissLp[ch]) * 0.35f;
+                    y += hissLp[ch] * hiss;
+                    // crepitio: piccoli impulsi che si spengono subito
+                    if (noise.uni() < clickRate)
+                        click[ch] = (noise.next() > 0.0f ? 1.0f : -1.0f) * (0.05f + 0.35f * noise.uni()) * (0.4f + 0.6f * crackle);
+                    y += click[ch];
+                    click[ch] *= 0.55f;
+                    w[ch] = y;
+                }
+                const float m = 0.5f * (w[0] + w[1]), s = 0.5f * (w[0] - w[1]) * (1.0f - age * 0.6f);
+                L[i] += mix * (m + s - L[i]);
+                R[i] += mix * (m - s - R[i]);
+            }
+        }
+
+    private:
+        double sr = 48000.0, wow = 0.0, flutter = 0.0;
+        DelayLine line;
+        Biquad hp;
+        float lastHp = -1.0f;
+        float lp1[2] {}, lp2[2] {}, hs[2] {}, click[2] {}, hissLp[2] {};
+        Noise noise;
+    };
+
+    class Limiter : public Effect
+    {
+    public:
+        void prepare (double sampleRate) override
+        {
+            sr = sampleRate;
+            look = juce::jmax (1, (int) (0.0015 * sr));
+            line.prepare (look + 4);
+            reset();
+        }
+        void reset() override    { line.clear(); env = 1.0f; smooth = 1.0f; }
+
+        void process (float* L, float* R, int n, const float* p, const Context&) override
+        {
+            const float in = juce::Decibels::decibelsToGain (p[0]);
+            const float ceiling = juce::Decibels::decibelsToGain (p[1]);
+            const float rel = 1.0f - std::exp (-1.0f / (p[2] * 0.001f * (float) sr));
+            const float att = 1.0f - std::exp (-1.0f / ((float) look / 2.5f));
+            for (int i = 0; i < n; ++i)
+            {
+                const float l = L[i] * in, r = R[i] * in;
+                const float peak = juce::jmax (std::abs (l), std::abs (r));
+                const float need = peak > ceiling ? ceiling / peak : 1.0f;
+                env = need < env ? need : env + (need - env) * rel;
+                smooth += (env - smooth) * (env < smooth ? att : 1.0f);
+                line.write (l, r);
+                const float g = smooth;
+                L[i] = juce::jlimit (-ceiling, ceiling, line.read (0, (float) look) * g);
+                R[i] = juce::jlimit (-ceiling, ceiling, line.read (1, (float) look) * g);
+            }
+        }
+
+        int getLookahead() const   { return look; }
+
+    private:
+        double sr = 48000.0;
+        int look = 64;
+        DelayLine line;
+        float env = 1.0f, smooth = 1.0f;
+    };
+
+    /** Pitch shifter a due "testine" che scorrono nella linea di ritardo e si scambiano in dissolvenza. */
+    struct PitchVoice
+    {
+        double phase = 0.0;
+        /** ratio = 2^(semitoni/12), window = grana in campioni. Ritorna i due canali spostati. */
+        inline void process (const DelayLine& line, float ratio, float window, float& outL, float& outR) noexcept
+        {
+            phase += (1.0 - ratio) / window;
+            phase -= std::floor (phase);
+            const float p1 = (float) phase, p2 = frac01 (phase + 0.5);
+            const float d1 = 2.0f + p1 * window, d2 = 2.0f + p2 * window;
+            const float g1 = std::sin (juce::MathConstants<float>::pi * p1), g2 = std::sin (juce::MathConstants<float>::pi * p2);
+            const float w1 = g1 * g1, w2 = g2 * g2;   // somma = 1
+            outL = line.read (0, d1) * w1 + line.read (0, d2) * w2;
+            outR = line.read (1, d1) * w1 + line.read (1, d2) * w2;
+        }
+    };
+
+    class PitchShift : public Effect
+    {
+    public:
+        void prepare (double sampleRate) override   { sr = sampleRate; line.prepare ((int) (sr * 0.13) + 8); reset(); }
+        void reset() override                        { line.clear(); main = {}; harm = {}; }
+
+        void process (float* L, float* R, int n, const float* p, const Context&) override
+        {
+            static constexpr float harmSemis[4] { 0.0f, -12.0f, 12.0f, 7.0f };
+            const int h = juce::jlimit (0, 3, juce::roundToInt (p[1]));
+            const float ratio = std::pow (2.0f, std::round (p[0]) / 12.0f);
+            const float hRatio = std::pow (2.0f, harmSemis[h] / 12.0f);
+            const float window = p[2] * 0.001f * (float) sr, mix = p[3];
+            for (int i = 0; i < n; ++i)
+            {
+                line.write (L[i], R[i]);
+                float l, r;
+                main.process (line, ratio, window, l, r);
+                if (h > 0)
+                {
+                    float hl, hr;
+                    harm.process (line, hRatio, window, hl, hr);
+                    l = (l + hl) * 0.7f; r = (r + hr) * 0.7f;
+                }
+                L[i] += mix * (l - L[i]);
+                R[i] += mix * (r - R[i]);
+            }
+        }
+
+    private:
+        double sr = 48000.0;
+        DelayLine line;
+        PitchVoice main, harm;
+    };
+
+    /** Trasformata di Hilbert a due catene di passa-tutto (coefficienti di Olli Niemitalo): due uscite a 90 gradi. */
+    struct Hilbert
+    {
+        static constexpr double k1[4] { 0.6923878, 0.9360654322959, 0.9882295226860, 0.9987488452737 };
+        static constexpr double k2[4] { 0.4021921162426, 0.8561710882420, 0.9722909545651, 0.9952884791278 };
+        float x1[4][2] {}, y1[4][2] {}, x2[4][2] {}, y2[4][2] {};   // [stadio][campione -1, -2]
+        float delayed = 0.0f;
+
+        void reset()    { *this = {}; }
+
+        static float stage (float a2, float x, float (&xs)[2], float (&ys)[2]) noexcept
+        {
+            const float y = a2 * (x + ys[1]) - xs[1];
+            xs[1] = xs[0]; xs[0] = x;
+            ys[1] = ys[0]; ys[0] = y;
+            return y;
+        }
+
+        void process (float x, float& re, float& im) noexcept
+        {
+            float a = x, b = x;
+            for (int s = 0; s < 4; ++s)
+            {
+                a = stage ((float) (k1[s] * k1[s]), a, x1[s], y1[s]);
+                b = stage ((float) (k2[s] * k2[s]), b, x2[s], y2[s]);
+            }
+            re = delayed; delayed = a;
+            im = b;
+        }
+    };
+
+    class RingMod : public Effect
+    {
+    public:
+        void prepare (double sampleRate) override   { sr = sampleRate; reset(); }
+        void reset() override                        { carrier = 0.0; lfo = 0.0; hil[0].reset(); hil[1].reset(); }
+
+        void process (float* L, float* R, int n, const float* p, const Context&) override
+        {
+            const bool shifter = p[0] > 0.5f;
+            const float mix = p[4];
+            for (int i = 0; i < n; ++i)
+            {
+                lfo += p[3] / sr; if (lfo >= 1.0) lfo -= 1.0;
+                const double f = p[1] * std::pow (2.0, (double) (p[2] * 2.0f * perf::fastSin ((float) lfo)));
+                carrier += f / sr; carrier -= std::floor (carrier);
+                const float s = perf::fastSin ((float) carrier), c = perf::fastSin ((float) carrier + 0.25f);
+                for (int ch = 0; ch < 2; ++ch)
+                {
+                    float& x = ch == 0 ? L[i] : R[i];
+                    float y;
+                    if (shifter)
+                    {
+                        float re, im;
+                        hil[ch].process (x, re, im);
+                        y = re * c - im * s;
+                    }
+                    else
+                        y = x * (ch == 0 ? s : perf::fastSin ((float) carrier + 0.03f));
+                    x += mix * (y - x);
+                }
+            }
+        }
+
+    private:
+        double sr = 48000.0, carrier = 0.0, lfo = 0.0;
+        Hilbert hil[2];
+    };
+
+    class Shimmer : public Effect
+    {
+    public:
+        void prepare (double sampleRate) override
+        {
+            sr = sampleRate;
+            reverb.setSampleRate (sr);
+            line.prepare ((int) (sr * 0.1) + 8);
+            reset();
+        }
+        void reset() override
+        {
+            reverb.reset(); line.clear(); voice = {};
+            for (auto& b : back) std::fill (std::begin (b), std::end (b), 0.0f);
+            hpz[0] = hpz[1] = hpx[0] = hpx[1] = 0.0f;
+        }
+
+        void process (float* L, float* R, int n, const float* p, const Context&) override
+        {
+            juce::Reverb::Parameters rp;
+            rp.roomSize = 0.55f + p[0] * 0.43f; rp.damping = p[2]; rp.width = 1.0f;
+            rp.wetLevel = 1.0f; rp.dryLevel = 0.0f;
+            if (rp.roomSize != last.roomSize || rp.damping != last.damping)
+            {
+                reverb.setParameters (rp);
+                last = rp;
+            }
+            const float shimmer = p[1] * 0.55f, mix = p[3];
+            const float window = 0.06f * (float) sr;
+            const float hpc = 1.0f - std::exp (-juce::MathConstants<float>::twoPi * 250.0f / (float) sr);
+            for (int start = 0; start < n; start += chunk)
+            {
+                const int m = juce::jmin (chunk, n - start);
+                float wl[chunk], wr[chunk];
+                for (int i = 0; i < m; ++i)
+                {
+                    wl[i] = (L[start + i] + back[0][i] * shimmer) * 0.5f;
+                    wr[i] = (R[start + i] + back[1][i] * shimmer) * 0.5f;
+                }
+                reverb.processStereo (wl, wr, m);
+                // la coda passa dal pitch shifter (+1 ottava) e torna dentro al prossimo pezzo
+                for (int i = 0; i < m; ++i)
+                {
+                    line.write (wl[i], wr[i]);
+                    float ul, ur;
+                    voice.process (line, 2.0f, window, ul, ur);
+                    hpz[0] += (ul - hpz[0]) * hpc;   // via i bassi dal giro
+                    hpz[1] += (ur - hpz[1]) * hpc;
+                    back[0][i] = std::tanh (ul - hpz[0]);
+                    back[1][i] = std::tanh (ur - hpz[1]);
+                    L[start + i] = L[start + i] * (1.0f - mix * 0.5f) + wl[i] * mix * 1.4f;
+                    R[start + i] = R[start + i] * (1.0f - mix * 0.5f) + wr[i] * mix * 1.4f;
+                }
+                for (int i = m; i < chunk; ++i) back[0][i] = back[1][i] = 0.0f;
+            }
+        }
+
+    private:
+        static constexpr int chunk = 32;
+        double sr = 48000.0;
+        juce::Reverb reverb;
+        juce::Reverb::Parameters last;
+        DelayLine line;
+        PitchVoice voice;
+        float back[2][chunk] {};
+        float hpz[2] {}, hpx[2] {};
+    };
+
     inline std::unique_ptr<Effect> createEffect (int type)
     {
         switch (type)
@@ -1028,6 +1778,18 @@ namespace mixer
             case glitch:     return std::make_unique<Glitch>();
             case trash:      return std::make_unique<Trash>();
             case vowel:      return std::make_unique<Vowel>();
+            case gate:       return std::make_unique<Gate>();
+            case tremolo:    return std::make_unique<Tremolo>();
+            case phaser:     return std::make_unique<Phaser>();
+            case flanger:    return std::make_unique<Flanger>();
+            case peq:        return std::make_unique<ParamEq>();
+            case transient:  return std::make_unique<Transient>();
+            case exciter:    return std::make_unique<Exciter>();
+            case vinyl:      return std::make_unique<Vinyl>();
+            case limiter:    return std::make_unique<Limiter>();
+            case pitch:      return std::make_unique<PitchShift>();
+            case ringmod:    return std::make_unique<RingMod>();
+            case shimmer:    return std::make_unique<Shimmer>();
             default:         return nullptr;
         }
     }
