@@ -729,13 +729,15 @@ public:
 
         // Destra: EQ in alto, parametri sotto
         eqCaption = right.removeFromTop (16).toFloat();
-        auto eq = right.removeFromTop (juce::jlimit (70, 110, right.getHeight() * 2 / 5));
+        // Schermo basso (telefono in orizzontale): l'EQ della traccia si stringe, piu' spazio alle manopole dell'effetto
+        const bool shortScreen = right.getHeight() < 330;
+        auto eq = right.removeFromTop (shortScreen ? 58 : juce::jlimit (70, 110, right.getHeight() * 2 / 5));
         const int ew = eq.getWidth() / 4;
         for (auto* k : eqKnobs)
             k->setBounds (eq.removeFromLeft (ew).reduced (2, 0));
-        right.removeFromTop (8);
+        right.removeFromTop (shortScreen ? 4 : 8);
         paramsCaption = right.removeFromTop (16).toFloat();
-        detailArea = right.removeFromTop (16).toFloat();
+        detailArea = shortScreen ? juce::Rectangle<float>() : right.removeFromTop (16).toFloat();
         paramsArea = right;
         layoutParams();
     }

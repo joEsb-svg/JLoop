@@ -105,6 +105,25 @@ public:
         g.drawFittedText (when, summaryArea.toNearestInt(), juce::Justification::topLeft, 3);
     }
 
+    /** "Dalla battuta  [-] N [+]": in una riga se c'e' spazio, altrimenti la scritta sopra e i tasti larghi sotto. */
+    void layoutStepper (juce::Rectangle<int>& area)
+    {
+        if (area.getWidth() >= 270)
+        {
+            auto row = area.removeFromTop (44);
+            startLabel = row.removeFromLeft (110).toFloat();
+            minusButton.setBounds (row.removeFromLeft (52).reduced (2));
+            startValue = row.removeFromLeft (60).toFloat();
+            plusButton.setBounds (row.removeFromLeft (52).reduced (2));
+            return;
+        }
+        startLabel = area.removeFromTop (20).toFloat();
+        auto row = area.removeFromTop (44);
+        minusButton.setBounds (row.removeFromLeft (row.getWidth() / 3).reduced (2));
+        plusButton.setBounds (row.removeFromRight (row.getWidth() / 2).reduced (2));
+        startValue = row.toFloat();
+    }
+
     void resized() override
     {
         auto r = getLocalBounds().reduced (8, 6);
@@ -125,16 +144,17 @@ public:
         }
         else
         {
-            fxArea = r.removeFromLeft (r.getWidth() * 45 / 100);
+            const bool compact = r.getWidth() < 1100;   // telefono in orizzontale: piu' spazio a "Quando"
+            fxArea = r.removeFromLeft (r.getWidth() * (compact ? 38 : 45) / 100);
             r.removeFromLeft (10);
-            whereArea = r.removeFromLeft (r.getWidth() / 2);
+            whereArea = r.removeFromLeft (r.getWidth() * (compact ? 44 : 50) / 100);
             r.removeFromLeft (10);
             whenArea = r;
         }
 
         fxCaption = fxArea.removeFromTop (18).toFloat();
         fxView.setBounds (fxArea);
-        fxList.setLayout (1, 50);
+        fxList.setLayout (1, getHeight() < 420 ? 44 : 50);
         fxList.setVisibleWidth (fxArea.getWidth() - 8);
 
         whereCaption = whereArea.removeFromTop (18).toFloat();
@@ -143,11 +163,7 @@ public:
         whereList.setVisibleWidth (whereArea.getWidth() - 8);
 
         whenCaption = whenArea.removeFromTop (18).toFloat();
-        auto row = whenArea.removeFromTop (44);
-        startLabel = row.removeFromLeft (100).toFloat();
-        minusButton.setBounds (row.removeFromLeft (44).reduced (2));
-        startValue = row.removeFromLeft (56).toFloat();
-        plusButton.setBounds (row.removeFromLeft (44).reduced (2));
+        layoutStepper (whenArea);
         whenArea.removeFromTop (6);
         lengthCaption = whenArea.removeFromTop (16).toFloat();
         lengthSwitch.setBounds (whenArea.removeFromTop (34).withWidth (juce::jmin (whenArea.getWidth(), 330)));

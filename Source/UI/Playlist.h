@@ -902,25 +902,35 @@ public:
         auto bar = r.removeFromTop (32);
         const bool narrow = getWidth() < 520;
 
-        closeButton.setBounds (bar.removeFromRight (narrow ? 64 : 76).reduced (0, 2));
+        const bool autoMode = modeSwitch.getSelected() == 1;
+        closeButton.setBounds (bar.removeFromRight (narrow ? 60 : 76).reduced (0, 2));
         bar.removeFromRight (6);
-        clearButton.setBounds (bar.removeFromRight (narrow ? 60 : 70).reduced (0, 2));
-        bar.removeFromRight (8);
-        zoomIn.setBounds (bar.removeFromRight (34).reduced (0, 2));
+        if (! autoMode)   // "Svuota" c'e' solo per i pattern: nelle automazioni lo spazio va ai tasti
+        {
+            clearButton.setBounds (bar.removeFromRight (narrow ? 60 : 70).reduced (0, 2));
+            bar.removeFromRight (8);
+        }
+        zoomIn.setBounds (bar.removeFromRight (narrow ? 30 : 34).reduced (0, 2));
         bar.removeFromRight (3);
-        zoomOut.setBounds (bar.removeFromRight (34).reduced (0, 2));
-        bar.removeFromRight (8);
+        zoomOut.setBounds (bar.removeFromRight (narrow ? 30 : 34).reduced (0, 2));
+        bar.removeFromRight (narrow ? 6 : 8);
 
         modeSwitch.setOptions (narrow ? juce::StringArray { "Clip", "Auto" } : juce::StringArray { "Pattern", "Automazioni" });
         titleArea = bar.removeFromLeft (narrow ? 0 : 80).toFloat();
-        modeSwitch.setBounds (bar.removeFromLeft (juce::jmin (narrow ? 150 : 210, bar.getWidth() / 2)).reduced (0, 2));
-        bar.removeFromLeft (8);
-        const auto right = bar.removeFromRight (juce::jmin (150, bar.getWidth()));
-        brushButton.setBounds (right.reduced (0, 2));
-        addLaneButton.setBounds (right.reduced (0, 2));
-        bar.removeFromRight (6);
-        fxButton.setButtonText (narrow ? "Effetti" : "Effetti pronti");
-        fxButton.setBounds (bar.removeFromRight (juce::jmin (150, bar.getWidth())).reduced (0, 2));
+        modeSwitch.setBounds (bar.removeFromLeft (juce::jmin (narrow ? (autoMode ? 96 : 150) : 210, bar.getWidth() / 2)).reduced (0, 2));
+        bar.removeFromLeft (narrow ? 6 : 8);
+        if (autoMode)
+        {
+            // Telefono: i due tasti si dividono lo spazio che resta
+            const int each = juce::jmin (150, (bar.getWidth() - 6) / 2);
+            addLaneButton.setButtonText (narrow ? "+ Nuova" : "+ Automazione");
+            addLaneButton.setBounds (bar.removeFromRight (each).reduced (0, 2));
+            bar.removeFromRight (6);
+            fxButton.setButtonText (narrow ? "Effetti" : "Effetti pronti");
+            fxButton.setBounds (bar.removeFromRight (each).reduced (0, 2));
+        }
+        else
+            brushButton.setBounds (bar.removeFromRight (juce::jmin (150, bar.getWidth())).reduced (0, 2));
         brushCaption = bar.toFloat().withTrimmedRight (6.0f);
         if (narrow) brushCaption = {};
 
@@ -945,6 +955,7 @@ private:
         picker.setVisible (false);
         fxPanel.setVisible (false);
         shapePanel.setVisible (false);
+        resized();
         repaint();
     }
 

@@ -112,6 +112,25 @@ public:
         g.drawText (info, previewArea.reduced (8.0f, 4.0f), juce::Justification::topLeft, true);
     }
 
+    /** "Dalla battuta  [-] N [+]": in una riga se c'e' spazio, altrimenti la scritta sopra e i tasti larghi sotto. */
+    void layoutStepper (juce::Rectangle<int>& area)
+    {
+        if (area.getWidth() >= 270)
+        {
+            auto row = area.removeFromTop (44);
+            startLabel = row.removeFromLeft (110).toFloat();
+            minusButton.setBounds (row.removeFromLeft (52).reduced (2));
+            startValue = row.removeFromLeft (60).toFloat();
+            plusButton.setBounds (row.removeFromLeft (52).reduced (2));
+            return;
+        }
+        startLabel = area.removeFromTop (20).toFloat();
+        auto row = area.removeFromTop (44);
+        minusButton.setBounds (row.removeFromLeft (row.getWidth() / 3).reduced (2));
+        plusButton.setBounds (row.removeFromRight (row.getWidth() / 2).reduced (2));
+        startValue = row.toFloat();
+    }
+
     void resized() override
     {
         auto r = getLocalBounds().reduced (8, 6);
@@ -131,22 +150,31 @@ public:
         rateCaption = right.removeFromTop (16).toFloat();
         rateSwitch.setBounds (right.removeFromTop (32));
         right.removeFromTop (6);
-        auto row = right.removeFromTop (40);
-        startLabel = row.removeFromLeft (100).toFloat();
-        minusButton.setBounds (row.removeFromLeft (40).reduced (2));
-        startValue = row.removeFromLeft (50).toFloat();
-        plusButton.setBounds (row.removeFromLeft (40).reduced (2));
+        layoutStepper (right);
         right.removeFromTop (4);
         lengthCaption = right.removeFromTop (16).toFloat();
         lengthSwitch.setBounds (right.removeFromTop (32));
         right.removeFromTop (6);
         rangeCaption = right.removeFromTop (16).toFloat();
-        auto lowRow = right.removeFromTop (28);
-        lowLabel = lowRow.removeFromLeft (lowRow.getWidth() / 2).toFloat();
-        lowSlider.setBounds (lowRow);
-        auto highRow = right.removeFromTop (28);
-        highLabel = highRow.removeFromLeft (highRow.getWidth() / 2).toFloat();
-        highSlider.setBounds (highRow);
+        if (right.getHeight() < 170)
+        {
+            // poco spazio (telefono in orizzontale): basso e alto affiancati, la scritta sopra
+            auto row = right.removeFromTop (44);
+            auto lo = row.removeFromLeft (row.getWidth() / 2).withTrimmedRight (6), hi = row.withTrimmedLeft (6);
+            lowLabel = lo.removeFromTop (16).toFloat();
+            lowSlider.setBounds (lo);
+            highLabel = hi.removeFromTop (16).toFloat();
+            highSlider.setBounds (hi);
+        }
+        else
+        {
+            auto lowRow = right.removeFromTop (28);
+            lowLabel = lowRow.removeFromLeft (lowRow.getWidth() / 2).toFloat();
+            lowSlider.setBounds (lowRow);
+            auto highRow = right.removeFromTop (28);
+            highLabel = highRow.removeFromLeft (highRow.getWidth() / 2).toFloat();
+            highSlider.setBounds (highRow);
+        }
         right.removeFromTop (6);
         applyButton.setBounds (right.removeFromBottom (44).reduced (0, 2));
         right.removeFromBottom (6);

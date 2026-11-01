@@ -16,6 +16,9 @@ Gli aggiornamenti si installano sopra la versione precedente.
 
 ## Stato attuale (v0.68)
 
+**0.68.1** (telefono): "Effetti pronti" e "Forme e onde" si adattano allo schermo (tasti - / + sempre visibili),
+tasti "Effetti" e "+ Nuova" nella playlist in verticale, manopole degli effetti piu' grandi col telefono in orizzontale.
+
 **Novita' della 0.68**: channel rack, nuova corsia "FX" accanto a PAN: un valore per ogni step di
 Filtro (anche sui synth), Riverbero e Delay (quanto manda). Tocca/trascina per alzare o abbassare, doppio tocco
 = torna come il canale (linea tratteggiata). Salvati nel progetto, copiati con "Copia riga".
