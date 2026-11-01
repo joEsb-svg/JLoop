@@ -86,6 +86,7 @@ public:
     /** Durata (senza coda) in secondi, per mostrarla prima di esportare. */
     double getMusicSeconds() const
     {
+        if (settings.song) return engine->getSongSeconds (getNumSteps());
         const double secondsPerStep = 60.0 / engine->getBpm() / 4.0;
         return getNumSteps() * secondsPerStep;
     }
@@ -121,7 +122,7 @@ private:
             return settings.song ? "La playlist e' vuota." : "Il pattern e' vuoto.";
 
         const double sr = settings.sampleRate;
-        const auto musicSamples = (juce::int64) std::llround (steps * sr * 60.0 / engine->getBpm() / 4.0);
+        const auto musicSamples = (juce::int64) std::llround ((settings.song ? engine->getSongSeconds (steps) : steps * 60.0 / engine->getBpm() / 4.0) * sr);
         const auto tailSamples  = (juce::int64) (settings.tailSeconds * sr);
         const auto total = musicSamples + tailSamples;
 

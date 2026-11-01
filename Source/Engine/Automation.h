@@ -20,24 +20,32 @@ namespace automation
     inline constexpr int maxLanes  = 32;
     inline constexpr int maxPoints = 256;
 
-    enum Kind { none = 0, master, channelParam, trackParam, effectParam, instrumentParam };
+    enum Kind { none = 0, master, channelParam, trackParam, effectParam, instrumentParam, song };
+
+    // song: b = quale (tempo della canzone, swing)
+    enum SongParam { sgTempo = 0, sgSwing, numSongParams };
+    inline constexpr float tempoMin = 60.0f, tempoMax = 200.0f;
+    inline float tempoFromValue (float v)   { return tempoMin + (tempoMax - tempoMin) * v; }
+    inline float valueFromTempo (double b)  { return juce::jlimit (0.0f, 1.0f, (float) ((b - tempoMin) / (tempoMax - tempoMin))); }
+    // effectParam con c = bypassParam: effetto acceso/spento
+    inline constexpr int bypassParam = 100;
 
     // channelParam: a = canale, b = quale
-    enum ChannelParam { chVolume = 0, chPan, chFilter, chReverb, chDelay, chPitch, numChannelParams };
+    enum ChannelParam { chVolume = 0, chPan, chFilter, chReverb, chDelay, chPitch, chOn, numChannelParams };
     // trackParam: a = traccia del mixer, b = quale
-    enum TrackParam { trVolume = 0, trPan, trEqLow, trEqMid, trEqHigh, numTrackParams };
+    enum TrackParam { trVolume = 0, trPan, trEqLow, trEqMid, trEqHigh, trOn, numTrackParams };
     // effectParam: a = traccia, b = slot, c = parametro
     // instrumentParam: a = canale, b = indice del parametro dello strumento
 
     inline const char* channelParamName (int i)
     {
-        static const char* names[] = { "Volume", "Panorama", "Filtro", "Riverbero", "Delay", "Intonazione" };
+        static const char* names[] = { "Volume", "Panorama", "Filtro", "Riverbero", "Delay", "Intonazione", "Acceso / muto" };
         return names[juce::jlimit (0, numChannelParams - 1, i)];
     }
 
     inline const char* trackParamName (int i)
     {
-        static const char* names[] = { "Volume", "Panorama", "EQ bassi", "EQ medi", "EQ alti" };
+        static const char* names[] = { "Volume", "Panorama", "EQ bassi", "EQ medi", "EQ alti", "Acceso / muto" };
         return names[juce::jlimit (0, numTrackParams - 1, i)];
     }
 

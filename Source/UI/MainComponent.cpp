@@ -1062,7 +1062,8 @@ void MainComponent::timerCallback()
         else if (retimePending && nowMs - retimeChangedAt > 700.0)
         {
             retimePending = false;
-            if (! engine.sampleRecipes.empty() && riser::retimeAll (engine, sampleStore) > 0)
+            // (con l'automazione del tempo il BPM cambia da solo mentre suona: i riser restano come sono)
+            if (! engine.sampleRecipes.empty() && engine.getTempoLane() < 0 && riser::retimeAll (engine, sampleStore) > 0)
                 rebuildRows();
         }
     }

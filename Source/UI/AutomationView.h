@@ -31,6 +31,7 @@ namespace AutomationText
         switch (t.kind)
         {
             case master:          return "Master";
+            case song:            return "Canzone";
             case channelParam:
             case instrumentParam: return t.a < e.getNumChannels() ? e.getChannel (t.a).name : juce::String ("Canale");
             case trackParam:
@@ -45,12 +46,14 @@ namespace AutomationText
         switch (t.kind)
         {
             case master:       return "Volume";
+            case song:         return t.b == sgTempo ? "Tempo (BPM)" : "Swing";
             case channelParam: return channelParamName (t.b);
             case trackParam:   return trackParamName (t.b);
             case effectParam:
             {
                 const auto& slot = e.getTrack (t.a).slots[(size_t) juce::jlimit (0, mixer::numSlots - 1, t.b)];
                 const auto& inf = mixer::info (slot.type.load());
+                if (t.c == bypassParam) return juce::String (inf.name) + ": acceso / spento";
                 return juce::String (inf.name) + ": " + (t.c < inf.numParams ? juce::String (inf.params[(size_t) t.c].name) : juce::String ("?"));
             }
             case instrumentParam:
@@ -68,9 +71,11 @@ namespace AutomationText
         switch (t.kind)
         {
             case master: return dbText (volumeGain (v, 3.5f));
+            case song:   return t.b == sgTempo ? juce::String (tempoFromValue (v), 1) + " BPM" : juce::String (juce::roundToInt (v * 100.0f)) + "%";
             case channelParam:
                 switch (t.b)
                 {
+                    case chOn:     return v < 0.5f ? "Muto" : "Acceso";
                     case chVolume: return dbText (volumeGain (v, 0.0f));
                     case chPan:    return panText (v);
                     case chPitch:  return juce::String (-12.0f + 24.0f * v, 1) + " st";
@@ -79,6 +84,7 @@ namespace AutomationText
             case trackParam:
                 switch (t.b)
                 {
+                    case trOn:     return v < 0.5f ? "Muto" : "Acceso";
                     case trVolume: return dbText (volumeGain (v, 4.0f));
                     case trPan:    return panText (v);
                     default:       return juce::String (-15.0f + 30.0f * v, 1) + " dB";
@@ -87,6 +93,7 @@ namespace AutomationText
             {
                 const auto& slot = e.getTrack (t.a).slots[(size_t) juce::jlimit (0, mixer::numSlots - 1, t.b)];
                 const auto& inf = mixer::info (slot.type.load());
+                if (t.c == bypassParam) return v < 0.5f ? "Spento" : "Acceso";
                 if (t.c < inf.numParams)
                     return mixer::formatValue (inf.params[(size_t) t.c], mixer::fromNormalised (inf.params[(size_t) t.c], v));
                 return {};
@@ -110,6 +117,7 @@ namespace AutomationText
         switch (t.kind)
         {
             case master: return volumeNorm (e.getMasterVolume(), 3.5f);
+            case song:   return t.b == sgTempo ? valueFromTempo (e.getBpm()) : e.getSwing();
             case channelParam:
             {
                 auto& ch = e.getChannel (t.a);
@@ -121,6 +129,7 @@ namespace AutomationText
                     case chReverb: return ch.reverb.load();
                     case chDelay:  return ch.delay.load();
                     case chPitch:  return (ch.pitch.load() + 12.0f) / 24.0f;
+                    case chOn:     return ch.muted.load() ? 0.0f : 1.0f;
                     default:       return 0.5f;
                 }
             }
@@ -134,6 +143,7 @@ namespace AutomationText
                     case trEqLow:  return (tr.eqLow.load() + 15.0f) / 30.0f;
                     case trEqMid:  return (tr.eqMid.load() + 15.0f) / 30.0f;
                     case trEqHigh: return (tr.eqHigh.load() + 15.0f) / 30.0f;
+                    case trOn:     return tr.muted.load() ? 0.0f : 1.0f;
                     default:       return 0.5f;
                 }
             }
@@ -141,6 +151,7 @@ namespace AutomationText
             {
                 auto& slot = e.getTrack (t.a).slots[(size_t) juce::jlimit (0, mixer::numSlots - 1, t.b)];
                 const auto& inf = mixer::info (slot.type.load());
+                if (t.c == bypassParam) return slot.bypass.load() ? 0.0f : 1.0f;
                 return t.c < inf.numParams ? mixer::toNormalised (inf.params[(size_t) t.c], slot.params[(size_t) t.c].load()) : 0.5f;
             }
             case instrumentParam:
@@ -150,6 +161,14 @@ namespace AutomationText
                 return 0.5f;
             default: return 0.5f;
         }
+    }
+
+    /** Bersagli acceso/spento: i punti stanno solo in alto (acceso) o in basso (spento). */
+    inline bool isBinary (const automation::Target& t)
+    {
+        using namespace automation;
+        return (t.kind == channelParam && t.b == chOn) || (t.kind == trackParam && t.b == trOn)
+            || (t.kind == effectParam && t.c == bypassParam);
     }
 
     inline juce::Colour colour (SequencerEngine& e, const automation::Target& t)
@@ -312,7 +331,7 @@ public:
             if (dragPoint > 0)                     tick = juce::jmax (tick, pts[(size_t) dragPoint - 1].tick + 1);
             if (dragPoint + 1 < (int) pts.size())  tick = juce::jmin (tick, pts[(size_t) dragPoint + 1].tick - 1);
             pts[(size_t) dragPoint].tick = tick;
-            pts[(size_t) dragPoint].value = valueAt (e.position.y, area);
+            pts[(size_t) dragPoint].value = snap (dragLane, valueAt (e.position.y, area));
             engine.setLanePoints (dragLane, pts);
             dragValueText = AutomationText::value (engine, engine.getLane (dragLane).target(), pts[(size_t) dragPoint].value);
             repaint();
@@ -370,7 +389,17 @@ public:
         else if (dragMode == DragMode::curve && dragPoint >= 0 && dragPoint < (int) pts.size())
             pts[(size_t) dragPoint].curve = 0.0f;  // tocco sulla maniglia: il tratto torna dritto
         else
-            pts.push_back ({ tickAt (e.position.x), valueAt (e.position.y, laneBounds (laneIndex (dragLane))) });
+        {
+            const int tick = tickAt (e.position.x);
+            const float v = snap (dragLane, valueAt (e.position.y, laneBounds (laneIndex (dragLane))));
+            if (AutomationText::isBinary (engine.getLane (dragLane).target()))
+            {
+                // acceso/spento: il cambio e' netto (un punto subito prima col valore di prima)
+                const float before = engine.getLane (dragLane).valueAt (tick - 1);
+                if (before >= 0.0f && tick > 0) pts.push_back ({ tick - 1, before >= 0.5f ? 1.0f : 0.0f });
+            }
+            pts.push_back ({ tick, v });
+        }
         engine.setLanePoints (dragLane, pts);
         if (onEdit) onEdit();
         repaint();
@@ -445,6 +474,11 @@ private:
     {
         const auto a = curveArea (lane);
         return { xForTick (p.tick), a.getBottom() - p.value * a.getHeight() };
+    }
+
+    float snap (int lane, float v) const
+    {
+        return AutomationText::isBinary (engine.getLane (lane).target()) ? (v >= 0.5f ? 1.0f : 0.0f) : v;
     }
 
     /** Maniglia della curvatura, a meta' del tratto i -> i+1 (solo se il tratto e' abbastanza largo e non piatto). */
@@ -730,6 +764,8 @@ public:
         std::vector<TileList::Item> items;
         sources.push_back ({ automation::master, 0 });
         items.push_back ({ "Master", "Volume generale", Theme::accent, true });
+        sources.push_back ({ automation::song, 0 });
+        items.push_back ({ "Canzone", "Tempo (BPM) e swing", Theme::cyan, true });
         for (int c = 0; c < engine.getNumChannels(); ++c)
         {
             sources.push_back ({ automation::channelParam, c });
@@ -803,6 +839,11 @@ private:
 
         if (src.kind == automation::master)
             add ({ automation::master, 0, 0, 0 }, {});
+        else if (src.kind == automation::song)
+        {
+            add ({ automation::song, 0, automation::sgTempo, 0 }, "Il tempo cambia nella canzone");
+            add ({ automation::song, 0, automation::sgSwing, 0 }, "Piu' o meno swing");
+        }
         else if (src.kind == automation::channelParam)
         {
             for (int p = 0; p < automation::numChannelParams; ++p)
@@ -816,12 +857,14 @@ private:
         {
             const int t = src.index;
             for (int p = 0; p < automation::numTrackParams; ++p)
-                if (t > 0 || p >= automation::trEqLow)
+                if (t > 0 || (p >= automation::trEqLow && p != automation::trOn))
                     add ({ automation::trackParam, t, p, 0 }, "Traccia");
             for (int s = 0; s < mixer::numSlots; ++s)
             {
                 const int type = engine.getTrack (t).slots[(size_t) s].type.load();
                 const auto& inf = mixer::info (type);
+                if (type != mixer::none)
+                    add ({ automation::effectParam, t, s, automation::bypassParam }, "Effetto " + juce::String (s + 1));
                 for (int p = 0; p < inf.numParams; ++p)
                     if (inf.params[(size_t) p].unit != mixer::Unit::track && ! (type == mixer::gate && p == 0))
                         add ({ automation::effectParam, t, s, p }, "Effetto " + juce::String (s + 1));

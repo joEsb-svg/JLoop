@@ -14,7 +14,11 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.66)
+## Stato attuale (v0.67)
+
+**Novita' della 0.67** (automazioni, nuove cose da muovere):
+- Canzone: tempo (BPM 60-200, anche l'export segue i cambi di tempo) e swing
+- Canali e tracce del mixer: acceso / muto; effetti del mixer: acceso / spento (i punti scattano su/giu')
 
 **Novita' della 0.66** (automazioni):
 - Tratti curvi: trascina su/giu' il rombo a meta' di un tratto (tocca il rombo per tornare dritto)

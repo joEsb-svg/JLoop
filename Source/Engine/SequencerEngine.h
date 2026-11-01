@@ -807,6 +807,30 @@ public:
 
     int getSongStartBar() const                 { return songStartBar.load(); }
 
+    /** La corsia del tempo della canzone, se c'e' ed e' accesa (-1 = no). */
+    int getTempoLane() const
+    {
+        for (int i = 0; i < automation::maxLanes; ++i)
+        {
+            const auto& l = getLane (i);
+            if (l.kind.load() == automation::song && l.b.load() == automation::sgTempo && l.enabled.load() && l.count.load() > 0)
+                return i;
+        }
+        return -1;
+    }
+
+    /** Durata in secondi dei primi 'steps' sedicesimi della canzone, seguendo l'automazione del tempo. */
+    double getSongSeconds (int steps) const
+    {
+        const int lane = getTempoLane();
+        if (lane < 0) return steps * 60.0 / getBpm() / 4.0;
+        double sec = 0.0;
+        const auto& l = getLane (lane);
+        for (int s = 0; s < steps; ++s)
+            sec += 60.0 / juce::jlimit (40.0, 240.0, (double) automation::tempoFromValue (l.valueAt ((s + 0.5) * ticksPerStep))) / 4.0;
+        return sec;
+    }
+
     /** Step della canzone che sta suonando (-1 se fermo o in modalita' pattern). */
     int getSongStep() const                     { return playing.load() && songMode.load() ? currentSongStep.load() : -1; }
 
@@ -2150,6 +2174,16 @@ private:
 
             if (kind == master)
                 masterVolume.store (volumeGain (v, 3.5f));
+            else if (kind == song)
+            {
+                if (a == 0 && b == sgTempo)
+                {
+                    const double nb = std::round (tempoFromValue (v) * 100.0) / 100.0;
+                    if (std::abs (nb - bpm.load()) > 0.004) bpm.store (nb);
+                }
+                else if (b == sgSwing)
+                    swing.store (v);
+            }
             else if (kind == channelParam && a >= 0 && a < numActive)
             {
                 auto& ch = channels[(size_t) a];
@@ -2160,6 +2194,7 @@ private:
                     case chFilter: ch.filter.store (v); break;
                     case chReverb: ch.reverb.store (v); break;
                     case chDelay:  ch.delay.store (v); break;
+                    case chOn:     ch.muted.store (v < 0.5f); break;
                     case chPitch:
                     {
                         const float semis = std::round ((-12.0f + 24.0f * v) * 10.0f) / 10.0f;
@@ -2179,6 +2214,7 @@ private:
                     case trEqLow:  tr.eqLow.store (-15.0f + 30.0f * v); break;
                     case trEqMid:  tr.eqMid.store (-15.0f + 30.0f * v); break;
                     case trEqHigh: tr.eqHigh.store (-15.0f + 30.0f * v); break;
+                    case trOn:     tr.muted.store (v < 0.5f); break;
                     default: break;
                 }
             }
@@ -2187,7 +2223,9 @@ private:
                 auto& slot = tracks[(size_t) a].slots[(size_t) b];
                 const auto& inf = mixer::info (slot.type.load());
                 const int p = l.c.load();
-                if (p >= 0 && p < inf.numParams)
+                if (p == bypassParam)
+                    slot.bypass.store (v < 0.5f);
+                else if (p >= 0 && p < inf.numParams)
                     slot.params[(size_t) p].store (mixer::fromNormalised (inf.params[(size_t) p], v));
             }
             else if (kind == instrumentParam && a >= 0 && a < numActive)
