@@ -2570,6 +2570,25 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
         playlist.showAutomationForTest();
     }
 
+    if (const int i = args.indexOf ("--autoshape-apply"); i >= 0)   // test: forma disegnata nella prima corsia (forma, giro in tick)
+    {
+        int lane = 0;
+        while (lane < automation::maxLanes && ! engine.isLaneUsed (lane)) ++lane;
+        if (lane < automation::maxLanes)
+            AutomationView::replaceRange (engine, lane, 0, 8 * 192,
+                                          automation::shapes::make (args[i + 1].getIntValue(), 0, 8 * 192, args[i + 2].getIntValue(), 0.1f, 0.9f));
+        openPlaylist();
+        playlist.showAutomationForTest();
+    }
+    else if (const int j = args.indexOf ("--autoshape"); j >= 0)   // test: pannello forme e onde sulla prima corsia (forma)
+    {
+        openPlaylist();
+        playlist.showAutomationForTest();
+        int lane = 0;
+        while (lane < automation::maxLanes && ! engine.isLaneUsed (lane)) ++lane;
+        playlist.showShapePanelForTest (juce::jmin (lane, automation::maxLanes - 1), args[j + 1].getIntValue());
+    }
+
     if (const int i = args.indexOf ("--autofx"); i >= 0)   // test: pannello degli effetti pronti (effetto, dove)
     {
         openPlaylist();

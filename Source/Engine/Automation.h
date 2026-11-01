@@ -51,7 +51,22 @@ namespace automation
     {
         int tick = 0;        // 12 tick per step, 192 per battuta
         float value = 0.5f;  // 0..1
+        float curve = 0.0f;  // curvatura del tratto che parte da questo punto: -1 (veloce subito) .. 0 (dritto) .. 1 (lento all'inizio)
     };
+
+    /** Il tratto curvo: t = 0..1 del tempo -> 0..1 della strada fatta. */
+    inline float shape (float t, float curve) noexcept
+    {
+        if (std::abs (curve) < 0.001f) return t;
+        return std::pow (t, std::exp2 (curve * 3.0f));
+    }
+
+    /** La curvatura che fa passare il tratto, a meta' del tempo, per la frazione 'mid' della strada (per la maniglia). */
+    inline float curveForMid (float mid) noexcept
+    {
+        mid = juce::jlimit (0.01f, 0.99f, mid);
+        return juce::jlimit (-1.0f, 1.0f, std::log2 (std::log (mid) / std::log (0.5f)) / 3.0f);
+    }
 
     inline uint32_t pack (const Point& p)
     {
@@ -79,6 +94,7 @@ namespace automation
         std::atomic<bool> enabled { true };
         std::atomic<int> count { 0 };
         std::array<std::atomic<uint32_t>, maxPoints> points {};
+        std::array<std::atomic<float>, maxPoints> curves {};
 
         Target target() const   { return { kind.load(), a.load(), b.load(), c.load() }; }
         void setTarget (const Target& t)    { a.store (t.a); b.store (t.b); c.store (t.c); kind.store (t.kind); }
@@ -99,10 +115,93 @@ namespace automation
                 {
                     const auto q = unpack (points[(size_t) i - 1].load());
                     const double span = juce::jmax (1, p.tick - q.tick);
-                    return q.value + (p.value - q.value) * (float) ((tick - q.tick) / span);
+                    const float t = shape ((float) ((tick - q.tick) / span), curves[(size_t) i - 1].load());
+                    return q.value + (p.value - q.value) * t;
                 }
             }
             return unpack (points[(size_t) n - 1].load()).value;
         }
     };
+
+    //==========================================================================
+    /** Forme e onde pronte per una corsia. */
+    namespace shapes
+    {
+        enum Id { rampUp = 0, rampDown, upDown, rampUpCurve, rampDownCurve,
+                  sine, triangle, sawUp, sawDown, square, randomSteps, randomSmooth, numShapes };
+
+        inline const char* name (int id)
+        {
+            static const char* names[] { "Sale", "Scende", "Sale e scende", "Sale (curva)", "Scende (curva)",
+                                         "Sinusoide", "Triangolo", "Dente di sega su", "Dente di sega giu'", "Quadra",
+                                         "Casuale a scalini", "Casuale morbido" };
+            return names[juce::jlimit (0, numShapes - 1, id)];
+        }
+
+        /** Le onde si ripetono a tempo; le rampe coprono tutto il tratto una volta sola. */
+        inline bool isWave (int id)     { return id >= sine; }
+
+        /** Ripetizione delle onde, in tick (192 = una battuta). */
+        inline constexpr int cycleChoices[6] { 384, 192, 96, 48, 24, 12 };
+        inline const char* cycleName (int i)
+        {
+            static const char* names[] { "2 battute", "1 battuta", "1/2", "1/4", "1/8", "1/16" };
+            return names[juce::jlimit (0, 5, i)];
+        }
+
+        inline constexpr int maxShapePoints = 200;
+
+        /** I punti della forma da 'start' per 'length' tick, tra lo e hi (0..1). Le onde troppo fitte si accorciano. */
+        inline std::vector<Point> make (int id, int start, int length, int cycle, float lo, float hi, juce::uint32 seed = 1)
+        {
+            std::vector<Point> pts;
+            const float mid = 0.5f * (lo + hi);
+            auto add = [&pts] (int t, float v, float c = 0.0f) { pts.push_back ({ t, v, c }); };
+            const int end = start + length;
+            switch (id)
+            {
+                case rampUp:        add (start, lo); add (end, hi); return pts;
+                case rampDown:      add (start, hi); add (end, lo); return pts;
+                case upDown:        add (start, lo); add (start + length / 2, hi); add (end, lo); return pts;
+                case rampUpCurve:   add (start, lo, 0.6f); add (end, hi); return pts;     // lenta all'inizio, corre alla fine
+                case rampDownCurve: add (start, hi, -0.6f); add (end, lo); return pts;   // scende subito, poi piano
+                default: break;
+            }
+
+            cycle = juce::jmax (4, cycle);
+            const int perCycle = id == sine || id == square ? 4 : id == randomSmooth ? 1 : 2;
+            const int maxCycles = juce::jmax (1, maxShapePoints / perCycle);
+            const int cycles = juce::jmin (maxCycles, juce::jmax (1, length / cycle));
+            const float easeIn = curveForMid (0.293f), easeOut = curveForMid (0.707f);   // un quarto di sinusoide
+            juce::Random rnd ((juce::int64) seed);
+            for (int k = 0; k < cycles; ++k)
+            {
+                const int t = start + k * cycle;
+                switch (id)
+                {
+                    case sine:
+                        add (t, lo, easeIn); add (t + cycle / 4, mid, easeOut);
+                        add (t + cycle / 2, hi, easeIn); add (t + cycle * 3 / 4, mid, easeOut);
+                        break;
+                    case triangle:   add (t, lo); add (t + cycle / 2, hi); break;
+                    case sawUp:      add (t, lo); add (t + cycle - 1, hi); break;
+                    case sawDown:    add (t, hi); add (t + cycle - 1, lo); break;
+                    case square:     add (t, hi); add (t + cycle / 2 - 1, hi); add (t + cycle / 2, lo); add (t + cycle - 1, lo); break;
+                    case randomSteps:
+                    {
+                        const float v = lo + (hi - lo) * rnd.nextFloat();
+                        add (t, v); add (t + cycle - 1, v);
+                        break;
+                    }
+                    case randomSmooth: add (t, lo + (hi - lo) * rnd.nextFloat()); break;
+                    default: break;
+                }
+            }
+            // chiusura: si torna al punto di partenza alla fine dell'ultimo giro
+            const int last = start + cycles * cycle;
+            if (id == sine || id == triangle) add (last, lo);
+            else if (id == randomSmooth) add (last, lo + (hi - lo) * rnd.nextFloat());
+            return pts;
+        }
+    }
 }

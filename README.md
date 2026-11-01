@@ -14,7 +14,13 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.65)
+## Stato attuale (v0.66)
+
+**Novita' della 0.66** (automazioni):
+- Tratti curvi: trascina su/giu' il rombo a meta' di un tratto (tocca il rombo per tornare dritto)
+- Menu della corsia > "Forme e onde...": 12 forme (rampe, curve, sinusoide, triangolo, dente di sega, quadra,
+  casuali) con anteprima; velocita' a tempo (2 battute ... 1/16), quante battute, valori basso/alto
+- Menu della corsia, dal cursore: copia, incolla, duplica subito dopo, cancella (1-16 battute); "rendi dritti tutti i tratti"
 
 **Novita' della 0.65**: Playlist > Automazioni > "Effetti pronti" (17 effetti in un tocco: JLoop mette l'effetto
 nel mixer e disegna le curve). Build-up col filtro, filtro che si apre/chiude, silenzio prima del drop, pitch che sale,

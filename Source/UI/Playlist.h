@@ -7,6 +7,7 @@
 #include "Widgets.h"
 #include "AutomationView.h"
 #include "AutoFxPanel.h"
+#include "AutoShapePanel.h"
 
 //==============================================================================
 /** Colori dei pattern nella playlist (come in FL Studio, ogni pattern ha il suo). */
@@ -808,7 +809,7 @@ public:
     explicit Playlist (SequencerEngine& e)
         : engine (e), grid (e),
           autoView (e, [this] { return grid.getBarWidth(); }, [this] { return grid.getScrollX(); }, [this] (float x) { grid.setScrollX (x); }),
-          picker (e), fxPanel (e)
+          picker (e), fxPanel (e), shapePanel (e)
     {
         for (auto* b : { &brushButton, &zoomOut, &zoomIn, &clearButton, &closeButton })
             addAndMakeVisible (b);
@@ -824,6 +825,9 @@ public:
         addChildComponent (fxPanel);
         fxButton.onClick = [this] { fxPanel.setBounds (getLocalBounds()); fxPanel.open(); };
         fxPanel.onApplied = [this] { autoView.repaint(); };
+        addChildComponent (shapePanel);
+        shapePanel.onApplied = [this] { autoView.repaint(); };
+        autoView.onShapes = [this] (int lane) { shapePanel.setBounds (getLocalBounds()); shapePanel.open (lane); };
         picker.onChoose = [this] (automation::Target t)
         {
             const int lane = engine.addLane (t);
@@ -867,6 +871,7 @@ public:
     /** Solo per i test: mostra le automazioni. */
     void showAutomationForTest()    { modeSwitch.setSelected (1); updateMode(); }
     void showTargetPickerForTest()  { picker.setBounds (getLocalBounds()); picker.open(); }
+    void showShapePanelForTest (int lane, int shape)  { shapePanel.setBounds (getLocalBounds()); shapePanel.open (lane); shapePanel.selectForTest (shape); }
     void showFxPanelForTest (int fx, int where)  { fxPanel.setBounds (getLocalBounds()); fxPanel.open(); fxPanel.selectForTest (fx, where); }
 
     /** Il pennello parte dal pattern che si sta modificando. */
@@ -924,6 +929,7 @@ public:
         autoView.setBounds (r);
         picker.setBounds (getLocalBounds());
         fxPanel.setBounds (getLocalBounds());
+        shapePanel.setBounds (getLocalBounds());
     }
 
 private:
@@ -938,6 +944,7 @@ private:
         fxButton.setVisible (automationMode);
         picker.setVisible (false);
         fxPanel.setVisible (false);
+        shapePanel.setVisible (false);
         repaint();
     }
 
@@ -973,6 +980,7 @@ private:
     AutomationView autoView;
     AutomationTargetPicker picker;
     AutoFxPanel fxPanel;
+    AutoShapePanel shapePanel;
     juce::TextButton fxButton { "Effetti pronti" };
     SegmentedControl modeSwitch { { "Pattern", "Automazioni" } };
     juce::TextButton addLaneButton { "+ Automazione" };

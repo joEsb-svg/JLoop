@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <optional>
 #include <functional>
 #include "../Engine/SequencerEngine.h"
 #include "SoundBrowser.h"   // TileList
@@ -281,6 +282,14 @@ public:
                     dragMode = DragMode::point;
                     break;
                 }
+            if (dragMode != DragMode::point)
+                for (int i = 0; i + 1 < (int) pts.size(); ++i)
+                    if (const auto h = handlePos (pts, i, area); h.has_value() && h->getDistanceFrom (e.position) < 16.0f)
+                    {
+                        dragPoint = i;
+                        dragMode = DragMode::curve;
+                        break;
+                    }
         }
     }
 
@@ -302,9 +311,26 @@ public:
             // Resta tra i vicini (l'ordine nel tempo non cambia)
             if (dragPoint > 0)                     tick = juce::jmax (tick, pts[(size_t) dragPoint - 1].tick + 1);
             if (dragPoint + 1 < (int) pts.size())  tick = juce::jmin (tick, pts[(size_t) dragPoint + 1].tick - 1);
-            pts[(size_t) dragPoint] = { tick, valueAt (e.position.y, area) };
+            pts[(size_t) dragPoint].tick = tick;
+            pts[(size_t) dragPoint].value = valueAt (e.position.y, area);
             engine.setLanePoints (dragLane, pts);
             dragValueText = AutomationText::value (engine, engine.getLane (dragLane).target(), pts[(size_t) dragPoint].value);
+            repaint();
+            return;
+        }
+
+        if (dragMode == DragMode::curve)
+        {
+            auto pts = engine.getLanePoints (dragLane);
+            if (dragPoint < 0 || dragPoint + 1 >= (int) pts.size())
+                return;
+            const auto area = laneBounds (laneIndex (dragLane));
+            const float a = pts[(size_t) dragPoint].value, b = pts[(size_t) dragPoint + 1].value;
+            if (std::abs (b - a) < 0.001f) return;
+            const float frac = (valueAt (e.position.y, area) - a) / (b - a);
+            pts[(size_t) dragPoint].curve = automation::curveForMid (frac);
+            engine.setLanePoints (dragLane, pts);
+            dragValueText = "Curva " + juce::String (juce::roundToInt (pts[(size_t) dragPoint].curve * 100.0f)) + "%";
             repaint();
             return;
         }
@@ -324,7 +350,7 @@ public:
         dragValueText.clear();
         if (moved)
         {
-            if (dragMode == DragMode::point && onEdit) onEdit();
+            if ((dragMode == DragMode::point || dragMode == DragMode::curve) && onEdit) onEdit();
             repaint();
             return;
         }
@@ -341,6 +367,8 @@ public:
         auto pts = engine.getLanePoints (dragLane);
         if (dragMode == DragMode::point && dragPoint >= 0 && dragPoint < (int) pts.size())
             pts.erase (pts.begin() + dragPoint);   // tocco su un punto: via
+        else if (dragMode == DragMode::curve && dragPoint >= 0 && dragPoint < (int) pts.size())
+            pts[(size_t) dragPoint].curve = 0.0f;  // tocco sulla maniglia: il tratto torna dritto
         else
             pts.push_back ({ tickAt (e.position.x), valueAt (e.position.y, laneBounds (laneIndex (dragLane))) });
         engine.setLanePoints (dragLane, pts);
@@ -356,7 +384,7 @@ public:
     }
 
 private:
-    enum class DragMode { none, pending, point, scrollX, scrollY };
+    enum class DragMode { none, pending, point, curve, scrollX, scrollY };
 
     std::vector<int> usedLanes() const
     {
@@ -419,6 +447,18 @@ private:
         return { xForTick (p.tick), a.getBottom() - p.value * a.getHeight() };
     }
 
+    /** Maniglia della curvatura, a meta' del tratto i -> i+1 (solo se il tratto e' abbastanza largo e non piatto). */
+    std::optional<juce::Point<float>> handlePos (const std::vector<automation::Point>& pts, int i, juce::Rectangle<float> lane) const
+    {
+        const auto& p = pts[(size_t) i];
+        const auto& q = pts[(size_t) i + 1];
+        const auto a = pointPos (p, lane), b = pointPos (q, lane);
+        if (b.x - a.x < 44.0f || std::abs (q.value - p.value) < 0.02f) return std::nullopt;
+        const float v = p.value + (q.value - p.value) * automation::shape (0.5f, p.curve);
+        const auto area = curveArea (lane);
+        return juce::Point<float> (0.5f * (a.x + b.x), area.getBottom() - v * area.getHeight());
+    }
+
     void paintLane (juce::Graphics& g, int lane, juce::Rectangle<float> r)
     {
         if (r.getBottom() < (float) rulerHeight || r.getY() > (float) getHeight())
@@ -450,8 +490,22 @@ private:
                 juce::Path p;
                 auto first = pointPos (pts.front(), r);
                 p.startNewSubPath ((float) headerWidth, first.y);
-                for (auto& pt : pts)
-                    p.lineTo (pointPos (pt, r));
+                p.lineTo (first);
+                for (size_t i = 1; i < pts.size(); ++i)
+                {
+                    const auto& q = pts[i - 1];
+                    const auto a = pointPos (q, r), b = pointPos (pts[i], r);
+                    if (std::abs (q.curve) > 0.001f && b.x - a.x > 3.0f)
+                    {
+                        const int steps = juce::jlimit (4, 40, (int) ((b.x - a.x) / 4.0f));
+                        for (int k = 1; k < steps; ++k)
+                        {
+                            const float t = (float) k / (float) steps;
+                            p.lineTo (a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * automation::shape (t, q.curve));
+                        }
+                    }
+                    p.lineTo (b);
+                }
                 p.lineTo ((float) getWidth(), pointPos (pts.back(), r).y);
 
                 juce::Path fill (p);
@@ -462,6 +516,18 @@ private:
                 g.fillPath (fill);
                 g.setColour (colour.withAlpha (on ? 1.0f : 0.35f));
                 g.strokePath (p, juce::PathStrokeType (2.0f));
+
+                for (int i = 0; i + 1 < (int) pts.size(); ++i)
+                    if (const auto h = handlePos (pts, i, r); h.has_value() && h->x > (float) headerWidth - 10.0f && h->x < (float) getWidth() + 10.0f)
+                    {
+                        const bool active = lane == dragLane && i == dragPoint && dragMode == DragMode::curve;
+                        juce::Path d;
+                        d.addPolygon (*h, 4, active ? 7.0f : 5.0f, juce::MathConstants<float>::pi * 0.25f);
+                        g.setColour (Theme::bg);
+                        g.fillPath (d);
+                        g.setColour (colour.withAlpha (active ? 1.0f : 0.7f));
+                        g.strokePath (d, juce::PathStrokeType (1.5f));
+                    }
 
                 for (size_t i = 0; i < pts.size(); ++i)
                 {
@@ -507,24 +573,31 @@ private:
     void showLaneMenu (int lane)
     {
         auto& l = engine.getLane (lane);
-        juce::PopupMenu shapes;
         static const int lengths[] = { 1, 2, 4, 8, 16 };
+        const int cursorBar = engine.getSongStartBar() + 1;
+        juce::PopupMenu copyMenu, dupMenu, clearMenu;
         for (int len : lengths)
         {
-            juce::PopupMenu sub;
-            sub.addItem (100 + len, "Sale");
-            sub.addItem (200 + len, "Scende");
-            sub.addItem (300 + len, "Sale e scende");
-            sub.addItem (400 + len, "Onde (una per battuta)");
-            shapes.addSubMenu (juce::String (len) + (len == 1 ? " battuta" : " battute"), sub);
+            const auto label = juce::String (len) + (len == 1 ? " battuta" : " battute");
+            copyMenu.addItem (1000 + len, label);
+            dupMenu.addItem (2000 + len, label);
+            clearMenu.addItem (3000 + len, label);
         }
 
         juce::PopupMenu menu;
         menu.addSectionHeader (AutomationText::parameter (engine, l.target()) + "  -  " + AutomationText::source (engine, l.target()));
         menu.addItem (1, "Accesa", true, l.enabled.load());
-        menu.addSubMenu ("Forme pronte (dalla battuta " + juce::String (engine.getSongStartBar() + 1) + ")", shapes);
-        menu.addItem (2, "Togli tutti i punti", l.count.load() > 0);
+        menu.addItem (4, "Forme e onde...");
         menu.addSeparator();
+        menu.addSectionHeader ("Dal cursore (battuta " + juce::String (cursorBar) + ")");
+        menu.addSubMenu ("Copia", copyMenu, l.count.load() > 0);
+        menu.addItem (5, "Incolla" + (clipboard().length > 0 ? " (" + juce::String (clipboard().length / 192) + " batt.)" : juce::String()),
+                      clipboard().length > 0);
+        menu.addSubMenu ("Duplica subito dopo", dupMenu, l.count.load() > 0);
+        menu.addSubMenu ("Cancella", clearMenu, l.count.load() > 0);
+        menu.addSeparator();
+        menu.addItem (2, "Togli tutti i punti", l.count.load() > 0);
+        menu.addItem (6, "Rendi dritti tutti i tratti", l.count.load() > 1);
         menu.addItem (3, "Elimina l'automazione");
 
         juce::Component::SafePointer<AutomationView> safe (this);
@@ -534,34 +607,83 @@ private:
                 return;
             auto& eng = safe->engine;
             auto& ln = eng.getLane (lane);
+            const int start = eng.getSongStartBar() * 192;
             if (result == 1)      ln.enabled.store (! ln.enabled.load());
             else if (result == 2) eng.setLanePoints (lane, {});
             else if (result == 3) eng.removeLane (lane);
-            else if (result >= 100)
+            else if (result == 4) { if (safe->onShapes) safe->onShapes (lane); return; }
+            else if (result == 5) pasteInto (eng, lane, start);
+            else if (result == 6)
             {
-                const int shape = result / 100, bars = result % 100;
-                const int start = eng.getSongStartBar() * 192, len = bars * 192;
                 auto pts = eng.getLanePoints (lane);
-                // Si tolgono i punti dentro il tratto, poi si mette la forma
-                pts.erase (std::remove_if (pts.begin(), pts.end(), [=] (auto& p) { return p.tick >= start && p.tick <= start + len; }), pts.end());
-                auto add = [&pts] (int t, float v) { pts.push_back ({ t, v }); };
-                if (shape == 1)      { add (start, 0.0f); add (start + len, 1.0f); }
-                else if (shape == 2) { add (start, 1.0f); add (start + len, 0.0f); }
-                else if (shape == 3) { add (start, 0.0f); add (start + len / 2, 1.0f); add (start + len, 0.0f); }
-                else
-                    for (int b = 0; b < bars; ++b)
-                    {
-                        add (start + b * 192, 0.15f);
-                        add (start + b * 192 + 96, 0.85f);
-                        if (b == bars - 1) add (start + len, 0.15f);
-                    }
+                for (auto& p : pts) p.curve = 0.0f;
                 eng.setLanePoints (lane, pts);
+            }
+            else if (result >= 1000)
+            {
+                const int what = result / 1000, len = (result % 1000) * 192;
+                copyFrom (eng, lane, start, len);
+                if (what == 2) pasteInto (eng, lane, start + len);
+                else if (what == 3) { replaceRange (eng, lane, start, len, {}); clipboard() = {}; }
             }
             if (safe->onEdit) safe->onEdit();
             safe->repaint();
         });
     }
 
+public:
+    /** Gli appunti delle automazioni: punti (tick dall'inizio del tratto) e lunghezza del tratto. */
+    struct Clip { std::vector<automation::Point> points; int length = 0; };
+    static Clip& clipboard()    { static Clip c; return c; }
+
+    /** Toglie i punti in [start, start+len] e ci mette quelli nuovi; ai bordi tiene il valore che c'era (niente salti). */
+    static void replaceRange (SequencerEngine& eng, int lane, int start, int len, std::vector<automation::Point> fresh)
+    {
+        auto& l = eng.getLane (lane);
+        const float before = l.valueAt (start), after = l.valueAt (start + len + 1);
+        auto pts = eng.getLanePoints (lane);
+        const bool hadAfter = std::any_of (pts.begin(), pts.end(), [=] (auto& p) { return p.tick > start + len; });
+        const bool hadBefore = std::any_of (pts.begin(), pts.end(), [=] (auto& p) { return p.tick < start; });
+        pts.erase (std::remove_if (pts.begin(), pts.end(), [=] (auto& p) { return p.tick >= start && p.tick <= start + len; }), pts.end());
+        if (fresh.empty())
+        {
+            if (hadBefore && before >= 0.0f) pts.push_back ({ start, before });
+            if (hadAfter && after >= 0.0f)   pts.push_back ({ start + len, after });
+        }
+        for (auto& p : fresh) pts.push_back (p);
+        eng.setLanePoints (lane, pts);
+    }
+
+    static void copyFrom (SequencerEngine& eng, int lane, int start, int len)
+    {
+        auto& c = clipboard();
+        c = {};
+        c.length = len;
+        auto& l = eng.getLane (lane);
+        const float first = l.valueAt (start);
+        c.points.push_back ({ 0, first < 0.0f ? 0.5f : first });
+        for (auto& p : eng.getLanePoints (lane))
+            if (p.tick > start && p.tick < start + len)
+                c.points.push_back ({ p.tick - start, p.value, p.curve });
+        // la curvatura del primo tratto
+        for (auto& p : eng.getLanePoints (lane))
+            if (p.tick <= start) c.points.front().curve = p.tick == start ? p.curve : 0.0f;
+        const float last = l.valueAt (start + len - 1);
+        c.points.push_back ({ len - 1, last < 0.0f ? c.points.back().value : last });
+    }
+
+    static void pasteInto (SequencerEngine& eng, int lane, int start)
+    {
+        const auto& c = clipboard();
+        if (c.length <= 0) return;
+        std::vector<automation::Point> fresh;
+        for (auto& p : c.points) fresh.push_back ({ start + p.tick, p.value, p.curve });
+        replaceRange (eng, lane, start, c.length - 1, fresh);
+    }
+
+    std::function<void (int lane)> onShapes;
+
+private:
     SequencerEngine& engine;
     std::function<float()> barWidthFn, scrollFn;
     std::function<void (float)> setScrollFn;

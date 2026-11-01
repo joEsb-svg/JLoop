@@ -689,7 +689,11 @@ public:
         std::vector<automation::Point> pts;
         const auto& l = getLane (i);
         for (int k = 0; k < juce::jmin (l.count.load(), automation::maxPoints); ++k)
-            pts.push_back (automation::unpack (l.points[(size_t) k].load()));
+        {
+            auto p = automation::unpack (l.points[(size_t) k].load());
+            p.curve = l.curves[(size_t) k].load();
+            pts.push_back (p);
+        }
         return pts;
     }
 
@@ -711,7 +715,10 @@ public:
         auto& l = getLane (i);
         l.count.store (0);   // il thread audio non legge punti a meta'
         for (size_t k = 0; k < clean.size(); ++k)
+        {
             l.points[k].store (automation::pack (clean[k]));
+            l.curves[k].store (juce::jlimit (-1.0f, 1.0f, clean[k].curve));
+        }
         l.count.store ((int) clean.size());
     }
 

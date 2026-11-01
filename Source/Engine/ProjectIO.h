@@ -269,7 +269,11 @@ namespace ProjectIO
                 if (! l.enabled.load()) o->setProperty ("enabled", false);
                 juce::Array<juce::var> pts;
                 for (auto& p : engine.getLanePoints (i))
-                    pts.add (juce::Array<juce::var> { p.tick, juce::roundToInt (p.value * 10000.0f) });
+                {
+                    juce::Array<juce::var> pt { p.tick, juce::roundToInt (p.value * 10000.0f) };
+                    if (std::abs (p.curve) > 0.0005f) pt.add (juce::roundToInt (p.curve * 1000.0f));
+                    pts.add (pt);
+                }
                 o->setProperty ("points", pts);
                 lanes.add (juce::var (o));
             }
@@ -471,7 +475,7 @@ namespace ProjectIO
                 if (auto* arr = o.getProperty ("points", {}).getArray())
                     for (auto& p : *arr)
                         if (auto* f = p.getArray(); f != nullptr && f->size() >= 2)
-                            pts.push_back ({ (int) (*f)[0], (float) (int) (*f)[1] / 10000.0f });
+                            pts.push_back ({ (int) (*f)[0], (float) (int) (*f)[1] / 10000.0f, f->size() >= 3 ? (float) (int) (*f)[2] / 1000.0f : 0.0f });
                 engine.setLanePoints (i, pts);
             }
 
