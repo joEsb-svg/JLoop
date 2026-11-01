@@ -185,6 +185,7 @@ MainComponent::MainComponent()
     addAndMakeVisible (songSwitch);
 
     playlist.onClose = [this] { playlist.setVisible (false); };
+    playlist.onPatternChanged = [this] { updateViews(); };
     playlist.getGrid().onEdit = [this] { Haptics::tick (this); };
     playlist.getGrid().onEditPattern = [this] (int pattern)
     {
@@ -803,6 +804,7 @@ void MainComponent::scrollStepsBy (float dx, int phase)
 //==============================================================================
 void MainComponent::updateViews()
 {
+    playlist.refreshBrush();   // in playlist il pennello e' il pattern scelto nel display
     const int length  = engine.getPatternLength();
     const int visible = getVisibleSteps();
     lengthChip.setValue (length);

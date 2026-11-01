@@ -133,8 +133,9 @@ public:
     std::function<void (int pattern)> onEditPattern;    // "Modifica pattern"
     std::function<void (int pattern)> onBrushChanged;
 
-    void setBrush (int pattern)     { brush = juce::jlimit (0, SequencerEngine::numPatterns - 1, pattern); repaint(); }
-    int getBrush() const            { return brush; }
+    /** Il "pennello" e' il pattern scelto nel display in alto (PATTERN): cambiandolo li' cambia anche qui. */
+    void setBrush (int pattern)     { engine.selectPattern (juce::jlimit (0, SequencerEngine::numPatterns - 1, pattern)); repaint(); }
+    int getBrush() const            { return engine.getCurrentPattern(); }
 
     void setBarWidth (float w)
     {
@@ -255,7 +256,7 @@ public:
             {
                 g.setColour (Theme::textDim);
                 g.setFont (Theme::font (14.0f));
-                g.drawFittedText ("Tocca la griglia per mettere il pattern scelto in alto (" + PatternColours::name (engine, brush) + ").\n"
+                g.drawFittedText ("Tocca la griglia per mettere il pattern scelto in alto (" + PatternColours::name (engine, getBrush()) + ").\n"
                                   "Tocca una clip per toglierla, trascinala per spostarla, trascina i bordi per accorciarla o allungarla, tienila premuta per il menu.",
                                   juce::Rectangle<int> (headerWidth + 12, rulerHeight + (int) trackHeight * 2, getWidth() - headerWidth - 24, 60),
                                   juce::Justification::centredLeft, 3);
@@ -428,7 +429,7 @@ public:
             const int track = trackAt (e.position.y);
             if (track < 0 || (int) clips.size() >= SequencerEngine::maxClips)
                 return;
-            clips.push_back ({ track, barAt (e.position.x), brush });
+            clips.push_back ({ track, barAt (e.position.x), getBrush() });
         }
 
         engine.setClips (clips);
@@ -680,7 +681,6 @@ private:
     }
 
     SequencerEngine& engine;
-    int brush = 0;
     float barWidth = 56.0f, trackHeight = 40.0f, scrollX = 0.0f, scrollY = 0.0f;
     float startScrollX = 0.0f, startScrollY = 0.0f;
     juce::Point<float> downPos;
@@ -733,7 +733,7 @@ public:
             grid.repaint();
         };
         closeButton.onClick = [this] { if (onClose) onClose(); };
-        grid.onBrushChanged = [this] (int) { updateBrushButton(); };
+        grid.onBrushChanged = [this] (int) { updateBrushButton(); if (onPatternChanged) onPatternChanged(); };
         addAndMakeVisible (grid);
         updateBrushButton();
     }
@@ -754,7 +754,10 @@ public:
     void showTargetPickerForTest()  { picker.setBounds (getLocalBounds()); picker.open(); }
 
     /** Il pennello parte dal pattern che si sta modificando. */
-    void setBrush (int pattern)     { grid.setBrush (pattern); updateBrushButton(); }
+    void setBrush (int pattern)     { grid.setBrush (pattern); updateBrushButton(); if (onPatternChanged) onPatternChanged(); }
+    /** Il pattern del display in alto e' cambiato: il pennello lo segue. */
+    void refreshBrush()             { updateBrushButton(); grid.repaint(); }
+    std::function<void()> onPatternChanged;
 
     void paint (juce::Graphics& g) override
     {

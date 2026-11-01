@@ -14,7 +14,10 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.59)
+## Stato attuale (v0.60)
+
+**Novita' della 0.60**: nella playlist il pennello e' il pattern scelto nel display in alto (frecce del PATTERN):
+cambiandolo li' si cambia il pattern da posizionare; la tendina PENNELLO resta, sempre allineata
 
 **Novita' della 0.59**: versione per Windows
 - Installer JLoop-Setup.exe (stesso link dell'APK): menu Start, icona sul desktop, .jloop aperti col doppio clic;
