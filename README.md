@@ -16,6 +16,8 @@ Gli aggiornamenti si installano sopra la versione precedente.
 
 ## Stato attuale (v0.64)
 
+**0.64.1**: riser e downer fatti da JLoop non compaiono piu' tra i "Campioni importati" (restano usabili nei progetti)
+
 **Novita' della 0.64** (solo PC):
 - Banco di lavoro piu' pulito: il mixer non sta piu' fisso sotto il rack (si apre con MIXER / F9)
 - Libreria a sinistra piu' stretta, ad albero: solo le cartelle principali, si aprono in giu' (doppio clic = usa il suono)

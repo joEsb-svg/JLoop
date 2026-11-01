@@ -165,10 +165,18 @@ public:
     {
         juce::StringArray names;
         for (auto& f : getFolder().findChildFiles (juce::File::findFiles, false))
-            if (formats.findFormatForFileExtension (f.getFileExtension()) != nullptr)
+            if (formats.findFormatForFileExtension (f.getFileExtension()) != nullptr && ! isGenerated (f.getFileName()))
                 names.add (f.getFileName());
         names.sortNatural();
         return names;
+    }
+
+    /** Riser e downer fatti da JLoop (RiserMaker): restano sul disco per i progetti, ma non sono "campioni importati". */
+    static bool isGenerated (const juce::String& fileName)
+    {
+        const auto base = juce::File (fileName).getFileNameWithoutExtension();
+        return (base.startsWith ("Riser ") || base.startsWith ("Downer ")) && base.contains (" BPM")
+               && (base.containsWholeWord ("battuta") || base.containsWholeWord ("battute"));
     }
 
     static juce::String displayName (const juce::String& fileName)
