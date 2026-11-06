@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+#include "../Instruments/Prisma/Prisma.h"
 #include "../Platform/OpenWith.h"
 #include "../Engine/MidiExport.h"
 #include "../Instruments/Common/NeonEditor.h"
@@ -2714,6 +2715,9 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
 
     if (const int i = args.indexOf ("--open-synth"); i >= 0)       // test: pannello di uno strumento (canale, scheda)
     {
+        if (const int k = args.indexOf ("--prisma-preset"); k >= 0)   // test: preset di Prisma (indice) prima di aprire
+            if (auto* pr = dynamic_cast<PrismaAudioProcessor*> (engine.getInstrument (args[i + 1].getIntValue())))
+                pr->getPresets().loadFactory (args[k + 1].getIntValue());
         openSynthPanel (args[i + 1].getIntValue());
         if (args.size() > i + 2)
         {

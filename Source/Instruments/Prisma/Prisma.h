@@ -22,18 +22,25 @@ namespace prisma
     inline constexpr int frameSize = 1024;        // campioni per forma
     inline constexpr int numFrames = 32;          // forme per tabella
     inline constexpr int numLevels = 8;           // versioni con 512, 256, ... 4 armonici
-    inline constexpr int numTables = 10;
+    inline constexpr int numBuiltinTables = 10;   // fatte da JLoop; dopo vengono quelle libere (CC0) da Resources/Prisma
+    inline constexpr int maxTables = 64;
     inline constexpr int maxVoices = 8;
     inline constexpr int maxUnison = 7;
     inline constexpr int numSlots = 8;            // matrice di modulazione
 
     juce::StringArray tableNames();
 
-    /** Le tabelle (uguali per tutti i Prisma): costruite una volta sola. */
+    /** Le tabelle (uguali per tutti i Prisma): ognuna si costruisce la prima volta che serve (ensure, dal thread della UI). */
     class Bank
     {
     public:
-        static const Bank& get();
+        static Bank& get();
+        int numTables() const noexcept                { return builtin + (int) imported.size(); }
+        juce::StringArray names() const;
+        /** Costruisce la tabella (se non c'e' gia'). Meglio chiamarla fuori dal thread audio. */
+        void ensure (int table);
+        bool isReady (int table) const noexcept       { return table >= 0 && table < maxTables && ready[(size_t) table].load (std::memory_order_acquire); }
+
         /** Campione (interpolato) della tabella t, posizione 0..1 (tra le forme), fase 0..1, livello di armonici. */
         inline float read (int table, float pos, double phase, int level) const noexcept
         {
@@ -58,14 +65,21 @@ namespace prisma
             while (level < numLevels - 1 && harm > maxHarm) { harm /= 2; ++level; }
             return level;
         }
+        /** Una forma; se la tabella non e' ancora pronta si usa la prima (sempre pronta). */
         const float* frame (int table, int f, int level) const noexcept
         {
-            return data.data() + ((((size_t) juce::jlimit (0, numTables - 1, table) * numFrames + (size_t) f) * numLevels + (size_t) level) * frameSize);
+            if (! isReady (table)) table = 0;
+            return data[(size_t) table].get() + (((size_t) f * numLevels + (size_t) level) * frameSize);
         }
 
     private:
         Bank();
-        std::vector<float> data;
+        struct Imported { juce::String name; const juce::int16* samples; };
+        const int builtin = numBuiltinTables;
+        std::vector<Imported> imported;
+        std::array<std::unique_ptr<float[]>, maxTables> data;
+        std::array<std::atomic<bool>, maxTables> ready {};
+        juce::CriticalSection lock;
     };
 
     juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
@@ -137,10 +151,12 @@ namespace prisma
 }
 
 //==============================================================================
-class PrismaAudioProcessor : public juce::AudioProcessor
+class PrismaAudioProcessor : public juce::AudioProcessor,
+                             private juce::AudioProcessorValueTreeState::Listener
 {
 public:
     PrismaAudioProcessor();
+    ~PrismaAudioProcessor() override;
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
     void reset() override;
@@ -169,6 +185,8 @@ public:
     std::atomic<float> shownPos[2] { { -1.0f }, { -1.0f } };
 
 private:
+    void parameterChanged (const juce::String&, float) override;
+    void ensureTables();
     struct Block;
     void readBlock (Block&);
     void noteOn (int note, float velocity, const Block&);

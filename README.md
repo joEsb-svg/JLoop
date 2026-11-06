@@ -14,7 +14,14 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.71)
+## Stato attuale (v0.72)
+
+**Novita' della 0.72**: PRISMA ha 17 tabelle nuove fatte da sound designer (libere, CC0: Kimura Taro Free Wavetables
+e WaveEdit Online): Hardcore FM, Phase Dist, Chebyshev, Saw Sweep, OP Digitale, CZ Reso, PPG, Vocoder, Formant K,
+Vocali GMa, Juno PWM, Corde, Aah Woh Ye, Parlante, Reso Saw, Supersaw W, Basso W (27 in tutto). Tolti i preset
+Growl e Neuro; 12 preset nuovi su queste tabelle: Talking Bass, Parlante 1/8, Reso Saw Bass, Basso W Pluck,
+Hardcore FM Stab, CZ Acid, PPG Pad, Juno Strings, Vocoder Lead, Corde Pluck, Anthem Supersaw W, Formant Choir.
+
 
 **Novita' della 0.71**: PRISMA, synth a wavetable stile Serum (+ Strumento > Prisma):
 2 oscillatori wavetable (10 tabelle da 32 forme, band-limited), posizione, 8 warp (sync, bend, specchio, quantizza,
@@ -551,6 +558,14 @@ ci/debug.keystore            chiave di firma di sviluppo (password "android")
 1. Clona JUCE 9.0.4 dentro la cartella del progetto: `git clone --branch 9.0.4 https://github.com/juce-framework/JUCE.git JUCE`
 2. Apri `JLoop.jucer` con il Projucer e salva: genera i progetti in `Builds/`
 3. Windows: apri `Builds/VisualStudio2022`; Android: apri `Builds/Android` con Android Studio
+
+## Crediti delle wavetable di Prisma
+
+Le tabelle importate di Prisma (Resources/Prisma/PrismaTables.bin, generate con tools/prisma/make_tables.py)
+sono di pubblico dominio (CC0 1.0):
+- Kimura Taro Free Wavetables - https://www.kimurataro.com/free-wavetables.html
+- WaveEdit Online (Synthesis Technology) - https://waveeditonline.com
+prese dalla raccolta https://github.com/atsushieno/open-vital-resources. Grazie agli autori.
 
 ## Licenza JUCE
 

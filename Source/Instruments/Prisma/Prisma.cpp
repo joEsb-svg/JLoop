@@ -1,12 +1,10 @@
 #include "Prisma.h"
 #include "PrismaEditor.h"
+#include <cstring>
 
 namespace prisma
 {
-    juce::StringArray tableNames()
-    {
-        return { "Analogico", "Formanti", "PWM", "Armonici", "Sync", "FM", "Wavefolder", "Growl", "Bitcrush", "Organo" };
-    }
+    juce::StringArray tableNames()     { return Bank::get().names(); }
 
     juce::StringArray sourceNames()
     {
@@ -160,40 +158,82 @@ namespace prisma
 
     Bank::Bank()
     {
-        data.assign ((size_t) numTables * numFrames * numLevels * frameSize, 0.0f);
-        juce::dsp::FFT fft (10);   // 1024
-        std::vector<float> frameData, spec ((size_t) frameSize * 2), work ((size_t) frameSize * 2);
-        for (int t = 0; t < numTables; ++t)
+        // Le tabelle libere (CC0): nome + 32 forme x 1024 campioni int16, dentro l'app
+        int size = 0;
+        if (const char* raw = BinaryData::getNamedResource ("PrismaTables_bin", size); raw != nullptr && size > 8
+              && juce::String (juce::CharPointer_UTF8 (raw), 4) == "PRSM")
         {
-            float tablePeak = 1.0e-6f;
-            for (int f = 0; f < numFrames; ++f)
+            int count = 0;
+            std::memcpy (&count, raw + 4, 4);
+            const size_t perTable = 32 + (size_t) numFrames * frameSize * 2;
+            for (int i = 0; i < count && builtin + (int) imported.size() < maxTables; ++i)
             {
-                makeFrame (t, (double) f / (numFrames - 1), frameData);
-                std::fill (spec.begin(), spec.end(), 0.0f);
-                std::copy (frameData.begin(), frameData.end(), spec.begin());
-                fft.performRealOnlyForwardTransform (spec.data(), true);
-                for (int level = 0; level < numLevels; ++level)
-                {
-                    const int maxHarm = (frameSize / 2) >> level;
-                    work = spec;
-                    work[0] = work[1] = 0.0f;   // via la continua
-                    for (int h = maxHarm + 1; h <= frameSize / 2; ++h) { work[(size_t) h * 2] = 0.0f; work[(size_t) h * 2 + 1] = 0.0f; }
-                    fft.performRealOnlyInverseTransform (work.data());
-                    float* dst = data.data() + ((((size_t) t * numFrames + (size_t) f) * numLevels + (size_t) level) * frameSize);
-                    for (int i = 0; i < frameSize; ++i) dst[i] = work[(size_t) i];
-                    if (level == 0)
-                        for (int i = 0; i < frameSize; ++i) tablePeak = juce::jmax (tablePeak, std::abs (dst[i]));
-                }
+                const size_t off = 8 + (size_t) i * perTable;
+                if (off + perTable > (size_t) size) break;
+                Imported t;
+                t.name = juce::String::fromUTF8 (raw + off, (int) strnlen (raw + off, 32));
+                t.samples = reinterpret_cast<const juce::int16*> (raw + off + 32);
+                imported.push_back (t);
             }
-            // stesso volume per tutte le tabelle (si normalizza sul picco della tabella intera: il morph non salta)
-            float* base = data.data() + (size_t) t * numFrames * numLevels * frameSize;
-            juce::FloatVectorOperations::multiply (base, 0.9f / tablePeak, numFrames * numLevels * frameSize);
         }
+        ensure (0);
     }
 
-    const Bank& Bank::get()
+    juce::StringArray Bank::names() const
     {
-        static const Bank bank;
+        juce::StringArray n { "Analogico", "Formanti", "PWM", "Armonici", "Sync", "FM", "Wavefolder", "Growl", "Bitcrush", "Organo" };
+        for (auto& t : imported) n.add (t.name);
+        return n;
+    }
+
+    void Bank::ensure (int t)
+    {
+        if (t < 0 || t >= numTables() || isReady (t)) return;
+        const juce::ScopedLock sl (lock);
+        if (isReady (t)) return;
+        auto buf = std::make_unique<float[]> ((size_t) numFrames * numLevels * frameSize);
+        juce::dsp::FFT fft (10);   // 1024
+        std::vector<float> frameData ((size_t) frameSize), spec ((size_t) frameSize * 2), work ((size_t) frameSize * 2);
+        float tablePeak = 1.0e-6f;
+        for (int f = 0; f < numFrames; ++f)
+        {
+            if (t < builtin) makeFrame (t, (double) f / (numFrames - 1), frameData);
+            else
+            {
+                const auto* src = imported[(size_t) (t - builtin)].samples + (size_t) f * frameSize;
+                for (int i = 0; i < frameSize; ++i)
+                {
+                    juce::int16 v;
+                    std::memcpy (&v, src + i, 2);   // (allineamento qualsiasi)
+                    frameData[(size_t) i] = (float) v / 32767.0f;
+                }
+            }
+            std::fill (spec.begin(), spec.end(), 0.0f);
+            std::copy (frameData.begin(), frameData.end(), spec.begin());
+            fft.performRealOnlyForwardTransform (spec.data(), true);
+            for (int level = 0; level < numLevels; ++level)
+            {
+                const int maxHarm = (frameSize / 2) >> level;
+                work = spec;
+                work[0] = work[1] = 0.0f;   // via la continua
+                for (int h = maxHarm + 1; h <= frameSize / 2; ++h) { work[(size_t) h * 2] = 0.0f; work[(size_t) h * 2 + 1] = 0.0f; }
+                fft.performRealOnlyInverseTransform (work.data());
+                float* dst = buf.get() + (((size_t) f * numLevels + (size_t) level) * frameSize);
+                for (int i = 0; i < frameSize; ++i) dst[i] = work[(size_t) i];
+                if (level == 0)
+                    for (int i = 0; i < frameSize; ++i) tablePeak = juce::jmax (tablePeak, std::abs (dst[i]));
+            }
+        }
+        // le tabelle di JLoop: picco a 0.9 su tutta la tabella (il morph non salta); quelle libere hanno gia' il loro volume
+        if (t < builtin)
+            juce::FloatVectorOperations::multiply (buf.get(), 0.9f / tablePeak, numFrames * numLevels * frameSize);
+        data[(size_t) t] = std::move (buf);
+        ready[(size_t) t].store (true, std::memory_order_release);
+    }
+
+    Bank& Bank::get()
+    {
+        static Bank bank;
         return bank;
     }
 
@@ -403,6 +443,40 @@ namespace prisma
             { "Vocal Sweep", { { "aTable", 1 }, { "aPos", 0.0f }, { "aUni", 2 }, { "aDetune", 0.15f }, { "envA", 0.05f }, { "envR", 0.8f },
                                { "l1Sync", 3 }, { "l1Shape", 1 }, { "m1Src", 2 }, { "m1Dst", 1 }, { "m1Amt", 1.0f }, { "revMix", 0.3f },
                                { "chorus", 0.3f }, { "master", -4.0f } } },
+            // --- con le tabelle libere (CC0) di Kimura Taro e WaveEdit Online
+            // 10 Hardcore FM 11 Phase Dist 12 Chebyshev 13 Saw Sweep 14 OP Digitale 15 CZ Reso 16 PPG 17 Vocoder 18 Formant K
+            // 19 Vocali GMa 20 Juno PWM 21 Corde 22 Aah Woh Ye 23 Parlante 24 Reso Saw 25 Supersaw W 26 Basso W
+            { "Talking Bass", { { "aTable", 22 }, { "aPos", 0.0f }, { "aOct", 1 }, { "subOn", 1 }, { "subLevel", 0.5f }, { "voiceMode", 1 },
+                                { "l1Sync", 5 }, { "l1Shape", 1 }, { "m1Src", 2 }, { "m1Dst", 1 }, { "m1Amt", 1.0f }, { "cutoff", 6000 }, { "master", 0.0f } } },
+            { "Parlante 1/8", { { "aTable", 23 }, { "aPos", 0.2f }, { "aOct", 1 }, { "subOn", 1 }, { "subLevel", 0.5f }, { "voiceMode", 1 },
+                                { "l1Sync", 6 }, { "l1Shape", 0 }, { "m1Src", 2 }, { "m1Dst", 1 }, { "m1Amt", 0.8f }, { "master", 0.0f } } },
+            { "Reso Saw Bass", { { "aTable", 24 }, { "aPos", 0.3f }, { "aOct", 1 }, { "aUni", 1 }, { "aDetune", 0.1f }, { "subOn", 1 }, { "subLevel", 0.45f },
+                                 { "voiceMode", 2 }, { "glide", 0.05f }, { "env2D", 0.35f }, { "m1Src", 1 }, { "m1Dst", 1 }, { "m1Amt", 0.5f },
+                                 { "cutoff", 5000 }, { "master", 0.0f } } },
+            { "Basso W Pluck", { { "aTable", 26 }, { "aPos", 0.1f }, { "aOct", 1 }, { "envA", 0.001f }, { "envD", 0.4f }, { "envS", 0.3f }, { "envR", 0.1f },
+                                 { "env2D", 0.25f }, { "m1Src", 1 }, { "m1Dst", 1 }, { "m1Amt", 0.6f }, { "voiceMode", 1 }, { "master", 3.0f } } },
+            { "Hardcore FM Stab", { { "aTable", 10 }, { "aPos", 0.15f }, { "aUni", 2 }, { "aDetune", 0.15f }, { "envA", 0.001f }, { "envD", 0.3f },
+                                    { "envS", 0.2f }, { "envR", 0.2f }, { "env2D", 0.3f }, { "m1Src", 1 }, { "m1Dst", 1 }, { "m1Amt", 0.55f },
+                                    { "revMix", 0.15f }, { "master", -4.0f } } },
+            { "CZ Acid", { { "aTable", 15 }, { "aPos", 0.1f }, { "aOct", 2 }, { "voiceMode", 2 }, { "glide", 0.07f }, { "envA", 0.001f },
+                           { "envD", 0.3f }, { "envS", 0.6f }, { "env2D", 0.2f }, { "m1Src", 1 }, { "m1Dst", 1 }, { "m1Amt", 0.7f },
+                           { "m2Src", 4 }, { "m2Dst", 1 }, { "m2Amt", 0.25f }, { "dlyMix", 0.2f }, { "dlyTime", 2 }, { "master", 4.0f } } },
+            { "PPG Pad", { { "aTable", 16 }, { "aPos", 0.3f }, { "aUni", 3 }, { "aDetune", 0.2f }, { "aBlend", 1.0f }, { "envA", 0.6f }, { "envR", 1.5f },
+                           { "l1Sync", 0 }, { "l1Rate", 0.12f }, { "m1Src", 2 }, { "m1Dst", 1 }, { "m1Amt", 0.35f }, { "chorus", 0.5f },
+                           { "revMix", 0.4f }, { "revSize", 0.8f }, { "master", -6.0f } } },
+            { "Juno Strings", { { "aTable", 20 }, { "aPos", 0.4f }, { "aUni", 3 }, { "aDetune", 0.18f }, { "aBlend", 1.0f }, { "envA", 0.35f },
+                                { "envR", 0.9f }, { "l1Sync", 0 }, { "l1Rate", 0.6f }, { "m1Src", 2 }, { "m1Dst", 1 }, { "m1Amt", 0.3f },
+                                { "cutoff", 6000 }, { "chorus", 0.7f }, { "revMix", 0.3f }, { "master", -6.0f } } },
+            { "Vocoder Lead", { { "aTable", 17 }, { "aPos", 0.3f }, { "aUni", 2 }, { "aDetune", 0.12f }, { "envA", 0.02f }, { "envR", 0.4f },
+                                { "voiceMode", 2 }, { "glide", 0.06f }, { "l1Sync", 4 }, { "l1Shape", 1 }, { "m1Src", 2 }, { "m1Dst", 1 }, { "m1Amt", 0.4f },
+                                { "dlyMix", 0.25f }, { "revMix", 0.2f }, { "master", 0.0f } } },
+            { "Corde Pluck", { { "aTable", 21 }, { "aPos", 0.0f }, { "envA", 0.001f }, { "envD", 0.8f }, { "envS", 0.0f }, { "envR", 0.6f },
+                               { "env2D", 0.6f }, { "m1Src", 1 }, { "m1Dst", 1 }, { "m1Amt", 0.8f }, { "revMix", 0.25f }, { "master", -1.0f } } },
+            { "Anthem Supersaw W", { { "aTable", 25 }, { "aPos", 0.5f }, { "aUni", 5 }, { "aDetune", 0.3f }, { "aBlend", 1.0f },
+                                     { "envA", 0.01f }, { "envR", 0.5f }, { "chorus", 0.3f }, { "revMix", 0.3f }, { "dlyMix", 0.15f }, { "master", -7.0f } } },
+            { "Formant Choir", { { "aTable", 19 }, { "aPos", 0.2f }, { "aUni", 4 }, { "aDetune", 0.2f }, { "aBlend", 1.0f }, { "envA", 0.8f },
+                                 { "envR", 2.0f }, { "l1Sync", 0 }, { "l1Rate", 0.08f }, { "m1Src", 2 }, { "m1Dst", 1 }, { "m1Amt", 0.7f },
+                                 { "revMix", 0.5f }, { "revSize", 0.9f }, { "master", -1.0f } } },
             { "Sync Screamer", { { "aTable", 4 }, { "aPos", 0.2f }, { "aWarp", 1 }, { "aWarpAmt", 0.0f }, { "aUni", 2 }, { "aDetune", 0.15f },
                                  { "voiceMode", 2 }, { "glide", 0.08f }, { "m1Src", 1 }, { "m1Dst", 3 }, { "m1Amt", 0.7f }, { "env2D", 0.6f },
                                  { "m2Src", 7 }, { "m2Dst", 1 }, { "m2Amt", 0.8f }, { "drive", 0.35f }, { "dlyMix", 0.25f }, { "master", 1.0f } } },
@@ -478,8 +552,26 @@ PrismaAudioProcessor::PrismaAudioProcessor()
         for (auto* suffix : { "Src", "Dst", "Amt" })
             p.push_back (apvts.getRawParameterValue ("m" + juce::String (s) + suffix));
     for (auto* x : p) jassert (x != nullptr);
+    apvts.addParameterListener ("aTable", this);
+    apvts.addParameterListener ("bTable", this);
     presets.loadFactory (0);
+    ensureTables();
 }
+
+PrismaAudioProcessor::~PrismaAudioProcessor()
+{
+    apvts.removeParameterListener ("aTable", this);
+    apvts.removeParameterListener ("bTable", this);
+}
+
+/** Le tabelle scelte si preparano subito (di solito dal thread della UI: preset, scelta della tabella). */
+void PrismaAudioProcessor::ensureTables()
+{
+    for (auto* id : { "aTable", "bTable" })
+        prisma::Bank::get().ensure ((int) apvts.getRawParameterValue (id)->load());
+}
+
+void PrismaAudioProcessor::parameterChanged (const juce::String&, float)   { ensureTables(); }
 
 void PrismaAudioProcessor::readBlock (Block& b)
 {
@@ -863,5 +955,8 @@ void PrismaAudioProcessor::setStateInformation (const void* data, int size)
 {
     if (auto xml = getXmlFromBinary (data, size))
         if (xml->hasTagName (apvts.state.getType()))
+        {
             apvts.replaceState (juce::ValueTree::fromXml (*xml));
+            ensureTables();
+        }
 }

@@ -24,11 +24,12 @@ public:
         auto area = r.reduced (10.0f, 8.0f);
         g.setFont (frui::mono (11.0f, false));
         g.setColour (frui::colours::textDim);
-        g.drawText (prisma::tableNames()[table].toUpperCase() + "   POS " + juce::String (juce::roundToInt (pos * 100.0f)) + "%",
+        g.drawText (prisma::Bank::get().names()[table].toUpperCase() + "   POS " + juce::String (juce::roundToInt (pos * 100.0f)) + "%",
                     area.removeFromTop (14.0f), juce::Justification::centredLeft, false);
 
         // 3D: le forme una dietro l'altra (spostate in alto a destra), la piu' vicina in basso a sinistra
-        const auto& bank = prisma::Bank::get();
+        auto& bank = prisma::Bank::get();
+        bank.ensure (table);
         const float depthX = area.getWidth() * 0.22f, depthY = area.getHeight() * 0.42f;
         const float w = area.getWidth() - depthX, h = area.getHeight() - depthY;
         const int shown = juce::roundToInt (pos * (prisma::numFrames - 1));
