@@ -245,6 +245,19 @@ void NeonEditor::layoutSection (Section& s)
     auto c = s.panel->content();
     bool anyKnob = false;
     for (auto* item : s.items) anyKnob = anyKnob || dynamic_cast<frui::Knob*> (item) != nullptr;
+    if (s.view != nullptr && ! s.items.empty() && ! anyKnob && s.viewLeft && (c.getWidth() > 420 || (c.getHeight() < 160 && c.getWidth() > 260)))
+    {
+        // solo selettori, disegno a sinistra (schermo basso/largo): selettori in colonna a destra
+        s.view->setBounds (c.removeFromLeft ((int) ((float) c.getWidth() * 0.55f)).reduced (0, 2));
+        c.removeFromLeft (8);
+        const int barH = juce::jlimit (20, 30, (c.getHeight() - 5 * ((int) s.items.size() - 1)) / juce::jmax (1, (int) s.items.size()));
+        for (auto* item : s.items)
+        {
+            item->setBounds (c.removeFromTop (barH).withSizeKeepingCentre (juce::jmin (c.getWidth(), 360), barH));
+            c.removeFromTop (5);
+        }
+        return;
+    }
     if (s.view != nullptr && ! s.items.empty() && ! anyKnob)
     {
         // solo selettori: in fila sopra, il disegno prende tutto il resto (a tutta larghezza)
@@ -282,14 +295,28 @@ void NeonEditor::layoutSection (Section& s)
             c.removeFromTop (4);
         }
     }
-    std::vector<juce::Component*> knobs;
-    const int barH = juce::jlimit (22, 30, c.getHeight() / 6);
+    std::vector<juce::Component*> knobs, selectors;
     for (auto* item : s.items)
+        (dynamic_cast<frui::Knob*> (item) != nullptr ? knobs : selectors).push_back (item);
+    const int barH = juce::jlimit (22, 30, c.getHeight() / 6);
+    if (! knobs.empty() && ! selectors.empty() && c.getHeight() < (int) selectors.size() * (barH + 5) + 70 && c.getWidth() > 380)
     {
-        if (dynamic_cast<frui::Knob*> (item) != nullptr) { knobs.push_back (item); continue; }
-        item->setBounds (c.removeFromTop (barH).withSizeKeepingCentre (juce::jmin (c.getWidth(), 260), barH));
-        c.removeFromTop (5);
+        // pannello basso: i selettori in colonna a sinistra, le manopole a destra (altrimenti non ci starebbero)
+        auto col = c.removeFromLeft (juce::jmin (260, c.getWidth() * 2 / 5));
+        c.removeFromLeft (6);
+        const int h = juce::jlimit (18, 30, (col.getHeight() - 4 * ((int) selectors.size() - 1)) / (int) selectors.size());
+        for (auto* item : selectors)
+        {
+            item->setBounds (col.removeFromTop (h));
+            col.removeFromTop (4);
+        }
     }
+    else
+        for (auto* item : selectors)
+        {
+            item->setBounds (c.removeFromTop (barH).withSizeKeepingCentre (juce::jmin (c.getWidth(), 260), barH));
+            c.removeFromTop (5);
+        }
     const int n = (int) knobs.size();
     if (n == 0) return;
     int cols = s.columns;

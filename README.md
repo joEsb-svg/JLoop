@@ -14,7 +14,14 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.70)
+## Stato attuale (v0.71)
+
+**Novita' della 0.71**: PRISMA, synth a wavetable stile Serum (+ Strumento > Prisma):
+2 oscillatori wavetable (10 tabelle da 32 forme, band-limited), posizione, 8 warp (sync, bend, specchio, quantizza,
+allunga, FM), unisono fino a 7 voci; sub e rumore; filtro LP12/LP24/HP/BP/notch con drive; 2 inviluppi, 2 LFO
+(liberi o a tempo), matrice di modulazione a 8 posti; poly 8 voci / mono / legato + glide; chorus, delay, riverbero.
+Disegno 3D della tabella (trascina = posizione), knob grandi MORPH e CUTOFF, 18 preset.
+
 
 **Novita' della 0.70**: le tue acapella si modificano (Vocals a tempo > Le tue): taglio con la forma d'onda
 (maniglie trascinabili), intonazione +-12 semitoni (la durata resta), volume, fade in/out, al contrario, effetto.
