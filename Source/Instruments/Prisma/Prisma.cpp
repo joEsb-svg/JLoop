@@ -47,117 +47,113 @@ namespace prisma
             for (int k = 0; k < 3; ++k) F[k] = table[i][k] + (table[i + 1][k] - table[i][k]) * fr;
         }
 
+        double basicWave (int w, double x)
+        {
+            switch (w)
+            {
+                case 0:  return std::sin (twoPi * x);
+                case 1:  return x < 0.25 ? 4.0 * x : x < 0.75 ? 2.0 - 4.0 * x : 4.0 * x - 4.0;
+                case 2:  return x < 0.5 ? 2.0 * x : 2.0 * x - 2.0;
+                default: return x < 0.5 ? 1.0 : -1.0;
+            }
+        }
+
+        // Analogico: sinusoide -> triangolo -> dente di sega -> quadra
+        void tableAnalog (double t, std::vector<float>& out)
+        {
+            const double s = t * 3.0;
+            const int k = juce::jmin ((int) s, 2);
+            const double fr = s - k;
+            const int N = (int) out.size();
+            for (int i = 0; i < N; ++i)
+            {
+                const double x = (double) i / N;
+                out[(size_t) i] = (float) (basicWave (k, x) * (1.0 - fr) + basicWave (k + 1, x) * fr);
+            }
+        }
+
+        double vowelAmp (int h, double f0, const double* F, double sharp, int mode)
+        {
+            const double F3[3] { F[0], F[1], F[2] };
+            const double g = formant (h * f0, F3, sharp);
+            if (mode == 0) return g / h;
+            return (h % 2 == 1 ? 1.0 : 0.35) * g * g / h;
+        }
+
+        // Formanti: a -> e -> i -> o -> u su un dente di sega
+        void tableFormant (double t, std::vector<float>& out)
+        {
+            static const double v[5][3] { { 800, 1150, 2900 }, { 450, 2100, 2800 }, { 300, 2600, 3300 }, { 450, 800, 2830 }, { 330, 700, 2700 } };
+            double F[3];
+            vowelAt (t, F, v, 5);
+            for (int h = 1; h <= 200; ++h)
+            {
+                const double a = vowelAmp (h, 110.0, F, 1.0, 0);
+                for (size_t i = 0; i < out.size(); ++i) out[i] += (float) (a * std::sin (twoPi * h * (double) i / (double) out.size()));
+            }
+        }
+
+        // Growl: "yoi" (o -> a -> i) su armonici dispari, formanti strette
+        void tableGrowl (double t, std::vector<float>& out)
+        {
+            static const double v[3][3] { { 450, 800, 2830 }, { 800, 1150, 2900 }, { 300, 2600, 3300 } };
+            double F[3];
+            vowelAt (t, F, v, 3);
+            for (int h = 1; h <= 300; ++h)
+            {
+                const double a = vowelAmp (h, 80.0, F, 1.8, 1);
+                for (size_t i = 0; i < out.size(); ++i) out[i] += (float) (a * std::sin (twoPi * h * (double) i / (double) out.size()));
+            }
+        }
+
+        double harmonicCountAmp (int h, double count)   { return juce::jlimit (0.0, 1.0, count - (h - 1)) / h; }
+
+        void tableHarmonics (double t, std::vector<float>& out)
+        {
+            const double count = 1.0 + t * 63.0;
+            for (int h = 1; h <= 64; ++h)
+            {
+                const double a = harmonicCountAmp (h, count);
+                if (a < 1.0e-6) continue;
+                for (size_t i = 0; i < out.size(); ++i) out[i] += (float) (a * std::sin (twoPi * h * (double) i / (double) out.size()));
+            }
+        }
+
+        void tableOrgan (double t, std::vector<float>& out)
+        {
+            static const int harm[6] { 1, 2, 3, 4, 6, 8 };
+            for (int k = 0; k < 6; ++k)
+            {
+                const double g = k == 0 ? 1.0 : juce::jlimit (0.0, 1.0, t * 6.0 - (k - 1));
+                for (size_t i = 0; i < out.size(); ++i) out[i] += (float) (g * 0.8 * std::sin (twoPi * harm[k] * (double) i / (double) out.size()));
+            }
+        }
+
         /** Una forma (un periodo) della tabella 'table', alla posizione t (0..1). */
         void makeFrame (int table, double t, std::vector<float>& out)
         {
             const int N = frameSize;
             out.assign ((size_t) N, 0.0f);
-            auto additive = [&] (std::function<double (int)> amp, int maxH)
+            if (table == 0) { tableAnalog (t, out); return; }
+            if (table == 1) { tableFormant (t, out); return; }
+            if (table == 3) { tableHarmonics (t, out); return; }
+            if (table == 7) { tableGrowl (t, out); return; }
+            if (table == 9) { tableOrgan (t, out); return; }
+            for (int i = 0; i < N; ++i)
             {
-                for (int h = 1; h <= maxH; ++h)
-                {
-                    const double a = amp (h);
-                    if (std::abs (a) < 1.0e-6) continue;
-                    for (int i = 0; i < N; ++i) out[(size_t) i] += (float) (a * std::sin (twoPi * h * i / N));
-                }
-            };
-            switch (table)
-            {
-                case 0:   // Analogico: sinusoide -> triangolo -> dente di sega -> quadra
-                {
-                    const double s = t * 3.0;
-                    const int k = juce::jmin ((int) s, 2);
-                    const double fr = s - k;
-                    auto wave = [] (int w, double x)
-                    {
-                        switch (w)
-                        {
-                            case 0:  return std::sin (twoPi * x);
-                            case 1:  return x < 0.25 ? 4.0 * x : x < 0.75 ? 2.0 - 4.0 * x : 4.0 * x - 4.0;
-                            case 2:  return x < 0.5 ? 2.0 * x : 2.0 * x - 2.0;
-                            default: return x < 0.5 ? 1.0 : -1.0;
-                        }
-                    };
-                    for (int i = 0; i < N; ++i)
-                    {
-                        const double x = (double) i / N;
-                        out[(size_t) i] = (float) (wave (k, x) * (1.0 - fr) + wave (k + 1, x) * fr);
-                    }
-                    break;
-                }
-                case 1:   // Formanti: a -> e -> i -> o -> u su un dente di sega
-                {
-                    static const double v[5][3] { { 800, 1150, 2900 }, { 450, 2100, 2800 }, { 300, 2600, 3300 }, { 450, 800, 2830 }, { 330, 700, 2700 } };
-                    double F[3]; vowelAt (t, F, v, 5);
-                    additive ([&] (int h) { return formant (h * 110.0, F, 1.0) / h; }, 200);
-                    break;
-                }
-                case 2:   // PWM: impulso da 50% a 3%
-                {
-                    const double w = 0.5 - 0.47 * t;
-                    for (int i = 0; i < N; ++i) out[(size_t) i] = (double) i / N < w ? 1.0f : -1.0f;
-                    break;
-                }
-                case 3:   // Armonici: si aggiungono uno alla volta
-                {
-                    const double count = 1.0 + t * 63.0;
-                    additive ([count] (int h) { const double g = juce::jlimit (0.0, 1.0, count - (h - 1)); return g / h; }, 64);
-                    break;
-                }
-                case 4:   // Sync: dente di sega "agganciato" sempre piu' veloce
-                {
-                    const double r = 1.0 + t * 7.0;
-                    for (int i = 0; i < N; ++i)
-                    {
-                        const double x = (double) i / N;
-                        const double y = std::fmod (x * r, 1.0);
-                        out[(size_t) i] = (float) ((2.0 * y - 1.0) * (1.0 - 0.3 * x));
-                    }
-                    break;
-                }
-                case 5:   // FM: indice che cresce (rapporto 2)
-                {
-                    const double idx = t * 6.0;
-                    for (int i = 0; i < N; ++i)
-                    {
-                        const double x = (double) i / N;
-                        out[(size_t) i] = (float) std::sin (twoPi * x + idx * std::sin (twoPi * 2.0 * x));
-                    }
-                    break;
-                }
-                case 6:   // Wavefolder: sinusoide "piegata" sempre di piu'
-                {
-                    const double g = 1.0 + t * 8.0;
-                    for (int i = 0; i < N; ++i) out[(size_t) i] = (float) std::sin (g * std::sin (twoPi * i / N) * juce::MathConstants<double>::halfPi);
-                    break;
-                }
-                case 7:   // Growl: "yoi" (o -> a -> i) su armonici dispari, formanti strette
-                {
-                    static const double v[3][3] { { 450, 800, 2830 }, { 800, 1150, 2900 }, { 300, 2600, 3300 } };
-                    double F[3]; vowelAt (t, F, v, 3);
-                    additive ([&] (int h) { const double f = formant (h * 80.0, F, 1.8); return (h % 2 == 1 ? 1.0 : 0.35) * f * f / h; }, 300);
-                    break;
-                }
-                case 8:   // Bitcrush: dente di sega con sempre meno gradini
+                const double x = (double) i / N;
+                double y = 0.0;
+                if (table == 2)        y = x < 0.5 - 0.47 * t ? 1.0 : -1.0;                                    // PWM
+                else if (table == 4)   { const double r = std::fmod (x * (1.0 + t * 7.0), 1.0); y = (2.0 * r - 1.0) * (1.0 - 0.3 * x); }   // Sync
+                else if (table == 5)   y = std::sin (twoPi * x + t * 6.0 * std::sin (twoPi * 2.0 * x));        // FM
+                else if (table == 6)   y = std::sin ((1.0 + t * 8.0) * std::sin (twoPi * x) * juce::MathConstants<double>::halfPi);   // Wavefolder
+                else                                                                                          // Bitcrush
                 {
                     const double levels = std::pow (2.0, 5.0 - t * 3.5), steps = 128.0 - t * 112.0;
-                    for (int i = 0; i < N; ++i)
-                    {
-                        const double x = std::floor ((double) i / N * steps) / steps;
-                        out[(size_t) i] = (float) (std::round ((2.0 * x - 1.0) * levels) / levels);
-                    }
-                    break;
+                    const double q = std::floor (x * steps) / steps;
+                    y = std::round ((2.0 * q - 1.0) * levels) / levels;
                 }
-                default:  // Organo: si tirano fuori i registri uno alla volta
-                {
-                    static const int harm[6] { 1, 2, 3, 4, 6, 8 };
-                    for (int k = 0; k < 6; ++k)
-                    {
-                        const double g = k == 0 ? 1.0 : juce::jlimit (0.0, 1.0, t * 6.0 - (k - 1));
-                        additive ([&] (int h) { return h == harm[k] ? g * 0.8 : 0.0; }, harm[k]);
-                    }
-                    break;
-                }
+                out[(size_t) i] = (float) y;
             }
         }
     }
