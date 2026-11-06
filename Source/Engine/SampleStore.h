@@ -175,6 +175,8 @@ public:
     static bool isGenerated (const juce::String& fileName)
     {
         const auto base = juce::File (fileName).getFileNameWithoutExtension();
+        if (base.startsWith ("Vocal ") && base.contains (" BPM") && (base.contains (" a tempo ") || base.containsWholeWord ("battuta") || base.containsWholeWord ("battute")))
+            return true;
         return (base.startsWith ("Riser ") || base.startsWith ("Downer ")) && base.contains (" BPM")
                && (base.containsWholeWord ("battuta") || base.containsWholeWord ("battute"));
     }

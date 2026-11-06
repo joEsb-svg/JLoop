@@ -3,6 +3,7 @@
 #include "../Engine/MidiExport.h"
 #include "../Instruments/Common/NeonEditor.h"
 #include "RiserPanel.h"
+#include "VocalPanel.h"
 #include "Theme.h"
 #include "../Engine/ProjectIO.h"
 #include "../Engine/Performance.h"
@@ -1334,6 +1335,7 @@ void MainComponent::showFileMenu()
     menu.addItem (10, "Live (lancia i pattern)...");
     menu.addItem (13, "Riser automatico...");
     menu.addItem (14, "Downer automatico...");
+    menu.addItem (22, "Vocals a tempo...");
     menu.addItem (6, "Esporta audio (WAV / OGG)...");
     {
         juce::PopupMenu midiMenu;
@@ -1423,6 +1425,8 @@ void MainComponent::showFileMenu()
                                 self.openRiser();
                             else if (result == 14)
                                 self.openRiser (true);
+                            else if (result == 22)
+                                self.openVocals();
                             else if (result >= 3000 && result < 4000)
                                 self.loadDemo (result - 3000);
                             else if (result >= 5000 && result < 9000)
@@ -2210,6 +2214,33 @@ void MainComponent::openRiser (bool downer)
     overlay->toFront (true);
 }
 
+void MainComponent::openVocals (int category, int index)
+{
+    auto* top = overlayHost (*this);
+    if (top == nullptr)
+        top = this;
+    auto* panel = new VocalPanel (engine, sampleStore);
+    juce::Component::SafePointer<MainComponent> safe (this);
+    panel->onCreated = [safe] (const vocals::Result& r)
+    {
+        if (safe == nullptr) return;
+        auto& self = *safe;
+        self.userTouched.store (true);
+        if (! self.engine.isSongMode() && r.pattern >= 0)
+            self.engine.selectPattern (r.pattern);
+        self.rebuildRows();
+        self.syncControlsFromEngine();
+        self.playlist.refresh();
+        if (r.channel >= 0)
+            self.scrollToChannel (r.channel);
+    };
+    panel->onClose = [panel] { juce::MessageManager::callAsync ([panel] { delete panel; }); };
+    top->addAndMakeVisible (panel);
+    panel->setBounds (top->getLocalBounds());
+    panel->toFront (true);
+    if (category >= 0) panel->selectForTest (category, juce::jmax (0, index));
+}
+
 void MainComponent::shareProject()
 {
     // I nomi dei campioni dentro gli strumenti (DrumForge, Slicer) stanno nei loro stati
@@ -2556,6 +2587,9 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
             c.colour = info->colour;
             applySoundChoice (-1, c);
         }
+
+    if (const int i = args.indexOf ("--vocals"); i >= 0)   // test: finestra delle vocals (categoria, frase)
+        openVocals (args[i + 1].getIntValue(), args[i + 2].getIntValue());
 
     if (args.contains ("--riser"))   // test: finestra del riser automatico
         openRiser (args.contains ("--downer"));

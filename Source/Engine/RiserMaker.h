@@ -5,6 +5,7 @@
 #include "SequencerEngine.h"
 #include "SampleStore.h"
 #include "RiserSound.h"
+#include "VocalMaker.h"
 
 //==============================================================================
 /**
@@ -72,7 +73,7 @@ namespace riser
     inline bool recipeFromString (const juce::String& text, Options& o, double& bpm, int& root)
     {
         const auto v = juce::JSON::parse (text);
-        if (! v.isObject()) return false;
+        if (! v.isObject() || v.getProperty ("kind", {}).toString() == "vocal") return false;
         o.down = v.getProperty ("kind", "riser").toString() == "downer";
         o.bars = juce::jlimit (1, 16, (int) v.getProperty ("bars", 4));
         o.noise = v.getProperty ("noise", true); o.note = v.getProperty ("note", true); o.roll = v.getProperty ("roll", true); o.impact = v.getProperty ("impact", true);
@@ -195,6 +196,30 @@ namespace riser
             auto& ch = engine.getChannel (c);
             auto it = engine.sampleRecipes.find (ch.sampleName);
             if (it == engine.sampleRecipes.end()) continue;
+
+            // Frasi vocali a tempo: stessa idea, la ricetta e' diversa
+            if (vocals::isVocalRecipe (it->second))
+            {
+                juce::String newName;
+                if (auto m = made.find (ch.sampleName); m != made.end()) newName = m->second;
+                else
+                {
+                    juce::String newRecipe;
+                    newName = vocals::retime (it->second, bpm, store, newRecipe);
+                    if (newName.isEmpty()) continue;
+                    engine.sampleRecipes[newName] = newRecipe;
+                    made[ch.sampleName] = newName;
+                }
+                if (auto* data = store.load (newName))
+                {
+                    ch.sampleName = newName;
+                    ch.sample.store (data);
+                    ch.touchSound();
+                    ++count;
+                }
+                continue;
+            }
+
             Options o; double madeAt = 0.0; int root = 0;
             if (! recipeFromString (it->second, o, madeAt, root) || std::abs (madeAt - bpm) < 0.05) continue;
 

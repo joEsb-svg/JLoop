@@ -14,7 +14,15 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.68)
+## Stato attuale (v0.69)
+
+**Novita' della 0.69**: Menu > "Vocals a tempo...":
+- 35 frasi vocali fatte da JLoop (sintesi a formanti): hook cantati nella tonalita' del progetto, grida e adlib,
+  build-up, voci robot/sussurri/coro alieno. Voce (femminile, maschile, coro, robot, sussurro), ottava, effetto
+  (asciutta, spazio, eco a tempo, radio); ascolta e aggiungi (canale + pattern, anche nella playlist)
+- "Le tue": una voce importata (acapella) + a che BPM era -> stirata al tempo del progetto senza cambiare intonazione
+- Tutte si rifanno da sole quando cambi i BPM (come riser e downer) e non compaiono tra i campioni importati
+
 
 **0.68.1** (telefono): "Effetti pronti" e "Forme e onde" si adattano allo schermo (tasti - / + sempre visibili),
 tasti "Effetti" e "+ Nuova" nella playlist in verticale, manopole degli effetti piu' grandi col telefono in orizzontale.
