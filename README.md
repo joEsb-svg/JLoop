@@ -14,7 +14,12 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.69)
+## Stato attuale (v0.70)
+
+**Novita' della 0.70**: le tue acapella si modificano (Vocals a tempo > Le tue): taglio con la forma d'onda
+(maniglie trascinabili), intonazione +-12 semitoni (la durata resta), volume, fade in/out, al contrario, effetto.
+Menu del canale > "Modifica la voce..." riapre una voce gia' messa (anche le frasi di JLoop) e la rifa' sul canale.
+
 
 **Novita' della 0.69**: Menu > "Vocals a tempo...":
 - 35 frasi vocali fatte da JLoop (sintesi a formanti): hook cantati nella tonalita' del progetto, grida e adlib,

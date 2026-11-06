@@ -2214,12 +2214,12 @@ void MainComponent::openRiser (bool downer)
     overlay->toFront (true);
 }
 
-void MainComponent::openVocals (int category, int index)
+void MainComponent::openVocals (int category, int index, int editChannel)
 {
     auto* top = overlayHost (*this);
     if (top == nullptr)
         top = this;
-    auto* panel = new VocalPanel (engine, sampleStore);
+    auto* panel = new VocalPanel (engine, sampleStore, editChannel);
     juce::Component::SafePointer<MainComponent> safe (this);
     panel->onCreated = [safe] (const vocals::Result& r)
     {
@@ -2590,6 +2590,12 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
 
     if (const int i = args.indexOf ("--vocals"); i >= 0)   // test: finestra delle vocals (categoria, frase)
         openVocals (args[i + 1].getIntValue(), args[i + 2].getIntValue());
+    if (const int i = args.indexOf ("--vocal-edit"); i >= 0)   // test: voce importata (nome file, BPM) messa a tempo e aperta per modificarla
+    {
+        vocals::MyVoice v; v.source = args[i + 1]; v.srcBpm = args[i + 2].getDoubleValue(); v.start = 0.4; v.semis = 2; v.fadeIn = 300; v.fadeOut = 600;
+        const auto r = vocals::applyStretched (engine, sampleStore, v);
+        if (r.ok) { rebuildRows(); openVocals (-1, -1, r.channel); }
+    }
 
     if (args.contains ("--riser"))   // test: finestra del riser automatico
         openRiser (args.contains ("--downer"));
@@ -3609,6 +3615,9 @@ void MainComponent::handleChannelCommand (int channel, int command)
             unfreezeChannel (channel);
             break;
 
+        case ChannelRow::editVocal:
+            openVocals (-1, -1, channel);
+            break;
         case ChannelRow::resample:
             startFreeze (channel);
             if (freezer != nullptr) resamplePattern = engine.getCurrentPattern();

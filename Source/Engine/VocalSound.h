@@ -422,6 +422,8 @@ namespace vocal
         }
     }
 
+    inline void applyFx (juce::AudioBuffer<float>& audio, double sr, double bpm, int fx);
+
     /** Ultimi ritocchi: niente continua, picco a -1 dB, poi l'effetto (asciutta, riverbero, eco a tempo, radio). */
     inline void finish (juce::AudioBuffer<float>& audio, double sr, double bpm, int fx)
     {
@@ -446,7 +448,15 @@ namespace vocal
             air.processSamples (d, n);
         }
         normalise (0.89f);
+        applyFx (audio, sr, bpm, fx);
+        if (fx != dry) normalise (0.89f);
+    }
 
+    /** Solo l'effetto (asciutta, riverbero, eco a tempo, radio), senza cambiare il volume. */
+    inline void applyFx (juce::AudioBuffer<float>& audio, double sr, double bpm, int fx)
+    {
+        float* d = audio.getWritePointer (0);
+        const int n = audio.getNumSamples();
         if (fx == radio)
         {
             juce::IIRFilter hp, lp;
@@ -479,6 +489,5 @@ namespace vocal
             rv.setParameters (p);
             rv.processMono (d, n);
         }
-        if (fx != dry) normalise (0.89f);
     }
 }

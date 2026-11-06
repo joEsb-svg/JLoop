@@ -284,45 +284,128 @@ namespace vocals
     //==========================================================================
     // LE TUE VOCI A TEMPO: un campione importato, suonato a un certo BPM, stirato al BPM del progetto (stessa intonazione)
 
-    inline juce::String stretchRecipe (const juce::String& source, double srcBpm, double bpm)
+    /** La tua voce: da che file, a che BPM era, e le modifiche (non distruttive: l'originale resta com'e'). */
+    struct MyVoice
+    {
+        juce::String source;
+        double srcBpm = 120.0;
+        double start = 0.0, end = 0.0;      // taglio, in secondi del file originale (end 0 = fino alla fine)
+        float semis = 0.0f;                 // intonazione (semitoni, la durata non cambia)
+        float gainDb = 0.0f;
+        float fadeIn = 0.0f, fadeOut = 0.0f; // millisecondi
+        bool reverse = false;
+        int fx = vocal::dry;
+    };
+
+    inline juce::String stretchRecipe (const MyVoice& v, double bpm)
     {
         auto* d = new juce::DynamicObject();
         d->setProperty ("kind", "vocalStretch");
-        d->setProperty ("source", source);
-        d->setProperty ("srcBpm", srcBpm);
+        d->setProperty ("source", v.source);
+        d->setProperty ("srcBpm", v.srcBpm);
         d->setProperty ("bpm", bpm);
+        d->setProperty ("start", v.start);
+        d->setProperty ("end", v.end);
+        d->setProperty ("semis", v.semis);
+        d->setProperty ("gain", v.gainDb);
+        d->setProperty ("fadeIn", v.fadeIn);
+        d->setProperty ("fadeOut", v.fadeOut);
+        d->setProperty ("reverse", v.reverse);
+        d->setProperty ("fx", v.fx);
         return juce::JSON::toString (juce::var (d), true);
     }
 
-    inline bool stretchFromString (const juce::String& text, juce::String& source, double& srcBpm, double& bpm)
+    inline bool stretchFromString (const juce::String& text, MyVoice& v, double& bpm)
     {
-        const auto v = juce::JSON::parse (text);
-        if (! v.isObject() || v.getProperty ("kind", {}).toString() != "vocalStretch") return false;
-        source = v.getProperty ("source", {}).toString();
-        srcBpm = juce::jlimit (20.0, 300.0, (double) v.getProperty ("srcBpm", 120.0));
-        bpm = (double) v.getProperty ("bpm", 120.0);
-        return source.isNotEmpty();
+        const auto o = juce::JSON::parse (text);
+        if (! o.isObject() || o.getProperty ("kind", {}).toString() != "vocalStretch") return false;
+        v.source = o.getProperty ("source", {}).toString();
+        v.srcBpm = juce::jlimit (20.0, 300.0, (double) o.getProperty ("srcBpm", 120.0));
+        bpm = (double) o.getProperty ("bpm", 120.0);
+        v.start = juce::jmax (0.0, (double) o.getProperty ("start", 0.0));
+        v.end = juce::jmax (0.0, (double) o.getProperty ("end", 0.0));
+        v.semis = juce::jlimit (-12.0f, 12.0f, (float) (double) o.getProperty ("semis", 0.0));
+        v.gainDb = juce::jlimit (-24.0f, 12.0f, (float) (double) o.getProperty ("gain", 0.0));
+        v.fadeIn = juce::jlimit (0.0f, 5000.0f, (float) (double) o.getProperty ("fadeIn", 0.0));
+        v.fadeOut = juce::jlimit (0.0f, 5000.0f, (float) (double) o.getProperty ("fadeOut", 0.0));
+        v.reverse = (bool) o.getProperty ("reverse", false);
+        v.fx = juce::jlimit (0, vocal::numFx - 1, (int) o.getProperty ("fx", 0));
+        return v.source.isNotEmpty();
     }
 
-    /** Stira il campione 'source' (suonato a srcBpm) al tempo bpm e lo salva. Ritorna il nome, vuoto se non riesce. */
-    inline juce::String writeStretched (SampleStore& store, const juce::String& source, double srcBpm, double bpm, SampleData*& data)
+    /** La tua voce modificata e a tempo (mono, al sample rate del file). */
+    inline juce::AudioBuffer<float> renderMine (const SampleData& src, const MyVoice& v, double bpm)
+    {
+        const double sr = src.sampleRate;
+        const int total = src.audio.getNumSamples();
+        // 1. taglio
+        const int a = juce::jlimit (0, juce::jmax (0, total - 1), (int) std::llround (v.start * sr));
+        const int b = v.end > v.start ? juce::jlimit (a + 1, total, (int) std::llround (v.end * sr)) : total;
+        juce::AudioBuffer<float> cut (1, juce::jmax (1, b - a));
+        cut.copyFrom (0, 0, src.audio, 0, a, cut.getNumSamples());
+        // 2. al contrario
+        if (v.reverse) cut.reverse (0, 0, cut.getNumSamples());
+        // 3. intonazione: si ricampiona (piu' acuto = piu' corto) e poi lo stiramento rimette a posto la durata
+        const double f = std::pow (2.0, v.semis / 12.0);
+        if (std::abs (v.semis) > 0.01f)
+        {
+            juce::AudioBuffer<float> re (1, juce::jmax (1, (int) (cut.getNumSamples() / f)));
+            const float* in = cut.getReadPointer (0);
+            float* o = re.getWritePointer (0);
+            const int n = cut.getNumSamples();
+            for (int i = 0; i < re.getNumSamples(); ++i)
+            {
+                const double pos = i * f;
+                const int i0 = (int) pos;
+                const float fr = (float) (pos - i0);
+                auto at = [in, n] (int k) { return in[juce::jlimit (0, n - 1, k)]; };
+                // interpolazione cubica (Catmull-Rom)
+                const float y0 = at (i0 - 1), y1 = at (i0), y2 = at (i0 + 1), y3 = at (i0 + 2);
+                o[i] = y1 + 0.5f * fr * (y2 - y0 + fr * (2.0f * y0 - 5.0f * y1 + 4.0f * y2 - y3 + fr * (3.0f * (y1 - y2) + y3 - y0)));
+            }
+            cut = std::move (re);
+        }
+        // 4. a tempo (stessa intonazione)
+        auto out = stretch::process (cut, sr, v.srcBpm / juce::jmax (20.0, bpm) * f);
+        // 5. volume e dissolvenze
+        const int n = out.getNumSamples();
+        out.applyGain (juce::Decibels::decibelsToGain (v.gainDb));
+        const int fi = juce::jmin (n, (int) (v.fadeIn * 0.001 * sr)), fo = juce::jmin (n, (int) (v.fadeOut * 0.001 * sr));
+        if (fi > 0) out.applyGainRamp (0, fi, 0.0f, 1.0f);
+        if (fo > 0) out.applyGainRamp (n - fo, fo, 1.0f, 0.0f);
+        // 6. effetto
+        if (v.fx != vocal::dry)
+        {
+            const double tail = 1.5;
+            juce::AudioBuffer<float> longer (1, n + (int) (tail * sr));
+            longer.clear();
+            longer.copyFrom (0, 0, out, 0, 0, n);
+            vocal::applyFx (longer, sr, bpm, v.fx);
+            out = std::move (longer);
+        }
+        const float peak = out.getMagnitude (0, 0, out.getNumSamples());
+        if (peak > 0.99f) out.applyGain (0.99f / peak);
+        return out;
+    }
+
+    /** Salva la tua voce modificata e a tempo. Ritorna il nome, vuoto se non riesce. */
+    inline juce::String writeStretched (SampleStore& store, const MyVoice& v, double bpm, SampleData*& data)
     {
         data = nullptr;
-        auto* src = store.load (source);
+        auto* src = store.load (v.source);
         if (src == nullptr) return {};
-        auto audio = stretch::process (src->audio, src->sampleRate, srcBpm / juce::jmax (20.0, bpm));
-        const float peak = audio.getMagnitude (0, 0, audio.getNumSamples());
-        if (peak > 0.99f) audio.applyGain (0.99f / peak);
+        const auto audio = renderMine (*src, v, bpm);
+        const double sr = src->sampleRate;
         auto folder = SampleStore::getFolder();
         folder.createDirectory();
         const juce::String bpmText = std::abs (bpm - std::round (bpm)) < 0.05 ? juce::String (juce::roundToInt (bpm)) : juce::String (bpm, 1);
-        const auto base = juce::File::createLegalFileName ("Vocal " + juce::File (source).getFileNameWithoutExtension() + " a tempo " + bpmText + " BPM");
+        const auto base = juce::File::createLegalFileName ("Vocal " + juce::File (v.source).getFileNameWithoutExtension() + " a tempo " + bpmText + " BPM");
         juce::File file = folder.getChildFile (base + ".wav");
         for (int i = 2; file.exists(); ++i) file = folder.getChildFile (base + " (" + juce::String (i) + ").wav");
         {
             juce::WavAudioFormat wav;
             std::unique_ptr<juce::OutputStream> os = std::make_unique<juce::FileOutputStream> (file);
-            auto w = wav.createWriterFor (os, juce::AudioFormatWriterOptions{}.withSampleRate (src->sampleRate).withNumChannels (1).withBitsPerSample (24));
+            auto w = wav.createWriterFor (os, juce::AudioFormatWriterOptions{}.withSampleRate (sr).withNumChannels (1).withBitsPerSample (24));
             if (w == nullptr || ! w->writeFromAudioSampleBuffer (audio, 0, audio.getNumSamples()))
                 return {};
         }
@@ -334,13 +417,13 @@ namespace vocals
     inline juce::String retime (const juce::String& recipe, double bpm, SampleStore& store, juce::String& newRecipe)
     {
         {
-            juce::String source; double srcBpm = 0.0, madeAt = 0.0;
-            if (stretchFromString (recipe, source, srcBpm, madeAt))
+            MyVoice v; double madeAt = 0.0;
+            if (stretchFromString (recipe, v, madeAt))
             {
                 if (std::abs (madeAt - bpm) < 0.05) return {};
-                newRecipe = stretchRecipe (source, srcBpm, bpm);
+                newRecipe = stretchRecipe (v, bpm);
                 SampleData* data = nullptr;
-                return writeStretched (store, source, srcBpm, bpm, data);
+                return writeStretched (store, v, bpm, data);
             }
         }
         Options o; double madeAt = 0.0; int root = 0, scale = 0;
@@ -375,15 +458,16 @@ namespace vocals
     }
 
     /** La tua voce (campione importato, suonato a srcBpm) a tempo col progetto: canale + pattern (+ clip). */
-    inline Result applyStretched (SequencerEngine& engine, SampleStore& store, const juce::String& source, double srcBpm, int bar = -1)
+    inline Result applyStretched (SequencerEngine& engine, SampleStore& store, const MyVoice& v, int bar = -1)
     {
         Result r;
         if (engine.getFirstFreePattern() < 0) { r.error = "Tutti i pattern sono gia' usati."; return r; }
         const double bpm = engine.getBpm();
         SampleData* data = nullptr;
-        const auto fileName = writeStretched (store, source, srcBpm, bpm, data);
+        const auto fileName = writeStretched (store, v, bpm, data);
         if (fileName.isEmpty()) { r.error = "Non riesco a leggere o a salvare la voce."; return r; }
-        engine.sampleRecipes[fileName] = stretchRecipe (source, srcBpm, bpm);
+        engine.sampleRecipes[fileName] = stretchRecipe (v, bpm);
+        const auto& source = v.source;
         const double seconds = data->audio.getNumSamples() / data->sampleRate;
         const int bars = juce::jlimit (1, SequencerEngine::maxSteps / SequencerEngine::stepsPerBar,
                                        (int) std::ceil (seconds * bpm / 240.0 - 0.05));
@@ -441,5 +525,42 @@ namespace vocals
         }
         r.ok = true;
         return r;
+    }
+
+    /** Rifa' il campione di un canale che ha gia' una voce (frase o tua) con le impostazioni nuove. */
+    inline bool replaceOnChannel (SequencerEngine& engine, SampleStore& store, int channel, const juce::String& recipe)
+    {
+        if (channel < 0 || channel >= engine.getNumChannels()) return false;
+        const double bpm = engine.getBpm();
+        SampleData* data = nullptr;
+        juce::String fileName, newRecipe;
+        MyVoice v; double madeAt = 0.0;
+        Options o; int root = 0, scale = 0;
+        if (stretchFromString (recipe, v, madeAt))
+        {
+            fileName = writeStretched (store, v, bpm, data);
+            newRecipe = stretchRecipe (v, bpm);
+        }
+        else if (recipeFromString (recipe, o, madeAt, root, scale))
+        {
+            root = engine.getScaleRoot(); scale = engine.getScaleType();
+            fileName = writeSample (store, o, bpm, root, scale, data);
+            newRecipe = recipeToString (o, bpm, root, scale);
+        }
+        if (fileName.isEmpty() || data == nullptr) return false;
+        engine.sampleRecipes[fileName] = newRecipe;
+        auto& ch = engine.getChannel (channel);
+        ch.sampleName = fileName;
+        ch.sample.store (data);
+        ch.touchSound();
+        return true;
+    }
+
+    /** La ricetta della voce del canale (vuota se il canale non ha una voce fatta qui). */
+    inline juce::String recipeOfChannel (SequencerEngine& engine, int channel)
+    {
+        if (channel < 0 || channel >= engine.getNumChannels()) return {};
+        auto it = engine.sampleRecipes.find (engine.getChannel (channel).sampleName);
+        return it != engine.sampleRecipes.end() && isVocalRecipe (it->second) ? it->second : juce::String();
     }
 }

@@ -895,6 +895,9 @@ void ChannelRow::showRowMenu()
     menu.addItem (editSound, synth ? "Apri " + juce::String (info != nullptr ? info->name : "il synth") + "..."
                                    : juce::String ("Modifica suono e mix..."));
     menu.addItem (openPianoRoll, "Piano roll...");
+    if (auto it = engine.sampleRecipes.find (chan.sampleName); ! synth && it != engine.sampleRecipes.end()
+          && (it->second.contains ("\"vocal\"") || it->second.contains ("\"vocalStretch\"")))
+        menu.addItem (editVocal, "Modifica la voce...");
     if (synth)
         menu.addItem (chan.frozen.load() != nullptr ? (int) unfreeze : (int) freeze,
                       chan.frozen.load() != nullptr ? juce::String (juce::CharPointer_UTF8 ("Scongela  \xe2\x9d\x84"))
