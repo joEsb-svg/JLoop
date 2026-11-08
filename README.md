@@ -14,7 +14,18 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.72)
+## Stato attuale (v0.73)
+
+**Novita' della 0.73**:
+- **Autotune** sulle tue acapella (Vocals a tempo > Le tue, o "Modifica la voce..." dal canale): Spento / Naturale /
+  Pop / Robotico, sulla tonalita' del progetto (o un'altra a scelta). Tiene la durata e il timbro della voce (PSOLA);
+  le "s", i respiri e le parti senza nota passano invariati. Naturale lascia il vibrato, Robotico e' l'effetto T-Pain.
+- **Corsia SUONO** (channel rack > FX > SUONO, o menu del canale > "Corsia SUONO..."): ogni step suona con A (il canale)
+  o con i canali scelti come B, C, D, alla stessa nota. Il trucco del complextro: una linea sola, tanti synth.
+  Tocca = lettera dopo, trascina = stessa lettera, tieni premuto (tasto destro su PC) = scegli i synth e gli schemi
+  (casuale, A B A C, A B C D, alterna, ogni 4 step). Vale anche per le note del piano roll (conta lo step dove comincia
+  la nota) e per i ratchet; la corsia muta zittisce anche B, C, D.
+
 
 **Novita' della 0.72**: PRISMA ha 17 tabelle nuove fatte da sound designer (libere, CC0: Kimura Taro Free Wavetables
 e WaveEdit Online): Hardcore FM, Phase Dist, Chebyshev, Saw Sweep, OP Digitale, CZ Reso, PPG, Vocoder, Formant K,

@@ -27,7 +27,7 @@ class ChannelRow : public juce::Component,
                    private juce::Timer
 {
 public:
-    enum class EditMode { step, velocity, probability, ratchet, pitch, pan, filter, reverb, delay };
+    enum class EditMode { step, velocity, probability, ratchet, pitch, pan, filter, reverb, delay, sound };
     static bool isLockMode (EditMode m)     { return m == EditMode::filter || m == EditMode::reverb || m == EditMode::delay; }
     static int lockOf (EditMode m)          { return m == EditMode::filter ? SequencerEngine::lockFilter : m == EditMode::reverb ? SequencerEngine::lockReverb : SequencerEngine::lockDelay; }
 
@@ -35,7 +35,7 @@ public:
     enum Command
     {
         changeSound = 10, editSound = 11, openPianoRoll = 12, rename = 13, solo = 16,
-        clone = 17, moveUp = 18, moveDown = 19, remove = 20, openMixer = 21, freeze = 22, unfreeze = 23, askUnfreeze = 24, resample = 25, editVocal = 26,
+        clone = 17, moveUp = 18, moveDown = 19, remove = 20, openMixer = 21, freeze = 22, unfreeze = 23, askUnfreeze = 24, resample = 25, editVocal = 26, soundLane = 27,
         colourBase = 1400, mixerTrackBase = 3000
     };
 
@@ -92,6 +92,10 @@ public:
     std::function<void()> onTap;              // per la vibrazione
 
     void showRowMenu();
+    /** Corsia SUONO: scegli i canali B, C, D e gli schemi (casuale, A B A C...). */
+    void showSoundMenu();
+    /** Il colore e il nome di un suono della corsia (0 = A = il canale). */
+    juce::Colour soundColour (int k) const;
     void showFillPanelForTest (int step)    { showFillPanel (step); }
 
 private:
@@ -129,6 +133,11 @@ private:
     int      playTick = -1;
     juce::uint64 shownNotesHash = 0;
     void paintNotesPreview (juce::Graphics&, bool muted);
+    void paintSoundLane (juce::Graphics&, bool muted);
+    bool pressSound (const juce::MouseEvent&);
+    int  nextSound (int k) const;
+    int  soundPressStep = -1, soundBefore = 0, soundPaint = 0;
+    bool soundLongPress = false;
     const void* shownSample = nullptr;
     juce::String shownLabel;
     int      shownPattern = -1;

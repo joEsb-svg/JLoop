@@ -184,6 +184,14 @@ public:
         setupSlider (fadeInSlider, 0.0, 2000.0, 10.0, [this] (double v) { myVoice.fadeIn = (float) v; });
         setupSlider (fadeOutSlider, 0.0, 2000.0, 10.0, [this] (double v) { myVoice.fadeOut = (float) v; });
         reverseToggle.onClick = [this] { myVoice.reverse = reverseToggle.getToggleState(); changed(); };
+        addChildComponent (tuneSwitch);
+        tuneSwitch.onChange = [this] (int m) { myVoice.tune = m; updateKeyButton(); changed(); };
+        addChildComponent (keyButton);
+        keyButton.setTooltip ("Le note su cui l'autotune porta la voce (di solito la tonalita' del progetto)");
+        keyButton.onClick = [this] { chooseTuneKey(); };
+        // l'autotune parte con la tonalita' del progetto
+        myVoice.tuneRoot = engine.getScaleRoot();
+        myVoice.tuneScale = engine.getScaleType();
         addChildComponent (reverseToggle);
         addChildComponent (wave);
         wave.onChanged = [this] { changed(); };
@@ -266,6 +274,9 @@ public:
             g.setColour (Theme::lcdText);
             g.setFont (Theme::font (16.0f, true));
             g.drawFittedText ((myVoice.semis > 0.0f ? "+" : "") + juce::String (juce::roundToInt (myVoice.semis)) + " st", semiValue, juce::Justification::centred, 1);
+            g.setColour (Theme::text);
+            g.setFont (Theme::font (12.5f, true));
+            g.drawFittedText ("Autotune", tuneLabel, juce::Justification::centredLeft, 1);
             g.setColour (Theme::text);
             g.setFont (Theme::font (11.5f, true));
             g.drawFittedText ("Volume " + juce::String (myVoice.gainDb, 1) + " dB", gainLabel, juce::Justification::centredLeft, 1);
@@ -367,6 +378,22 @@ public:
             semiValue = semiRow.removeFromLeft (60);
             semiPlus.setBounds (semiRow.removeFromLeft (40).reduced (2));
             right.removeFromTop (4);
+            auto tuneRow = right.removeFromTop (tight ? 30 : 32);
+            tuneLabel = tuneRow.removeFromLeft (juce::jmin (96, tuneRow.getWidth() / 4));
+            tuneSwitch.setBounds (tuneRow);
+            right.removeFromTop (4);
+            // tonalita': riga sua se c'e' posto, se no in fondo alla riga dell'intonazione
+            semiRow.removeFromLeft (8);
+            keyCompact = ! (right.getHeight() >= 175 || semiRow.getWidth() < 70);
+            updateKeyButton();
+            if (! keyCompact)
+            {
+                auto keyRow = right.removeFromTop (26);
+                keyButton.setBounds (keyRow.withTrimmedLeft (tuneLabel.getWidth()).reduced (0, 1));
+                right.removeFromTop (4);
+            }
+            else
+                keyButton.setBounds (semiRow.reduced (0, 2));
             auto gainRow = right.removeFromTop (26);
             gainLabel = gainRow.removeFromLeft (juce::jmin (130, gainRow.getWidth() / 2));
             gainSlider.setBounds (gainRow);
@@ -417,7 +444,7 @@ private:
         for (auto* c : std::initializer_list<juce::Component*> { &voiceSwitch, &octaveSwitch })
             c->setVisible (! mine());
         for (auto* c : std::initializer_list<juce::Component*> { &bpmMinus, &bpmPlus, &bpmGuess, &semiMinus, &semiPlus, &gainSlider,
-                                                                 &fadeInSlider, &fadeOutSlider, &reverseToggle, &wave })
+                                                                 &fadeInSlider, &fadeOutSlider, &reverseToggle, &wave, &tuneSwitch, &keyButton })
             c->setVisible (mine());
         fxSwitch.setSelected (mine() ? myVoice.fx : options.fx);
         addButton.setEnabled (! mine() || source.isNotEmpty());
@@ -438,8 +465,53 @@ private:
         fadeOutSlider.setValue (myVoice.fadeOut, juce::dontSendNotification);
         reverseToggle.setToggleState (myVoice.reverse, juce::dontSendNotification);
         fxSwitch.setSelected (myVoice.fx);
+        tuneSwitch.setSelected (myVoice.tune);
+        updateKeyButton();
         wave.engineBpm = engine.getBpm();
         wave.setSource (sourceData(), &myVoice);
+    }
+
+    void updateKeyButton()
+    {
+        const juce::String key = myVoice.tuneScale > 0 ? theory::scaleLabel (myVoice.tuneRoot, myVoice.tuneScale) : juce::String ("tutte le note");
+        const bool project = myVoice.tuneRoot == engine.getScaleRoot() && myVoice.tuneScale == engine.getScaleType();
+        keyButton.setButtonText (keyCompact ? shortKey() + juce::String (juce::CharPointer_UTF8 (" \xe2\x96\xbe"))
+                                            : juce::String (juce::CharPointer_UTF8 ("Tonalit\xc3\xa0: ")) + key + (project ? " (progetto)" : "")
+                                              + juce::String (juce::CharPointer_UTF8 (" \xe2\x96\xbe")));
+        keyButton.setEnabled (myVoice.tune != autotune::off);
+    }
+
+    juce::String shortKey() const
+    {
+        if (myVoice.tuneScale <= 0) return "Tutte";
+        if (myVoice.tuneScale == 1) return theory::letterName (myVoice.tuneRoot);
+        if (myVoice.tuneScale == 2) return juce::String (theory::letterName (myVoice.tuneRoot)) + "m";
+        return juce::String (theory::letterName (myVoice.tuneRoot)) + " " + juce::String (theory::scales()[(size_t) myVoice.tuneScale].name).substring (0, 4).toLowerCase() + ".";
+    }
+
+    void chooseTuneKey()
+    {
+        juce::PopupMenu m, roots, types;
+        m.addItem (1, "Come il progetto (" + (engine.getScaleType() > 0 ? theory::scaleLabel (engine.getScaleRoot(), engine.getScaleType())
+                                                                         : juce::String ("tutte le note")) + ")");
+        for (int r = 0; r < 12; ++r)
+            roots.addItem (100 + r, theory::noteName (r), true, myVoice.tuneRoot == r);
+        for (int t = 0; t < (int) theory::scales().size(); ++t)
+            types.addItem (200 + t, t == 0 ? juce::String ("Tutte le note (cromatica)") : juce::String (theory::scales()[(size_t) t].name),
+                           true, myVoice.tuneScale == t);
+        m.addSubMenu ("Nota di partenza", roots);
+        m.addSubMenu ("Scala", types);
+        juce::Component::SafePointer<VocalPanel> safe (this);
+        m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&keyButton), [safe] (int id)
+        {
+            if (safe == nullptr || id == 0) return;
+            auto& v = safe->myVoice;
+            if (id == 1) { v.tuneRoot = safe->engine.getScaleRoot(); v.tuneScale = safe->engine.getScaleType(); }
+            else if (id >= 200) v.tuneScale = id - 200;
+            else if (id >= 100) v.tuneRoot = id - 100;
+            safe->updateKeyButton();
+            safe->changed();
+        });
     }
 
     void showMine()
@@ -640,6 +712,10 @@ private:
     juce::TextButton bpmMinus { "-" }, bpmPlus { "+" }, bpmGuess { "Indovina" }, semiMinus { "-" }, semiPlus { "+" };
     juce::Slider gainSlider, fadeInSlider, fadeOutSlider;
     juce::ToggleButton reverseToggle { "Al contrario" };
+    SegmentedControl tuneSwitch { autotune::modeNames() };
+    juce::TextButton keyButton;
+    juce::Rectangle<int> tuneLabel;
+    bool keyCompact = false;
     juce::TextButton closeButton { "Chiudi" }, listenButton { juce::String (juce::CharPointer_UTF8 ("\xe2\x96\xb6 Ascolta")) }, addButton { "Aggiungi al progetto" };
     juce::ToggleButton playlistToggle { "Mettila anche nella playlist (dal cursore)" };
     juce::Rectangle<int> box, titleArea, infoArea, bpmValueArea, semiLabel, semiValue, gainLabel, fadeInLabel, fadeOutLabel;

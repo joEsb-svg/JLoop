@@ -8,6 +8,7 @@
 #include "MusicTheory.h"
 #include "VocalSound.h"
 #include "TimeStretch.h"
+#include "AutoTune.h"
 
 //==============================================================================
 /**
@@ -295,6 +296,8 @@ namespace vocals
         float fadeIn = 0.0f, fadeOut = 0.0f; // millisecondi
         bool reverse = false;
         int fx = vocal::dry;
+        int tune = autotune::off;           // autotune: spento, naturale, pop, robotico
+        int tuneRoot = 9, tuneScale = 0;    // tonalita' dell'autotune (di solito quella del progetto)
     };
 
     inline juce::String stretchRecipe (const MyVoice& v, double bpm)
@@ -312,6 +315,12 @@ namespace vocals
         d->setProperty ("fadeOut", v.fadeOut);
         d->setProperty ("reverse", v.reverse);
         d->setProperty ("fx", v.fx);
+        if (v.tune != autotune::off)
+        {
+            d->setProperty ("tune", v.tune);
+            d->setProperty ("tuneRoot", v.tuneRoot);
+            d->setProperty ("tuneScale", v.tuneScale);
+        }
         return juce::JSON::toString (juce::var (d), true);
     }
 
@@ -330,6 +339,9 @@ namespace vocals
         v.fadeOut = juce::jlimit (0.0f, 5000.0f, (float) (double) o.getProperty ("fadeOut", 0.0));
         v.reverse = (bool) o.getProperty ("reverse", false);
         v.fx = juce::jlimit (0, vocal::numFx - 1, (int) o.getProperty ("fx", 0));
+        v.tune = juce::jlimit (0, autotune::numModes - 1, (int) o.getProperty ("tune", 0));
+        v.tuneRoot = (((int) o.getProperty ("tuneRoot", v.tuneRoot) % 12) + 12) % 12;
+        v.tuneScale = juce::jlimit (0, (int) theory::scales().size() - 1, (int) o.getProperty ("tuneScale", v.tuneScale));
         return v.source.isNotEmpty();
     }
 
@@ -343,6 +355,9 @@ namespace vocals
         const int b = v.end > v.start ? juce::jlimit (a + 1, total, (int) std::llround (v.end * sr)) : total;
         juce::AudioBuffer<float> cut (1, juce::jmax (1, b - a));
         cut.copyFrom (0, 0, src.audio, 0, a, cut.getNumSamples());
+        // 1b. autotune (sulla voce originale: la tonalita' si sposta al contrario dell'intonazione, cosi' dopo e' giusta)
+        if (v.tune != autotune::off)
+            cut = autotune::process (cut, sr, v.tune, v.tuneRoot - juce::roundToInt (v.semis), v.tuneScale);
         // 2. al contrario
         if (v.reverse) cut.reverse (0, 0, cut.getNumSamples());
         // 3. intonazione: si ricampiona (piu' acuto = piu' corto) e poi lo stiramento rimette a posto la durata

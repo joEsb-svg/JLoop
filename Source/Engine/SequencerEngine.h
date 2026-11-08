@@ -52,7 +52,8 @@ public:
     static constexpr int ticksPerStep     = 12;    // risoluzione del piano roll: 1/12 di sedicesimo
     static constexpr int maxNotes         = 256;
     /** Corsie per step oltre a velocity/prob/roll/pitch/pan: filtro, mandata riverbero, mandata delay. */
-    enum StepLock { lockFilter = 0, lockReverb, lockDelay, numStepLocks };   // note per canale e per pattern
+    enum StepLock { lockFilter = 0, lockReverb, lockDelay, lockSound, numStepLocks };   // lockSound: corsia SUONO (0 = A, 1..3 = B..D)
+    static constexpr int numSoundTargets = 3;   // B, C, D   // note per canale e per pattern
     static constexpr int rootNote         = 60;
     static constexpr int stepsPerBar      = 16;
     static constexpr int numTracks        = 12;    // tracce della playlist
@@ -130,7 +131,9 @@ public:
         std::atomic<int>   arpMode    { 0 };       // 0 su, 1 giu', 2 su e giu', 3 casuale, 4 accordo ripetuto
         std::atomic<int>   arpRate    { 12 };      // tick tra una nota e l'altra (12 = 1/16)
         std::atomic<int>   arpOctaves { 1 };       // 1..3
-        std::atomic<float> arpGate    { 0.6f };    // durata delle note (frazione del passo)
+        std::atomic<float> arpGate    { 0.6f };
+        /** Corsia SUONO: i canali che suonano le note marcate B, C, D (-1 = nessuno). A e' il canale stesso. */
+        std::array<std::atomic<int>, numSoundTargets> soundTarget { { { -1 }, { -1 }, { -1 } } };    // durata delle note (frazione del passo)
 
         // Usati solo dal thread della UI
         juce::String name;
@@ -295,6 +298,7 @@ public:
         ch.type.store (drumOrSample);
         ch.drumType.store (0);
         ch.frozen.store (nullptr);
+        for (auto& t : ch.soundTarget) t.store (-1);
         ch.colour.store (0xff8aa0b8);
         ch.name = "Canale";
         ch.customName = false;
@@ -903,6 +907,22 @@ public:
     {
         current().locks[(size_t) juce::jlimit (0, numStepLocks - 1, lock)][(size_t) channel][(size_t) step]
             .store (value < 0.0f ? (uint8_t) 0 : (uint8_t) (1 + juce::roundToInt (juce::jlimit (0.0f, 1.0f, value) * 254.0f)));
+    }
+
+    /** Corsia SUONO: 0 = A (il canale stesso), 1..3 = B..D. */
+    int getStepSound (int channel, int step) const          { return juce::jlimit (0, numSoundTargets, (int) current().locks[(size_t) lockSound][(size_t) channel][(size_t) step].load()); }
+    void setStepSound (int channel, int step, int sound)    { current().locks[(size_t) lockSound][(size_t) channel][(size_t) step].store ((uint8_t) juce::jlimit (0, numSoundTargets, sound)); }
+    int getSoundTarget (int channel, int k) const           { return channels[(size_t) channel].soundTarget[(size_t) juce::jlimit (0, numSoundTargets - 1, k)].load(); }
+    void setSoundTarget (int channel, int k, int target)    { channels[(size_t) channel].soundTarget[(size_t) juce::jlimit (0, numSoundTargets - 1, k)].store (target == channel ? -1 : target); }
+    /** Il canale usa la corsia SUONO (almeno un suono B..D scelto e almeno uno step che lo usa, nel pattern attuale). */
+    bool usesSoundLane (int channel) const
+    {
+        bool any = false;
+        for (auto& t : channels[(size_t) channel].soundTarget) any = any || t.load() >= 0;
+        if (! any) return false;
+        for (int s = 0; s < maxSteps; ++s)
+            if (current().locks[(size_t) lockSound][(size_t) channel][(size_t) s].load() != 0) return true;
+        return false;
     }
 
     void clearStep (Pattern& p, int c, int s)
@@ -1596,6 +1616,7 @@ private:
         int instrumentId, stepNote, mixerTrack, arpMode, arpRate, arpOctaves;
         bool arpOn;
         float arpGate;
+        int soundTarget[numSoundTargets];
 
         struct PatternRows
         {
@@ -1621,7 +1642,8 @@ private:
                     if (pat.velocity[(size_t) ch][(size_t) s].load() != 0 || pat.probability[(size_t) ch][(size_t) s].load() != 100
                         || pat.ratchet[(size_t) ch][(size_t) s].load() != 1 || pat.semis[(size_t) ch][(size_t) s].load() != 0
                         || pat.panStep[(size_t) ch][(size_t) s].load() != 0 || pat.locks[0][(size_t) ch][(size_t) s].load() != 0
-                        || pat.locks[1][(size_t) ch][(size_t) s].load() != 0 || pat.locks[2][(size_t) ch][(size_t) s].load() != 0)
+                        || pat.locks[1][(size_t) ch][(size_t) s].load() != 0 || pat.locks[2][(size_t) ch][(size_t) s].load() != 0
+                        || pat.locks[3][(size_t) ch][(size_t) s].load() != 0)
                         return p + 1;
             }
         }
@@ -1645,6 +1667,7 @@ private:
         out.mixerTrack = ch.mixerTrack.load();
         out.arpOn = ch.arpOn.load(); out.arpMode = ch.arpMode.load(); out.arpRate = ch.arpRate.load();
         out.arpOctaves = ch.arpOctaves.load(); out.arpGate = ch.arpGate.load();
+        for (int k = 0; k < numSoundTargets; ++k) out.soundTarget[k] = ch.soundTarget[(size_t) k].load();
 
         out.rows.resize ((size_t) juce::jlimit (1, numPatterns, patternLimit));
         for (int p = 0; p < (int) out.rows.size(); ++p)
@@ -1683,6 +1706,7 @@ private:
         ch.mixerTrack.store (in.mixerTrack);
         ch.arpOn.store (in.arpOn); ch.arpMode.store (in.arpMode); ch.arpRate.store (in.arpRate);
         ch.arpOctaves.store (in.arpOctaves); ch.arpGate.store (in.arpGate);
+        for (int k = 0; k < numSoundTargets; ++k) ch.soundTarget[(size_t) k].store (in.soundTarget[k]);
         ch.touchSound();
 
         for (int p = 0; p < (int) in.rows.size(); ++p)
@@ -1758,6 +1782,18 @@ private:
             channels[(size_t) c].instrument.store (nullptr);
 
         numActiveChannels.store (newCount);
+
+        // Corsia SUONO: i canali B/C/D seguono il loro canale nella nuova posizione (eliminato: nessuno)
+        for (int c = 0; c < newCount; ++c)
+            for (auto& t : channels[(size_t) c].soundTarget)
+            {
+                const int was = t.load();
+                int now = -1;
+                if (was >= 0)
+                    for (int i = 0; i < newCount && now < 0; ++i)
+                        if (order[(size_t) i] == was) now = i;
+                t.store (now == c ? -1 : now);
+            }
 
         // Automazioni dei canali: seguono il canale nella nuova posizione (canale eliminato: via la curva)
         for (auto& l : lanes)
@@ -1930,7 +1966,7 @@ private:
                     auto& r = ratchets[(size_t) c];
                     if (r.remaining > 0 && --r.countdown <= 0)
                     {
-                        triggerChannel (c, r.velocity, humanizeAmt[(size_t) c] * 0.5f, -1, juce::jmax (1, ticksPerStep / maxRatchet), false, r.semis);
+                        triggerRouted (c, r.target < 0 ? c : r.target, r.velocity, humanizeAmt[(size_t) c] * 0.5f, juce::jmax (1, ticksPerStep / maxRatchet), r.semis);
                         r.velocity *= 0.85f;
                         r.countdown = r.interval;
                         --r.remaining;
@@ -2791,13 +2827,16 @@ private:
             }
             for (int k = 0; k < numStepLocks; ++k)
             {
+                if (k == lockSound) continue;
                 const int raw = pattern.locks[(size_t) k][(size_t) c][(size_t) stepIndex].load();
                 lockNow[(size_t) k][(size_t) c] = raw == 0 ? -1.0f : (float) (raw - 1) / 254.0f;
                 locksActive = locksActive || raw != 0;
             }
-            triggerChannel (c, v, humanizeAmt[(size_t) c], -1, ticksPerStep / count, false, semi);
+            const int target = soundRoute (pattern, c, stepIndex);
+            triggerRouted (c, target, v, humanizeAmt[(size_t) c], ticksPerStep / count, semi);
 
             auto& r = ratchets[(size_t) c];
+            r.target = target;
             r.remaining = count - 1;
             r.interval = juce::jmax (1, (int) (stepLength / count));
             r.countdown = r.interval;
@@ -2921,12 +2960,46 @@ private:
 
                 const auto n = unpackNote (v);
                 const int length = juce::jmax (1, juce::jmin (n.length, maxLength));
+                // corsia SUONO: la nota va al canale B/C/D dello step in cui comincia
+                if (const int t = soundRoute (pattern, c, tick / ticksPerStep); t != c)
+                {
+                    if (! channels[(size_t) c].muted.load())
+                    {
+                        if (instruments[(size_t) t] != nullptr) instNoteOn (t, n.pitch, (float) n.velocity / 127.0f, length);
+                        else triggerChannel (t, (float) n.velocity / 127.0f, humanizeAmt[(size_t) t], n.pitch, length, true);
+                    }
+                    continue;
+                }
                 if (instruments[(size_t) c] != nullptr)
                     instNoteOn (c, n.pitch, (float) n.velocity / 127.0f, length);   // lo strumento riceve l'altezza vera
                 else
                     triggerChannel (c, (float) n.velocity / 127.0f, humanizeAmt[(size_t) c], n.pitch, length, true);
             }
         }
+    }
+
+    /** Corsia SUONO: a quale canale va lo step "step" del canale c (c stesso se e' A o se il suono scelto non c'e' piu'). */
+    int soundRoute (const Pattern& p, int c, int step) const noexcept
+    {
+        if (step < 0 || step >= maxSteps) return c;
+        const int k = p.locks[(size_t) lockSound][(size_t) c][(size_t) step].load();
+        if (k <= 0 || k > numSoundTargets) return c;
+        const int t = channels[(size_t) c].soundTarget[(size_t) k - 1].load();
+        if (t < 0 || t >= numActive || t == c) return c;
+        if (instruments[(size_t) t] == nullptr && channels[(size_t) t].type.load() == synth) return c;
+        return t;
+    }
+
+    /** Uno step del canale c suonato dal canale t (corsia SUONO): stessa nota, stessa forza. */
+    void triggerRouted (int c, int t, float velocity, float humanize, int lengthTicks, float semis)
+    {
+        if (t == c) { triggerChannel (c, velocity, humanize, -1, lengthTicks, false, semis); return; }
+        if (channels[(size_t) c].muted.load()) return;   // la corsia muta tace anche sugli altri suoni
+        if (instruments[(size_t) c] != nullptr && instruments[(size_t) t] != nullptr)
+            triggerChannel (t, velocity, humanize, juce::jlimit (0, 127, channels[(size_t) c].stepNote.load() + juce::roundToInt (semis)), lengthTicks, false);
+        else
+            triggerChannel (t, velocity, humanize, -1, lengthTicks, false, semis);
+        channels[(size_t) c].activity.store (velocity);
     }
 
     void instNoteOn (int c, int note, float velocity, int lengthTicks)
@@ -3103,7 +3176,7 @@ private:
     std::atomic<int> browserPreview { 0 }, browserDrumType { 0 }, browserKit { 0 };
 
     // Stato usato SOLO dal thread audio
-    struct RatchetState { int remaining = 0, interval = 1, countdown = 0; float velocity = 0.0f, semis = 0.0f; };
+    struct RatchetState { int remaining = 0, interval = 1, countdown = 0; float velocity = 0.0f, semis = 0.0f; int target = -1; };
     std::array<float, maxChannels> gainBase {}, stepPanNow {};
     /** Valori per step attivi (filtro, riverbero, delay) dell'ultimo step suonato: -1 = quelli del canale. */
     std::array<std::array<float, maxChannels>, numStepLocks> lockNow = [] { std::array<std::array<float, maxChannels>, numStepLocks> a {}; for (auto& r : a) r.fill (-1.0f); return a; }();

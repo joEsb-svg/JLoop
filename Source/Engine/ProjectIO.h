@@ -130,6 +130,8 @@ namespace ProjectIO
             o->setProperty ("mixer", ch.mixerTrack.load());
             if (ch.arpOn.load() || ch.arpMode.load() != 0 || ch.arpRate.load() != 12)
                 o->setProperty ("arp", juce::Array<juce::var> { ch.arpOn.load(), ch.arpMode.load(), ch.arpRate.load(), ch.arpOctaves.load(), ch.arpGate.load() });
+            if (ch.soundTarget[0].load() >= 0 || ch.soundTarget[1].load() >= 0 || ch.soundTarget[2].load() >= 0)   // corsia SUONO: canali B, C, D
+                o->setProperty ("soundTargets", juce::Array<juce::var> { ch.soundTarget[0].load(), ch.soundTarget[1].load(), ch.soundTarget[2].load() });
             if (ch.sampleName.isNotEmpty())
                 o->setProperty ("sample", ch.sampleName);
             channels.add (juce::var (o));
@@ -202,7 +204,7 @@ namespace ProjectIO
             o->setProperty ("ratchet", ratchets);
             if (anySemis) o->setProperty ("stepPitch", semis);   // altezza e pan per step (solo se usati)
             if (anyPan)   o->setProperty ("stepPan", pans);
-            static const char* lockKeys[] { "stepFilter", "stepReverb", "stepDelay" };
+            static const char* lockKeys[] { "stepFilter", "stepReverb", "stepDelay", "stepSound" };
             for (int k = 0; k < SequencerEngine::numStepLocks; ++k)
                 if (anyLock[(size_t) k]) o->setProperty (lockKeys[k], locks[(size_t) k]);
             patterns.add (juce::var (o));
@@ -433,6 +435,7 @@ namespace ProjectIO
                 readRows ("stepFilter",  pat.locks[0],    0, 255);
                 readRows ("stepReverb",  pat.locks[1],    0, 255);
                 readRows ("stepDelay",   pat.locks[2],    0, 255);
+                readRows ("stepSound",   pat.locks[3],    0, SequencerEngine::numSoundTargets);
 
                 if (auto* notes = o.getProperty ("notes", {}).getArray())
                 {
@@ -535,6 +538,13 @@ namespace ProjectIO
                     ch.arpOctaves.store (juce::jlimit (1, 3, (int) (*arp)[3]));
                     ch.arpGate.store (juce::jlimit (0.05f, 1.0f, (float) (double) (*arp)[4]));
                 }
+            if (auto* chs = json.getProperty ("channels", {}).getArray(); chs != nullptr && c < chs->size())
+                if (auto* st = chs->getReference (c).getProperty ("soundTargets", {}).getArray(); st != nullptr)
+                    for (int k = 0; k < juce::jmin (st->size(), SequencerEngine::numSoundTargets); ++k)
+                    {
+                        const int t = (int) (*st)[k];
+                        engine.setSoundTarget (c, k, t >= 0 && t < engine.getNumChannels() ? t : -1);
+                    }
         }
 
         std::array<std::array<int, mixer::numSlots>, mixer::numTracks> wanted {};   // tipo di effetto voluto per ogni slot

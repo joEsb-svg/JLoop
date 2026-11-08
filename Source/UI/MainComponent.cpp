@@ -948,7 +948,8 @@ ChannelRow::EditMode MainComponent::currentEditMode() const
 {
     const int sel = modeSwitch.getSelected();
     if (sel < 6) return (ChannelRow::EditMode) sel;
-    return stepFxMode == 0 ? ChannelRow::EditMode::filter : stepFxMode == 1 ? ChannelRow::EditMode::reverb : ChannelRow::EditMode::delay;
+    return stepFxMode == 0 ? ChannelRow::EditMode::filter : stepFxMode == 1 ? ChannelRow::EditMode::reverb
+         : stepFxMode == 2 ? ChannelRow::EditMode::delay : ChannelRow::EditMode::sound;
 }
 
 /** "FX" nella barra delle corsie: si sceglie quale (filtro, riverbero, delay per step). */
@@ -959,6 +960,8 @@ void MainComponent::chooseStepFx()
     menu.addItem (1, "Filtro (si apre / si chiude)", true, stepFxMode == 0);
     menu.addItem (2, "Riverbero (quanto ne manda)", true, stepFxMode == 1);
     menu.addItem (3, "Delay (quanto ne manda)", true, stepFxMode == 2);
+    menu.addSeparator();
+    menu.addItem (4, "SUONO: un synth diverso per step (A B C D)", true, stepFxMode == 3);
     juce::Component::SafePointer<MainComponent> safe (this);
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&modeSwitch), [safe] (int r)
     {
@@ -970,13 +973,18 @@ void MainComponent::chooseStepFx()
             safe->updateViews();
             return;
         }
-        safe->stepFxMode = r - 1;
-        safe->lastModeSelected = 6;
-        static const char* names[] { "FILT", "RIV", "DEL" };
-        safe->modeSwitch.setOptions ({ "STEP", "VEL", "PROB", "ROLL", "PITCH", "PAN", names[r - 1] });
-        safe->modeSwitch.setSelected (6);
-        safe->updateViews();
+        safe->setStepFxMode (r - 1);
     });
+}
+
+void MainComponent::setStepFxMode (int m)
+{
+    stepFxMode = juce::jlimit (0, 3, m);
+    lastModeSelected = 6;
+    static const char* names[] { "FILT", "RIV", "DEL", "SUONO" };
+    modeSwitch.setOptions ({ "STEP", "VEL", "PROB", "ROLL", "PITCH", "PAN", names[stepFxMode] });
+    modeSwitch.setSelected (6);
+    updateViews();
 }
 
 void MainComponent::applyScroll()
@@ -2593,10 +2601,24 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
         openVocals (args[i + 1].getIntValue(), args[i + 2].getIntValue());
     if (const int i = args.indexOf ("--vocal-edit"); i >= 0)   // test: voce importata (nome file, BPM) messa a tempo e aperta per modificarla
     {
-        vocals::MyVoice v; v.source = args[i + 1]; v.srcBpm = args[i + 2].getDoubleValue(); v.start = 0.4; v.semis = 2; v.fadeIn = 300; v.fadeOut = 600;
+        vocals::MyVoice v; v.source = args[i + 1]; v.srcBpm = args[i + 2].getDoubleValue(); v.start = 0.4; v.semis = 2; v.fadeIn = 300; v.fadeOut = 600; v.tune = autotune::pop; v.tuneRoot = 9; v.tuneScale = 2;
         const auto r = vocals::applyStretched (engine, sampleStore, v);
         if (r.ok) { rebuildRows(); openVocals (-1, -1, r.channel); }
     }
+
+    if (args.contains ("--sound-lane"))   // test: corsia SUONO (con "--sound-demo": canale 0 con B, C, D e uno schema)
+    {
+        if (args.contains ("--sound-demo"))
+        {
+            for (int s = 0; s < engine.getPatternLength(); ++s)
+                engine.setStepVelocity (0, s, s % 2 == 0 || s % 7 == 3 ? SequencerEngine::defaultVelocity : 0);
+            for (int k = 0; k < 3; ++k) engine.setSoundTarget (0, k, k + 1);
+            for (int s = 0; s < engine.getPatternLength(); ++s) engine.setStepSound (0, s, s % 2 == 0 ? 0 : (s / 2) % 2 == 0 ? 1 : (s % 8 == 7 ? 3 : 2));
+        }
+        setStepFxMode (3);
+    }
+    if (args.contains ("--sound-menu"))   // test: menu della corsia SUONO
+        for (auto* row : rows) { row->showSoundMenu(); break; }
 
     if (args.contains ("--riser"))   // test: finestra del riser automatico
         openRiser (args.contains ("--downer"));
@@ -3622,6 +3644,12 @@ void MainComponent::handleChannelCommand (int channel, int command)
         case ChannelRow::editVocal:
             openVocals (-1, -1, channel);
             break;
+        case ChannelRow::soundLane:   // corsia SUONO: si mostra e si scelgono i suoni
+            setStepFxMode (3);
+            for (auto* row : rows)
+                if (row->getChannel() == channel) { row->showSoundMenu(); break; }
+            break;
+
         case ChannelRow::resample:
             startFreeze (channel);
             if (freezer != nullptr) resamplePattern = engine.getCurrentPattern();

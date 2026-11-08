@@ -200,6 +200,13 @@ void ChannelRow::paint (juce::Graphics& g)
         g.fillPath (tri);
     }
 
+    // Corsia SUONO (anche per i canali col piano roll: conta lo step in cui comincia ogni nota)
+    if (mode == EditMode::sound)
+    {
+        paintSoundLane (g, muted);
+        return;
+    }
+
     // Canale con note nel piano roll: al posto degli step, un'anteprima delle note
     if (engine.hasNotes (channel))
     {
@@ -410,6 +417,8 @@ juce::String ChannelRow::getTooltip()
     if (muteArea.expanded (2.0f).contains (p)) return "Accendi / spegni il canale (mute)";
     if (menuArea.contains (p))                  return "Cambia suono o strumento";
     if (nameArea.contains (p))                  return "Clic: ascolta. Tasto destro: menu del canale (rinomina, colore, piano roll, congela...). Trascina: sposta il canale";
+    if (mode == EditMode::sound && getPadsArea().contains (p))
+        return "Corsia SUONO. Clic: lettera dopo (A, B, C, D). Trascina: stessa lettera. Tasto destro: scegli i synth e gli schemi";
     if (getPadsArea().contains (p))             return "Clic: accendi/spegni lo step (trascina per dipingerne tanti). Tasto destro: riempimento automatico";
     return {};
 }
@@ -456,6 +465,9 @@ void ChannelRow::pressDown (const juce::MouseEvent& e)
         startTimer (450);
         return;
     }
+
+    if (mode == EditMode::sound && pressSound (e))
+        return;
 
     // Canale congelato: per modificarlo bisogna prima scongelarlo
     if (engine.getChannel (channel).frozen.load() != nullptr && getPadsArea().contains (e.position))
@@ -572,6 +584,21 @@ void ChannelRow::mouseDrag (const juce::MouseEvent& e)
         return;
     }
 
+    if (mode == EditMode::sound && soundPressStep >= 0)
+    {
+        // trascinando si "dipinge" la stessa lettera sugli altri step
+        const int col = stepAt ({ e.position.x, getPadsArea().getCentreY() });
+        if (! soundLongPress && col >= 0 && col != lastColumn && col < engine.getPatternLength())
+        {
+            stopTimer();
+            engine.setStepSound (channel, col, soundPaint);
+            lastColumn = col;
+            if (onTap) onTap();
+            repaint();
+        }
+        return;
+    }
+
     if (lastColumn < 0)
         return;
 
@@ -630,6 +657,15 @@ void ChannelRow::mouseDrag (const juce::MouseEvent& e)
 void ChannelRow::mouseUp (const juce::MouseEvent& e)
 {
     stopTimer();
+    if (soundPressStep >= 0)
+    {
+        const bool menu = soundLongPress;
+        soundPressStep = -1;
+        soundLongPress = false;
+        lastColumn = -1;
+        if (menu) showSoundMenu();   // al rilascio, come il menu del canale
+        return;
+    }
     if (hScrolling)
     {
         hScrolling = false;
@@ -663,6 +699,16 @@ void ChannelRow::mouseUp (const juce::MouseEvent& e)
 void ChannelRow::timerCallback()
 {
     stopTimer();
+    if (soundPressStep >= 0 && ! soundLongPress)
+    {
+        // pressione lunga sulla corsia SUONO: lo step torna com'era, al rilascio il menu dei suoni
+        engine.setStepSound (channel, soundPressStep, soundBefore);
+        soundLongPress = true;
+        flash = 1.0f;
+        repaint();
+        if (onLongPress) onLongPress();
+        return;
+    }
     if (pressOnStep)
     {
         // Pressione lunga su uno step: lo step torna com'era e al rilascio si apre il riempimento
@@ -904,6 +950,7 @@ void ChannelRow::showRowMenu()
                                                     : juce::String (juce::CharPointer_UTF8 ("Congela traccia (meno CPU)  \xe2\x9d\x84")));
     if (synth)
         menu.addItem (resample, "Ricampiona nello Slicer (taglia il pattern)");
+    menu.addItem (soundLane, "Corsia SUONO (un synth diverso per step)...");
     menu.addSeparator();
     menu.addItem (15, "Muto", true, chan.muted.load());
     menu.addItem (solo, "Solo (ascolta solo questo)", true, chan.solo.load());
@@ -1106,4 +1153,195 @@ void ChannelRow::paintNotesPreview (juce::Graphics& g, bool muted)
     g.setColour (Theme::textDim);
     g.setFont (Theme::font (10.0f, true));
     g.drawText ("PIANO ROLL", area.reduced (6.0f, 3.0f), juce::Justification::topRight, false);
+}
+
+//==============================================================================
+// Corsia SUONO: ogni step suona con A (questo canale) o con i canali scelti come B, C, D
+
+juce::Colour ChannelRow::soundColour (int k) const
+{
+    if (k <= 0) return getColour();
+    const int t = engine.getSoundTarget (channel, k - 1);
+    return t >= 0 && t < engine.getNumChannels() ? juce::Colour (engine.getChannel (t).colour.load()) : Theme::textDim;
+}
+
+int ChannelRow::nextSound (int k) const
+{
+    for (int i = 1; i <= SequencerEngine::numSoundTargets + 1; ++i)
+    {
+        const int n = (k + i) % (SequencerEngine::numSoundTargets + 1);
+        if (n == 0 || engine.getSoundTarget (channel, n - 1) >= 0) return n;
+    }
+    return 0;
+}
+
+void ChannelRow::paintSoundLane (juce::Graphics& g, bool muted)
+{
+    const auto area = getPadsArea();
+    g.reduceClipRegion (area.expanded (3.0f, 3.0f).toNearestInt());
+    const int length = engine.getPatternLength();
+    const int playStep = engine.getPlayingPattern() == engine.getCurrentPattern() ? current : -1;
+
+    // quali step suonano davvero: step accesi o note del piano roll che cominciano li'
+    std::array<bool, SequencerEngine::maxSteps> plays {};
+    if (engine.hasNotes (channel))
+    {
+        for (auto& n : engine.getNotes (channel))
+            if (const int s = n.start / SequencerEngine::ticksPerStep; s >= 0 && s < SequencerEngine::maxSteps)
+                plays[(size_t) s] = true;
+    }
+    else
+        for (int s = 0; s < SequencerEngine::maxSteps; ++s)
+            plays[(size_t) s] = engine.isStepOn (channel, s);
+
+    bool anyTarget = false;
+    for (int k = 0; k < SequencerEngine::numSoundTargets; ++k)
+        anyTarget = anyTarget || engine.getSoundTarget (channel, k) >= 0;
+
+    const int fromStep = juce::jmax (0, (int) std::floor (firstStep) - 1);
+    const int toStep = juce::jmin (SequencerEngine::maxSteps, (int) std::ceil (firstStep) + visibleSteps + 1);
+    for (int step = fromStep; step < toStep; ++step)
+    {
+        auto pad = getStepBounds (step);
+        if (step >= length)
+        {
+            g.setColour (Theme::panel);
+            g.fillRoundedRectangle (pad, 4.0f);
+            continue;
+        }
+        const auto off = (step / 4) % 2 == 0 ? Theme::stepOffA : Theme::stepOffB;
+        Theme::drawSunken (g, pad, off.darker (0.35f), 4.0f);
+        const int k = engine.getStepSound (channel, step);
+        auto col = soundColour (k).withMultipliedSaturation (muted ? 0.3f : 1.0f);
+        const bool on = plays[(size_t) step];
+        auto inner = pad.reduced (3.0f);
+        if (on)
+        {
+            g.setGradientFill (juce::ColourGradient (col.brighter (0.25f), inner.getX(), inner.getY(), col.darker (0.35f), inner.getX(), inner.getBottom(), false));
+            g.fillRoundedRectangle (inner, 3.0f);
+        }
+        else
+        {
+            g.setColour (col.withAlpha (0.18f));
+            g.fillRoundedRectangle (inner, 3.0f);
+        }
+        if (anyTarget)
+        {
+            const char letter[2] = { (char) ('A' + k), 0 };
+            g.setColour (on ? (col.getPerceivedBrightness() > 0.6f ? juce::Colours::black : juce::Colours::white).withAlpha (0.9f)
+                            : col.withAlpha (0.6f));
+            g.setFont (Theme::font (juce::jlimit (10.0f, 18.0f, juce::jmin (pad.getWidth(), pad.getHeight()) * 0.45f), true));
+            g.drawText (letter, pad, juce::Justification::centred, false);
+        }
+        if (step == playStep)
+            Theme::drawActiveGlow (g, pad, 4.0f, Theme::cyan);
+    }
+
+    if (! anyTarget)
+    {
+        // corsia ancora vuota: un invito discreto a scegliere i suoni (solo sugli step del pattern)
+        auto box = area;
+        const auto last = getStepBounds (juce::jmax (0, length - 1));
+        box.setRight (juce::jmin (box.getRight(), last.getRight()));
+        g.setColour (Theme::textDim);
+        g.setFont (Theme::font (juce::jlimit (10.0f, 12.0f, box.getHeight() * 0.28f), true));
+        g.drawFittedText (juce::String ("tocca: scegli i synth B, C, D"),
+                          box.reduced (6.0f, 2.0f).toNearestInt(), juce::Justification::centred, 2, 0.8f);
+    }
+}
+
+bool ChannelRow::pressSound (const juce::MouseEvent& e)
+{
+    if (! getPadsArea().contains (e.position))
+        return false;
+    bool anyTarget = false;
+    for (int k = 0; k < SequencerEngine::numSoundTargets; ++k)
+        anyTarget = anyTarget || engine.getSoundTarget (channel, k) >= 0;
+    if (! anyTarget)
+    {
+        showSoundMenu();
+        return true;
+    }
+    const int step = stepAt (e.position);
+    if (step < 0 || step >= engine.getPatternLength())
+        return true;
+    soundPressStep = step;
+    soundLongPress = false;
+    soundBefore = engine.getStepSound (channel, step);
+    soundPaint = nextSound (soundBefore);
+    engine.setStepSound (channel, step, soundPaint);
+    lastColumn = step;
+    startTimer (500);
+    if (onTap) onTap();
+    repaint();
+    return true;
+}
+
+void ChannelRow::showSoundMenu()
+{
+    const int n = engine.getNumChannels();
+    const juce::String letters[] { "B", "C", "D" };
+    juce::PopupMenu menu;
+    menu.addSectionHeader ("Corsia SUONO: ogni step suona con A, B, C o D");
+    menu.addColouredItem (-1, "A = " + engine.getChannel (channel).name + " (questo canale)", getColour(), false, false);
+    for (int k = 0; k < SequencerEngine::numSoundTargets; ++k)
+    {
+        const int t = engine.getSoundTarget (channel, k);
+        juce::PopupMenu sub;
+        sub.addItem (10000 + k * 1000 + 999, "Nessuno", true, t < 0);
+        for (int i = 0; i < n; ++i)
+            if (i != channel)
+                sub.addColouredItem (10000 + k * 1000 + i, engine.getChannel (i).name, juce::Colour (engine.getChannel (i).colour.load()), true, t == i);
+        menu.addSubMenu (letters[k] + " = " + (t >= 0 && t < n ? engine.getChannel (t).name : juce::String ("scegli un canale...")), sub);
+    }
+    menu.addSeparator();
+    bool anyTarget = false;
+    for (int k = 0; k < SequencerEngine::numSoundTargets; ++k)
+        anyTarget = anyTarget || engine.getSoundTarget (channel, k) >= 0;
+    menu.addItem (1, "Casuale (tra i suoni scelti)", anyTarget);
+    menu.addItem (2, "Schema A B A C", anyTarget);
+    menu.addItem (3, "Schema A B C D", anyTarget);
+    menu.addItem (4, "Alterna A B", anyTarget);
+    menu.addItem (5, "Ogni 4 step cambia (A A A A B B B B...)", anyTarget);
+    menu.addItem (6, "Tutto su A");
+    menu.addSeparator();
+    menu.addItem (7, "Tocca uno step = lettera dopo; trascina = stessa lettera; tieni premuto = questo menu", false, false);
+
+    juce::Component::SafePointer<ChannelRow> safe (this);
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this), [safe] (int r)
+    {
+        if (safe == nullptr || r <= 0) return;
+        auto& eng = safe->engine;
+        const int ch = safe->channel;
+        if (r >= 10000)
+        {
+            const int k = (r - 10000) / 1000, i = (r - 10000) % 1000;
+            eng.setSoundTarget (ch, k, i == 999 ? -1 : i);
+            safe->repaint();
+            return;
+        }
+        // le lettere disponibili (A sempre, poi B/C/D se scelti)
+        std::vector<int> avail { 0 };
+        for (int k = 0; k < SequencerEngine::numSoundTargets; ++k)
+            if (eng.getSoundTarget (ch, k) >= 0) avail.push_back (k + 1);
+        auto pick = [&avail] (int i) { return avail[(size_t) (i % (int) avail.size())]; };
+        auto other = [&avail] (int i) { return avail.size() > 1 ? avail[(size_t) (1 + i % ((int) avail.size() - 1))] : 0; };   // solo B/C/D
+        const int len = eng.getPatternLength();
+        juce::Random rnd;
+        for (int s = 0; s < len; ++s)
+        {
+            int v = 0;
+            switch (r)
+            {
+                case 1: v = pick (rnd.nextInt ((int) avail.size())); break;
+                case 2: v = s % 2 == 0 ? 0 : other ((s / 2) % 2); break;     // A B A C
+                case 3: v = s % 4 == 0 ? 0 : other (s % 4 - 1); break;       // A B C D
+                case 4: v = s % 2 == 0 ? 0 : other (0); break;               // A B
+                case 5: v = pick (s / 4); break;
+                default: v = 0; break;
+            }
+            eng.setStepSound (ch, s, v);
+        }
+        safe->repaint();
+    });
 }

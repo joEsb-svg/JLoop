@@ -193,7 +193,7 @@ public:
 
             g.setColour (i == selected ? Theme::accent : Theme::textDim);
             g.setFont (Theme::font (juce::jmin (12.0f, r.getHeight() * 0.5f), true).withExtraKerningFactor (0.05f));
-            g.drawText (options[i], seg, juce::Justification::centred, false);
+            g.drawFittedText (options[i], seg.toNearestInt(), juce::Justification::centred, 1, 0.7f);
         }
     }
 

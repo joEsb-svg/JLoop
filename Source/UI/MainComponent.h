@@ -235,6 +235,7 @@ private:
     int stepFxMode = 0;                 // l'ultima corsia "FX": 0 filtro, 1 riverbero, 2 delay
     int lastModeSelected = 0;
     void chooseStepFx();
+    void setStepFxMode (int mode);   // 0 filtro, 1 riverbero, 2 delay, 3 SUONO
     ChannelRow::EditMode currentEditMode() const;
     IconButton undoButton { IconButton::Icon::undo }, redoButton { IconButton::Icon::redo },
                metroButton { IconButton::Icon::metronome };
