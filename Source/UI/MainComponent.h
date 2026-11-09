@@ -210,6 +210,22 @@ private:
     void showPerformanceReport();
     void resetPerformanceLog();
     juce::OpenGLContext openGL;          // Android: lo schermo lo disegna la scheda grafica, non il processore
+   #if JUCE_WINDOWS
+    /** Windows: come disegnare le finestre. JUCE usa Direct2D, che su alcuni portatili lascia pezzi di schermo vecchi
+        o neri quando si muove il mouse; di base si usa il disegno "software" (0), stabile. Vale per tutte le finestre,
+        anche quelle aperte dopo (menu, strumenti), quindi si controlla di continuo. */
+    struct WindowsRenderer : juce::Timer
+    {
+        int engine = 0;
+        void timerCallback() override
+        {
+            for (int i = 0; i < juce::ComponentPeer::getNumPeers(); ++i)
+                if (auto* p = juce::ComponentPeer::getPeer (i))
+                    if (engine < p->getAvailableRenderingEngines().size() && p->getCurrentRenderingEngine() != engine)
+                        p->setCurrentRenderingEngine (engine);
+        }
+    } windowsRenderer;
+   #endif
     juce::String audioError;
     juce::String projectName;
     juce::String lastSavedJson;

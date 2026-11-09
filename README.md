@@ -14,7 +14,10 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.73)
+## Stato attuale (v0.73.1)
+
+**0.73.1**: su Windows lo schermo non sfarfalla piu' (pezzi neri o vecchi muovendo il mouse): JUCE disegnava con
+Direct2D, ora di base si usa il disegno software, stabile. Si puo' riprovare Direct2D dal menu (CPU > "Grafica Direct2D").
 
 **Novita' della 0.73**:
 - **Autotune** sulle tue acapella (Vocals a tempo > Le tue, o "Modifica la voce..." dal canale): Spento / Naturale /

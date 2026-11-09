@@ -298,6 +298,10 @@ MainComponent::MainComponent()
     lengthChip.setTooltip ("Lunghezza del pattern in quarti: frecce, oppure clic per scriverla");
    #endif   // file aperti con "Apri con JLoop"
 
+   #if JUCE_WINDOWS
+    windowsRenderer.engine = settings != nullptr && settings->getBoolValue ("direct2D", false) ? 1 : 0;
+    windowsRenderer.startTimer (40);
+   #endif
    #if JUCE_ANDROID
     // La grafica (sfumature, luci, testo) la calcola la GPU: sul telefono il processore resta libero per l'audio.
     // Lo schermo si ridisegna solo quando qualcosa cambia (niente ridisegno continuo).
@@ -2930,6 +2934,9 @@ void MainComponent::loadSettings()
 
    #if ! (JUCE_ANDROID || JUCE_IOS)
     juce::Desktop::getInstance().setGlobalScaleFactor ((float) settings->getDoubleValue ("uiScale", 1.0));
+   #if JUCE_WINDOWS
+    windowsRenderer.engine = settings->getBoolValue ("direct2D", false) ? 1 : 0;
+   #endif
     tooltips = std::make_unique<juce::TooltipWindow> (this, 600);   // suggerimenti al passaggio del mouse
     // Sul PC: la scheda audio scelta l'ultima volta
     if (auto xml = settings->getXmlValue ("audioDeviceState"))
@@ -3187,6 +3194,9 @@ void MainComponent::showPerformanceMenu()
    #if JUCE_ANDROID
     top.addItem (5103, "Grafica con la scheda grafica (GPU)", true, openGL.isAttached());
    #endif
+   #if JUCE_WINDOWS
+    top.addItem (5104, "Grafica Direct2D (se lo schermo sfarfalla, tienila spenta)", true, windowsRenderer.engine == 1);
+   #endif
     top.addSeparator();
     top.addSubMenu ("Impostazioni", menu);
 
@@ -3220,6 +3230,16 @@ void MainComponent::handleSettingsResult (int result)
     else if (result == 5102)
     {
         showPerformanceReport();
+    }
+    else if (result == 5104)
+    {
+       #if JUCE_WINDOWS
+        windowsRenderer.engine = windowsRenderer.engine == 1 ? 0 : 1;
+        settings->setValue ("direct2D", windowsRenderer.engine == 1);
+        settings->saveIfNeeded();
+        windowsRenderer.timerCallback();
+        repaint();
+       #endif
     }
     else if (result == 5103)
     {
