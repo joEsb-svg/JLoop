@@ -1,5 +1,6 @@
 #include "MainComponent.h"
 #include "../Instruments/Prisma/Prisma.h"
+#include "../Instruments/Materia/MateriaEditor.h"
 #include "../Platform/OpenWith.h"
 #include "../Engine/MidiExport.h"
 #include "../Instruments/Common/NeonEditor.h"
@@ -2744,6 +2745,9 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
         if (const int k = args.indexOf ("--prisma-preset"); k >= 0)   // test: preset di Prisma (indice) prima di aprire
             if (auto* pr = dynamic_cast<PrismaAudioProcessor*> (engine.getInstrument (args[i + 1].getIntValue())))
                 pr->getPresets().loadFactory (args[k + 1].getIntValue());
+        if (const int k = args.indexOf ("--materia-preset"); k >= 0)
+            if (auto* mt = dynamic_cast<MateriaAudioProcessor*> (engine.getInstrument (args[i + 1].getIntValue())))
+                mt->getPresets().loadFactory (args[k + 1].getIntValue());
         openSynthPanel (args[i + 1].getIntValue());
         if (args.size() > i + 2)
         {
@@ -2751,6 +2755,8 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
                 pfEditor->showTab (args[i + 2].getIntValue());
             else if (auto* neon = dynamic_cast<NeonEditor*> (synthPanel->getEditorForTest()))
                 neon->showTab (args[i + 2].getIntValue());
+            else if (auto* mat = dynamic_cast<MateriaEditor*> (synthPanel->getEditorForTest()))   // gruppo e posto del blocco
+                mat->selectBlock (args[i + 2].getIntValue(), args.size() > i + 3 ? args[i + 3].getIntValue() : 0);
         }
     }
 

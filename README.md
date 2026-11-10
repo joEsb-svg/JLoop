@@ -14,7 +14,19 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.73.1)
+## Stato attuale (v0.74)
+
+**Novita' della 0.74: MATERIA**, il synth "banco vuoto" (prima tappa). Si parte da niente e si aggiungono i blocchi:
+- **Sorgenti** (fino a 4): Oscillatore (forma, sync, piega, FM), Wavetable (le 27 tabelle di Prisma), Rumore (colore,
+  intonato, grana), Corda (nylon, acciaio, legno, vetro; pizzicata o con l'archetto). Ognuna con ottava, unisono, volume, pan.
+  L'FM di una sorgente arriva dalla sorgente prima (anche a volume zero).
+- **Forma** (fino a 6, in catena, si riordinano): Filtro, Distorsione (5 tipi), Piega-onda, Risonatore (corda o tubo
+  intonato sulla nota), Schiaccia-bit, Vocale (A E I O U); poi sul suono intero Chorus, Ritardo a tempo, Riverbero.
+- **Movimento** (fino a 6): Inviluppo, LFO (libero o a tempo), Sequenza a 8 passi disegnati col dito, Casuale, Nota,
+  Forza, Rotella. Ognuno muove fino a 3 manopole qualsiasi (puntino giallo sulla manopola mossa).
+- Sul telefono in verticale: lista dei blocchi e pannello del blocco scelto in basso. Su PC, tablet e telefono in
+  orizzontale: tre colonne coi blocchi aperti. 8 punti di partenza (tra cui "Vuoto").
+- Prossime tappe: lo "scultore" (parti da un tuo suono registrato o da un campione) e i "materiali" (tubi, lastre, membrane).
 
 **0.73.1**: su Windows lo schermo non sfarfalla piu' (pezzi neri o vecchi muovendo il mouse): JUCE disegnava con
 Direct2D, ora di base si usa il disegno software, stabile. Si puo' riprovare Direct2D dal menu (CPU > "Grafica Direct2D").

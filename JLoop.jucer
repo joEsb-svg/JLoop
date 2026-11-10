@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <JUCERPROJECT name="JLoop" projectType="guiapp" bundleIdentifier="com.joesb.dawfl"
-              version="0.73.1" companyName="joEsb" id="DwFl01" useAppConfig="0"
+              version="0.74.0" companyName="joEsb" id="DwFl01" useAppConfig="0"
               addUsingNamespaceToJuceHeader="0" cppLanguageStandard="20" defines="JucePlugin_Name=&quot;BassForge&quot;&#10;JUCE_STRICT_REFCOUNTEDPOINTER=1"
               jucerFormatVersion="1">
   <MAINGROUP id="Mg0001" name="JLoop">
@@ -110,6 +110,10 @@
       <FILE id="PrsC01" name="Prisma.cpp" compile="1" resource="0" file="Source/Instruments/Prisma/Prisma.cpp"/>
       <FILE id="PrsH02" name="PrismaEditor.h" compile="0" resource="0" file="Source/Instruments/Prisma/PrismaEditor.h"/>
       <FILE id="PrsC02" name="PrismaEditor.cpp" compile="1" resource="0" file="Source/Instruments/Prisma/PrismaEditor.cpp"/>
+      <FILE id="MatH01" name="Materia.h" compile="0" resource="0" file="Source/Instruments/Materia/Materia.h"/>
+      <FILE id="MatC01" name="Materia.cpp" compile="1" resource="0" file="Source/Instruments/Materia/Materia.cpp"/>
+      <FILE id="MatH02" name="MateriaEditor.h" compile="0" resource="0" file="Source/Instruments/Materia/MateriaEditor.h"/>
+      <FILE id="MatC02" name="MateriaEditor.cpp" compile="1" resource="0" file="Source/Instruments/Materia/MateriaEditor.cpp"/>
       <FILE id="FmH001" name="FMForge.h" compile="0" resource="0" file="Source/Instruments/FMForge/FMForge.h"/>
       <FILE id="FmC001" name="FMForge.cpp" compile="1" resource="0" file="Source/Instruments/FMForge/FMForge.cpp"/>
       <FILE id="FmH002" name="FMForgeEditor.h" compile="0" resource="0" file="Source/Instruments/FMForge/FMForgeEditor.h"/>
@@ -979,7 +983,7 @@
   </MAINGROUP>
   <EXPORTFORMATS>
     <ANDROIDSTUDIO targetFolder="Builds/Android" androidActivitySubClassName="com.joesb.dawfl.JLoopActivity" androidAdditionalJavaFolders="Source/Android/java" androidManifestCustomXmlElements="&lt;manifest&gt;&#10;  &lt;application&gt;&#10;    &lt;activity&gt;&#10;      &lt;intent-filter&gt;&#10;        &lt;action android:name=&quot;android.intent.action.MAIN&quot;/&gt;&#10;        &lt;category android:name=&quot;android.intent.category.LAUNCHER&quot;/&gt;&#10;      &lt;/intent-filter&gt;&#10;      &lt;intent-filter&gt;&#10;        &lt;action android:name=&quot;android.intent.action.VIEW&quot;/&gt;&#10;        &lt;category android:name=&quot;android.intent.category.DEFAULT&quot;/&gt;&#10;        &lt;category android:name=&quot;android.intent.category.BROWSABLE&quot;/&gt;&#10;        &lt;data android:scheme=&quot;content&quot;/&gt;&#10;        &lt;data android:scheme=&quot;file&quot;/&gt;&#10;        &lt;data android:mimeType=&quot;application/octet-stream&quot;/&gt;&#10;        &lt;data android:mimeType=&quot;application/zip&quot;/&gt;&#10;        &lt;data android:mimeType=&quot;application/x-zip-compressed&quot;/&gt;&#10;        &lt;data android:mimeType=&quot;application/x-jloop&quot;/&gt;&#10;      &lt;/intent-filter&gt;&#10;      &lt;intent-filter&gt;&#10;        &lt;action android:name=&quot;android.intent.action.VIEW&quot;/&gt;&#10;        &lt;category android:name=&quot;android.intent.category.DEFAULT&quot;/&gt;&#10;        &lt;category android:name=&quot;android.intent.category.BROWSABLE&quot;/&gt;&#10;        &lt;data android:scheme=&quot;content&quot;/&gt;&#10;        &lt;data android:scheme=&quot;file&quot;/&gt;&#10;        &lt;data android:host=&quot;*&quot;/&gt;&#10;        &lt;data android:mimeType=&quot;*/*&quot;/&gt;&#10;        &lt;data android:pathPattern=&quot;.*\\.jloop&quot;/&gt;&#10;        &lt;data android:pathPattern=&quot;.*\\..*\\.jloop&quot;/&gt;&#10;        &lt;data android:pathPattern=&quot;.*\\..*\\..*\\.jloop&quot;/&gt;&#10;      &lt;/intent-filter&gt;&#10;    &lt;/activity&gt;&#10;  &lt;/application&gt;&#10;&lt;/manifest&gt;" microphonePermissionNeeded="1" androidEnableContentSharing="1" androidBluetoothScanNeeded="1" androidBluetoothConnectNeeded="1" smallIcon="IcOn01" bigIcon="IcOn01"
-                   androidVersionCode="82" androidMinimumSDK="24" androidScreenOrientation="landscape"
+                   androidVersionCode="83" androidMinimumSDK="24" androidScreenOrientation="landscape"
                    androidInternetNeeded="0" androidExternalWriteNeeded="0" androidPushNotifications="0"
                    androidReadMediaAudioPermission="0" androidReadMediaImagesPermission="0"
                    androidReadMediaVideoPermission="0">

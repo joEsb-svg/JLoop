@@ -18,6 +18,7 @@
 #include "AcidLine/AcidLine.h"
 #include "ZapFM/ZapFM.h"
 #include "Prisma/Prisma.h"
+#include "Materia/Materia.h"
 
 //==============================================================================
 /**
@@ -52,6 +53,7 @@ namespace Instruments
             { "acidline", "AcidLine", "Linee acide stile 303: note, accent e slide (acid, psy, goa)", 0xffd8ff4a },
             { "zapfm", "ZapFM", "Laser, zap e glitch FM per Hi-tech e psy", 0xffa47cff },
             { "prisma", "Prisma", "Wavetable stile Serum: lead, bassi, pad che si trasformano", 0xff44e6ff },
+            { "materia", "Materia", "Il banco vuoto: costruisci il suono da zero con sorgenti, forma e movimento", 0xffc9a2ff },
             { "slicer", "Slicer", "Taglia loop e voci sui colpi: un pezzo per tasto (vocal chop)", 0xffe8c35a },
         };
         return infos;
@@ -85,6 +87,7 @@ namespace Instruments
         if (id == "acidline") return std::make_unique<AcidLineAudioProcessor>();
         if (id == "zapfm") return std::make_unique<ZapFMAudioProcessor>();
         if (id == "prisma") return std::make_unique<PrismaAudioProcessor>();
+        if (id == "materia") return std::make_unique<MateriaAudioProcessor>();
         return std::make_unique<BassForgeAudioProcessor>();
     }
 
@@ -120,6 +123,8 @@ namespace Instruments
             for (int i = 0; i < zap::Presets::numFactory(); ++i) names.add (zap::Presets::factoryName (i));
         else if (dynamic_cast<PrismaAudioProcessor*> (p) != nullptr)
             for (int i = 0; i < prisma::Presets::numFactory(); ++i) names.add (prisma::Presets::factoryName (i));
+        else if (dynamic_cast<MateriaAudioProcessor*> (p) != nullptr)
+            for (int i = 0; i < materia::Presets::numFactory(); ++i) names.add (materia::Presets::factoryName (i));
         return names;
     }
 
@@ -138,6 +143,7 @@ namespace Instruments
         if (auto* ac = dynamic_cast<AcidLineAudioProcessor*> (p))  ac->getPresets().loadFactory (index);
         if (auto* zf = dynamic_cast<ZapFMAudioProcessor*> (p))  zf->getPresets().loadFactory (index);
         if (auto* pz = dynamic_cast<PrismaAudioProcessor*> (p))  pz->getPresets().loadFactory (index);
+        if (auto* mt = dynamic_cast<MateriaAudioProcessor*> (p))  mt->getPresets().loadFactory (index);
     }
 
     inline juce::Array<juce::File> userPresets (juce::AudioProcessor* p)
@@ -155,6 +161,7 @@ namespace Instruments
         if (auto* ac = dynamic_cast<AcidLineAudioProcessor*> (p))  return ac->getPresets().userPresets();
         if (auto* zf = dynamic_cast<ZapFMAudioProcessor*> (p))  return zf->getPresets().userPresets();
         if (auto* pz = dynamic_cast<PrismaAudioProcessor*> (p))  return pz->getPresets().userPresets();
+        if (auto* mt = dynamic_cast<MateriaAudioProcessor*> (p))  return mt->getPresets().userPresets();
         return {};
     }
 
@@ -173,6 +180,7 @@ namespace Instruments
         if (auto* ac = dynamic_cast<AcidLineAudioProcessor*> (p))  ac->getPresets().load (file);
         if (auto* zf = dynamic_cast<ZapFMAudioProcessor*> (p))  zf->getPresets().load (file);
         if (auto* pz = dynamic_cast<PrismaAudioProcessor*> (p))  pz->getPresets().load (file);
+        if (auto* mt = dynamic_cast<MateriaAudioProcessor*> (p))  mt->getPresets().load (file);
     }
 
     inline bool saveUser (juce::AudioProcessor* p, const juce::String& name)
@@ -190,6 +198,7 @@ namespace Instruments
         if (auto* ac = dynamic_cast<AcidLineAudioProcessor*> (p))  return ac->getPresets().save (name);
         if (auto* zf = dynamic_cast<ZapFMAudioProcessor*> (p))  return zf->getPresets().save (name);
         if (auto* pz = dynamic_cast<PrismaAudioProcessor*> (p))  return pz->getPresets().save (name);
+        if (auto* mt = dynamic_cast<MateriaAudioProcessor*> (p))  return mt->getPresets().save (name);
         return false;
     }
 
@@ -208,6 +217,7 @@ namespace Instruments
         if (auto* ac = dynamic_cast<AcidLineAudioProcessor*> (p))  return ac->getPresets().currentName();
         if (auto* zf = dynamic_cast<ZapFMAudioProcessor*> (p))  return zf->getPresets().currentName();
         if (auto* pz = dynamic_cast<PrismaAudioProcessor*> (p))  return pz->getPresets().currentName();
+        if (auto* mt = dynamic_cast<MateriaAudioProcessor*> (p))  return mt->getPresets().currentName();
         return "Synth";
     }
 
