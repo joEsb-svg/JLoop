@@ -2538,6 +2538,8 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
             }
     }
 
+    if (const int i = args.indexOf ("--splash-at"); i >= 0 && splash != nullptr)   // test: presentazione ferma al secondo indicato
+        splash->freezeAt (args[i + 1].getDoubleValue());
     if (args.contains ("--no-splash") && splash != nullptr)   // test: niente presentazione
     {
         removeChildComponent (splash.get());

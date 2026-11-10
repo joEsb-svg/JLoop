@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <JUCERPROJECT name="JLoop" projectType="guiapp" bundleIdentifier="com.joesb.dawfl"
-              version="0.74.0" companyName="joEsb" id="DwFl01" useAppConfig="0"
+              version="0.75.0" companyName="joEsb" id="DwFl01" useAppConfig="0"
               addUsingNamespaceToJuceHeader="0" cppLanguageStandard="20" defines="JucePlugin_Name=&quot;BassForge&quot;&#10;JUCE_STRICT_REFCOUNTEDPOINTER=1"
               jucerFormatVersion="1">
   <MAINGROUP id="Mg0001" name="JLoop">
@@ -866,7 +866,10 @@
         <FILE id="Lb0738" name="x_k_electrofunk_perc2.ogg" compile="0" resource="1" file="Resources/Library/x_k_electrofunk_perc2.ogg"/>
       </GROUP>
       <FILE id="IcOn01" name="icon.png" compile="0" resource="0" file="Resources/icon.png"/>
-      <FILE id="SpLsh1" name="splash_logo.png" compile="0" resource="1" file="Resources/splash_logo.png"/>
+      <FILE id="SpLsh1" name="splash_back.png" compile="0" resource="1" file="Resources/splash_back.png"/>
+      <FILE id="SpLsh2" name="splash_glow.png" compile="0" resource="1" file="Resources/splash_glow.png"/>
+      <FILE id="SpLsh3" name="splash_front.png" compile="0" resource="1" file="Resources/splash_front.png"/>
+      <FILE id="SpLsh4" name="splash_word.png" compile="0" resource="1" file="Resources/splash_word.png"/>
       <FILE id="LgMk01" name="logo_mark.png" compile="0" resource="1" file="Resources/logo_mark.png"/>
     </GROUP>
     <GROUP id="{BE1A880B-0000-0000-0000-BE1A880B3E73}" name="BassForge">
@@ -983,7 +986,7 @@
   </MAINGROUP>
   <EXPORTFORMATS>
     <ANDROIDSTUDIO targetFolder="Builds/Android" androidActivitySubClassName="com.joesb.dawfl.JLoopActivity" androidAdditionalJavaFolders="Source/Android/java" androidManifestCustomXmlElements="&lt;manifest&gt;&#10;  &lt;application&gt;&#10;    &lt;activity&gt;&#10;      &lt;intent-filter&gt;&#10;        &lt;action android:name=&quot;android.intent.action.MAIN&quot;/&gt;&#10;        &lt;category android:name=&quot;android.intent.category.LAUNCHER&quot;/&gt;&#10;      &lt;/intent-filter&gt;&#10;      &lt;intent-filter&gt;&#10;        &lt;action android:name=&quot;android.intent.action.VIEW&quot;/&gt;&#10;        &lt;category android:name=&quot;android.intent.category.DEFAULT&quot;/&gt;&#10;        &lt;category android:name=&quot;android.intent.category.BROWSABLE&quot;/&gt;&#10;        &lt;data android:scheme=&quot;content&quot;/&gt;&#10;        &lt;data android:scheme=&quot;file&quot;/&gt;&#10;        &lt;data android:mimeType=&quot;application/octet-stream&quot;/&gt;&#10;        &lt;data android:mimeType=&quot;application/zip&quot;/&gt;&#10;        &lt;data android:mimeType=&quot;application/x-zip-compressed&quot;/&gt;&#10;        &lt;data android:mimeType=&quot;application/x-jloop&quot;/&gt;&#10;      &lt;/intent-filter&gt;&#10;      &lt;intent-filter&gt;&#10;        &lt;action android:name=&quot;android.intent.action.VIEW&quot;/&gt;&#10;        &lt;category android:name=&quot;android.intent.category.DEFAULT&quot;/&gt;&#10;        &lt;category android:name=&quot;android.intent.category.BROWSABLE&quot;/&gt;&#10;        &lt;data android:scheme=&quot;content&quot;/&gt;&#10;        &lt;data android:scheme=&quot;file&quot;/&gt;&#10;        &lt;data android:host=&quot;*&quot;/&gt;&#10;        &lt;data android:mimeType=&quot;*/*&quot;/&gt;&#10;        &lt;data android:pathPattern=&quot;.*\\.jloop&quot;/&gt;&#10;        &lt;data android:pathPattern=&quot;.*\\..*\\.jloop&quot;/&gt;&#10;        &lt;data android:pathPattern=&quot;.*\\..*\\..*\\.jloop&quot;/&gt;&#10;      &lt;/intent-filter&gt;&#10;    &lt;/activity&gt;&#10;  &lt;/application&gt;&#10;&lt;/manifest&gt;" microphonePermissionNeeded="1" androidEnableContentSharing="1" androidBluetoothScanNeeded="1" androidBluetoothConnectNeeded="1" smallIcon="IcOn01" bigIcon="IcOn01"
-                   androidVersionCode="83" androidMinimumSDK="24" androidScreenOrientation="landscape"
+                   androidVersionCode="84" androidMinimumSDK="24" androidScreenOrientation="landscape"
                    androidInternetNeeded="0" androidExternalWriteNeeded="0" androidPushNotifications="0"
                    androidReadMediaAudioPermission="0" androidReadMediaImagesPermission="0"
                    androidReadMediaVideoPermission="0">

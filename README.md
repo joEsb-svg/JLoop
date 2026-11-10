@@ -14,7 +14,12 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.74)
+## Stato attuale (v0.75)
+
+**0.75**: logo nuovo (J + infinito in metallo consumato con la luce al neon arancio dentro, in 3D) per icona dell'app,
+installer di Windows e barra in alto; apertura nuova "il neon si accende": il logo esce dal buio spento, la luce
+sfarfalla come un'insegna e si accende, poi compare JLOOP e si vede l'app (circa 2,8 s; un tocco salta).
+I livelli del logo si rigenerano con tools/logo/ (SVG + Playwright).
 
 **Novita' della 0.74: MATERIA**, il synth "banco vuoto" (prima tappa). Si parte da niente e si aggiungono i blocchi:
 - **Sorgenti** (fino a 4): Oscillatore (forma, sync, piega, FM), Wavetable (le 27 tabelle di Prisma), Rumore (colore,
