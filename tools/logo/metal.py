@@ -1,7 +1,7 @@
 import math
 def defs(uid, neon):
     return f'''<defs>
-<filter id="metal{uid}" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB">
+<filter id="metal{uid}" filterUnits="userSpaceOnUse" x="-2000" y="-2000" width="5000" height="5000" color-interpolation-filters="sRGB">
  <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="5" seed="{3+uid}" result="n"/>
  <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.10  0 0 0 0 0.11  0 0 0 0 0.12  2.2 0 0 0 -1.05" result="spots"/>
  <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="{9+uid}" result="grain"/>
@@ -12,7 +12,7 @@ def defs(uid, neon):
  <feComposite in="t2" in2="light" operator="arithmetic" k1="1.05" k2="0" k3="0" k4="0" result="lit"/>
  <feComposite in="lit" in2="SourceAlpha" operator="in"/>
 </filter>
-<filter id="glow{uid}" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB">
+<filter id="glow{uid}" filterUnits="userSpaceOnUse" x="-2000" y="-2000" width="5000" height="5000" color-interpolation-filters="sRGB">
  <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="3" seed="5" result="n"/>
  <feColorMatrix in="n" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.4 -0.35" result="mask"/>
  <feComposite in="SourceGraphic" in2="mask" operator="arithmetic" k1="0.55" k2="0.75" k3="0" k4="0" result="core"/>
@@ -20,7 +20,7 @@ def defs(uid, neon):
  <feGaussianBlur in="SourceGraphic" stdDeviation="40" result="b2"/>
  <feMerge><feMergeNode in="b2"/><feMergeNode in="b1"/><feMergeNode in="core"/></feMerge>
 </filter>
-<linearGradient id="side{uid}" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2a2f33"/><stop offset="1" stop-color="#0d0f11"/></linearGradient>
+<linearGradient id="side{uid}" gradientUnits="userSpaceOnUse" x1="-200" y1="0" x2="300" y2="0"><stop offset="0" stop-color="#2a2f33"/><stop offset="1" stop-color="#0d0f11"/></linearGradient>
 </defs>'''
 def jpath(x,y,s):
     # centro della J: gambo alto, gancio tondo a sinistra con estremita' piatta

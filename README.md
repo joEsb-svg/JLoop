@@ -14,7 +14,9 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.75)
+## Stato attuale (v0.75.1)
+
+**0.75.1**: il logo torna com'era (la J sopra l'infinito, col puntino), ma in metallo e neon arancio come nella 0.75.
 
 **0.75**: logo nuovo (J + infinito in metallo consumato con la luce al neon arancio dentro, in 3D) per icona dell'app,
 installer di Windows e barra in alto; apertura nuova "il neon si accende": il logo esce dal buio spento, la luce

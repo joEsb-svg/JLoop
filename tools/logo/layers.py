@@ -27,10 +27,10 @@ def page(W,H,tx,ty,sc,body,bg=None):
             +(f'<rect width="100%" height="100%" fill="{bg}"/>' if bg else '')
             +f'<g transform="translate({tx},{ty}) scale({sc}) translate(-30,-290)">'+body+'</g></svg>')
 for L in ('back','glow','front'):
-    open(f'splash_{L}.svg','w').write(page(1000,860,500,420,1.6,mark(L)))
-open('logo_mark.svg','w').write(page(400,360,200,182,0.6,mark('all')))
-open('icon.svg','w').write(page(512,512,256,262,0.84,mark('all'),'#050607'))
-open('preview.svg','w').write(page(1000,860,500,420,1.6,mark('all'),'#000'))
+    open(f'splash_{L}.svg','w').write(page(1000,860,500,430,1.4,mark(L)))
+open('logo_mark.svg','w').write(page(400,360,200,185,0.55,mark('all')))
+open('icon.svg','w').write(page(512,512,256,262,0.78,mark('all'),'#050607'))
+open('preview.svg','w').write(page(1000,860,500,430,1.4,mark('all'),'#000'))
 # scritta
 w=f'''<svg xmlns="http://www.w3.org/2000/svg" width="900" height="170"><defs><filter id="b" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="9"/></filter>
 <linearGradient id="m" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9dde1"/><stop offset=".5" stop-color="#8d949b"/><stop offset="1" stop-color="#5b6167"/></linearGradient></defs>
