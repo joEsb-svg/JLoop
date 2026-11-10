@@ -21,6 +21,7 @@
 #include "DemoProjects.h"
 #include "QuickGuide.h"
 #include "UndoHistory.h"
+#include "DoctorPanel.h"
 #include "LivePanel.h"
 #include "HoloDisplay.h"
 #include "Haptics.h"
@@ -298,6 +299,12 @@ private:
     SoundBrowser browser { engine, sampleStore };
     Playlist playlist { engine };
     ExportPanel exportPanel { engine, sampleStore };
+    DoctorPanel doctorPanel { engine, sampleStore };   // controllo del progetto
+    GuideBar guideBar;                                 // la sua guida passo passo
+    IconButton doctorButton { IconButton::Icon::doctor };
+    void openDoctor();
+    void doctorGo (doctor::Go, const doctor::Issue&);
+    void layoutGuide();
     MixerPanel mixerPanel { engine };
     // PC, "banco di lavoro": libreria dei suoni fissa a sinistra e mixer fisso sotto il channel rack
     SoundBrowser deskBrowser { engine, sampleStore };

@@ -14,7 +14,15 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.75.1)
+## Stato attuale (v0.76)
+
+**Novita' della 0.76: Controllo del progetto** (icona col battito nella barra in alto). JLoop suona la canzone in
+silenzio (copia del progetto, offline) e cerca: master che va in rosso, canzone troppo piano o troppo forte (LUFS),
+una traccia che copre le altre, cassa e basso che si coprono senza sidechain, bassi stereo, note fuori tonalita'
+(della scala del progetto o di quella che si sente), due tracce forti nella stessa zona di frequenze.
+Punteggio, linea del tempo con dove sono i problemi, e per ognuno: Sistema (correzione automatica, si annulla
+come ogni modifica), Ascolta (parte da li'), Ignora, e la **guida passo passo**: una barra in basso che spiega
+cosa fare a mano, con il pulsante che apre il posto giusto (mixer sulla traccia, piano roll, mastering).
 
 **0.75.1**: il logo torna com'era (la J sopra l'infinito, col puntino), ma in metallo e neon arancio come nella 0.75.
 

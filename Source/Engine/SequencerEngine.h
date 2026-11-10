@@ -2127,6 +2127,8 @@ private:
         if (masteringParams.enabled.load())
             masteringChain.process (mixL.data(), mixR.data(), n, mastering::Snapshot::from (masteringParams));
 
+        if (analysisTap != nullptr) analysisTap->master (mixL.data(), mixR.data(), n);
+
         for (int s = 0; s < n; ++s)
         {
             float l = mixL[(size_t) s];
@@ -2447,6 +2449,7 @@ private:
             }
             if (pl > tr.peakL.load()) tr.peakL.store (pl);
             if (pr > tr.peakR.load()) tr.peakR.store (pr);
+            if (analysisTap != nullptr) analysisTap->track (t, L, R, n, gl, gr);
         }
 
         // Il Master: canali collegati direttamente + tutte le tracce
@@ -3297,7 +3300,19 @@ public:
     }
     double getPreparedRate() const  { return preparedRate.load(); }
 
+    /** Solo per il controllo del progetto (motore offline): chi "ascolta" ogni traccia del mixer e il master. */
+    struct AnalysisTap
+    {
+        virtual ~AnalysisTap() = default;
+        /** Una traccia insert dopo i suoi effetti; gl/gr = fader e pan (0 se muta). */
+        virtual void track (int t, const float* L, const float* R, int n, float gl, float gr) noexcept = 0;
+        /** Il master prima del limiter di sicurezza (dopo fader e mastering). */
+        virtual void master (const float* L, const float* R, int n) noexcept = 0;
+    };
+    void setAnalysisTap (AnalysisTap* t)    { analysisTap = t; }
+
 private:
+    AnalysisTap* analysisTap = nullptr;
     int captureChannel = -1;
     juce::AudioBuffer<float>* captureTarget = nullptr;
     juce::int64 captureWrite = 0;

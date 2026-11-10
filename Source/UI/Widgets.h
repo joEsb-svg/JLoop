@@ -480,7 +480,7 @@ class IconButton : public juce::Button,
                    private juce::Timer
 {
 public:
-    enum class Icon { undo, redo, metronome, menu };
+    enum class Icon { undo, redo, metronome, menu, doctor };
 
     explicit IconButton (Icon i) : juce::Button ("icon"), icon (i) {}
 
@@ -535,6 +535,20 @@ public:
         {
             for (int i = -1; i <= 1; ++i)
                 g.fillRoundedRectangle (box.getX() + s * 0.1f, box.getCentreY() + (float) i * s * 0.3f - 1.1f, s * 0.8f, 2.2f, 1.1f);
+        }
+        else if (icon == Icon::doctor)
+        {
+            // battito (controllo del progetto)
+            juce::Path p;
+            const float y = box.getCentreY();
+            p.startNewSubPath (box.getX() - s * 0.1f, y);
+            p.lineTo (box.getX() + s * 0.25f, y);
+            p.lineTo (box.getX() + s * 0.38f, y - s * 0.45f);
+            p.lineTo (box.getX() + s * 0.55f, y + s * 0.5f);
+            p.lineTo (box.getX() + s * 0.7f, y - s * 0.15f);
+            p.lineTo (box.getX() + s * 0.78f, y);
+            p.lineTo (box.getRight() + s * 0.1f, y);
+            g.strokePath (p, juce::PathStrokeType (1.9f, juce::PathStrokeType::mitered, juce::PathStrokeType::rounded));
         }
         else if (icon == Icon::metronome)
         {

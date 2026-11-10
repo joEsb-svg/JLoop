@@ -218,6 +218,33 @@ MainComponent::MainComponent()
     cpuBadge.onClick = [this] { showPerformanceMenu(); };
     addAndMakeVisible (cpuBadge);
     exportPanel.getProjectJson = [this] { return ProjectIO::toJson (engine); };
+    // Controllo del progetto e guida passo passo
+    doctorPanel.getProjectJson = [this] { return ProjectIO::toJson (engine); };
+    doctorPanel.onClose = [this] { doctorPanel.setVisible (false); };
+    doctorPanel.onListen = [this] (const doctor::Issue& is) { doctorGo (doctor::Go::listen, is); };
+    doctorPanel.onGuide = [this] (const doctor::Issue& is)
+    {
+        doctorPanel.setVisible (false);
+        guideBar.start (is, doctor::guide (engine, is));
+        guideBar.setVisible (true);
+        layoutGuide();
+        guideBar.toFront (false);
+    };
+    guideBar.onResize = [this] { layoutGuide(); };
+    guideBar.onGo = [this] (doctor::Go go) { doctorGo (go, guideBar.getIssue()); guideBar.toFront (false); };
+    guideBar.onClose = [this] { guideBar.setVisible (false); };
+    guideBar.onDone = [this] { guideBar.setVisible (false); openDoctor(); };   // fatto: si ricontrolla
+    guideBar.onDoIt = [this]
+    {
+        doctorPanel.fix (guideBar.getIssue());
+        guideBar.setVisible (false);
+        openDoctor();
+    };
+    addChildComponent (doctorPanel);
+    addChildComponent (guideBar);
+    doctorButton.setTooltip ("Controllo del progetto: JLoop ascolta la canzone e ti dice cosa sistemare");
+    doctorButton.onClick = [this] { openDoctor(); };
+    addAndMakeVisible (doctorButton);
     exportPanel.getProjectName = [this] { return projectName; };
     addChildComponent (exportPanel);
 
@@ -467,6 +494,7 @@ void MainComponent::layoutLandscape (juce::Rectangle<int> full)
     iconCell (fileButton);
     iconCell (undoButton);
     iconCell (redoButton);
+    iconCell (doctorButton);
     header.removeFromLeft (narrow ? 4 : 8);
     const int playD = narrow ? h - 6 : h;
     playButton.setBounds (header.removeFromLeft (playD).withSizeKeepingCentre (playD, playD));
@@ -566,6 +594,8 @@ void MainComponent::layoutPortrait (juce::Rectangle<int> full)
     line2.removeFromLeft (3);
     recordButton.setBounds (line2.removeFromLeft (h2 - 18).withSizeKeepingCentre (h2 - 18, h2 - 18));
     line2.removeFromLeft (5);
+    doctorButton.setBounds (line2.removeFromRight (40).withSizeKeepingCentre (40, 40));
+    line2.removeFromRight (5);
     holo.setBounds (line2);
 
     full.removeFromTop (8);
@@ -663,6 +693,8 @@ void MainComponent::layoutRack (juce::Rectangle<int> full, bool portrait)
     browser.setBounds (over);
     playlist.setBounds (over);
     exportPanel.setBounds (over);
+    doctorPanel.setBounds (over);
+    layoutGuide();
     mixerPanel.setBounds (over);
     livePanel.setBounds (over);
     if (synthPanel != nullptr)
@@ -2613,6 +2645,22 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
         if (r.ok) { rebuildRows(); openVocals (-1, -1, r.channel); }
     }
 
+    if (args.contains ("--doctor"))   // test: controllo del progetto (con "--doctor-guide N": la guida del problema N)
+    {
+        if (args.contains ("--doctor-loud")) { engine.setMasterVolume (1.5f); for (int t = 1; t <= 12; ++t) engine.getTrack (t).volume.store (1.5f); }
+        openDoctor();
+        if (const int g = args.indexOf ("--doctor-guide"); g >= 0)
+        {
+            const int which = args[g + 1].getIntValue();
+            juce::Timer::callAfterDelay (4500, [safe = juce::Component::SafePointer<MainComponent> (this), which]
+            {
+                if (safe == nullptr) return;
+                const auto& issues = safe->doctorPanel.getReport().issues;
+                if (juce::isPositiveAndBelow (which, (int) issues.size()) && safe->doctorPanel.onGuide)
+                    safe->doctorPanel.onGuide (issues[(size_t) which]);
+            });
+        }
+    }
     if (args.contains ("--sound-lane"))   // test: corsia SUONO (con "--sound-demo": canale 0 con B, C, D e uno schema)
     {
         if (args.contains ("--sound-demo"))
@@ -3296,6 +3344,8 @@ bool MainComponent::handleBackButton()
     }
     if (synthPanel != nullptr && synthPanel->isVisible())  { synthPanel->onClose(); return true; }
     if (browser.isVisible())     { browser.setVisible (false); return true; }
+    if (guideBar.isVisible()) { guideBar.setVisible (false); return true; }
+    if (doctorPanel.isVisible()) { doctorPanel.stop(); doctorPanel.setVisible (false); return true; }
     if (exportPanel.isVisible()) { exportPanel.setVisible (false); return true; }
     if (pianoRoll.isVisible())   { pianoRoll.setVisible (false); return true; }
     if (editor.isVisible())      { editor.setVisible (false); return true; }
@@ -3594,6 +3644,53 @@ void MainComponent::openLive()
     livePanel.setVisible (true);
     livePanel.resized();
     livePanel.toFront (false);
+}
+
+void MainComponent::openDoctor()
+{
+    guideBar.setVisible (false);
+    doctorPanel.setVisible (true);
+    doctorPanel.toFront (false);
+    doctorPanel.start();
+}
+
+void MainComponent::layoutGuide()
+{
+    const int w = juce::jmin (getWidth() - 16, 760);
+    const int h = guideBar.heightFor (w);
+    guideBar.setBounds (juce::Rectangle<int> (w, h).withCentre ({ getWidth() / 2, getHeight() - 10 - h / 2 }));
+}
+
+/** Dalla guida o dalle carte: apre il posto giusto dell'app. */
+void MainComponent::doctorGo (doctor::Go go, const doctor::Issue& is)
+{
+    switch (go)
+    {
+        case doctor::Go::mixer:      openMixer (juce::jmax (0, is.track)); break;
+        case doctor::Go::mastering:  openExport(); break;
+        case doctor::Go::pianoRoll:
+            if (is.pattern >= 0) engine.selectPattern (is.pattern);
+            if (is.channel >= 0) openPianoRoll (is.channel);
+            break;
+        case doctor::Go::listen:
+        {
+            engine.setPlaying (false);
+            if (is.kind == doctor::offKey && is.pattern >= 0)
+            {
+                engine.setSongMode (false);
+                engine.selectPattern (is.pattern);
+            }
+            else if (engine.getSongLengthSteps() > 0)
+            {
+                engine.setSongMode (true);
+                engine.setSongPosition (juce::jmax (0, is.fromBar));
+            }
+            songSwitch.setSelected (engine.isSongMode() ? 1 : 0);
+            engine.setPlaying (true);
+            break;
+        }
+        case doctor::Go::nothing: break;
+    }
 }
 
 void MainComponent::openExport()
