@@ -3,6 +3,7 @@
 #include <JuceHeader.h>
 #include "../Platform/OpenWith.h"
 #include "LibraryIndex.h"
+#include "SoundLibrary.h"
 
 //==============================================================================
 /** Un campione audio caricato in memoria (mono), pronto per il thread audio. */
@@ -105,6 +106,15 @@ public:
 
     static constexpr const char* libraryPrefix = "lib:";
 
+    // Suoni "derivati": "rev:<nome>" = lo stesso suono al contrario; "drum:<tipo>:<kit>" = un colpo della batteria
+    // sintetizzata registrato come campione (serve per poterlo girare al contrario).
+    static constexpr const char* reversePrefix = "rev:";
+    static bool isReversed (const juce::String& name)        { return name.startsWith (reversePrefix); }
+    static juce::String reversedOf (const juce::String& name) { return reversePrefix + name; }
+    static juce::String drumName (int type, int kit)          { return "drum:" + juce::String (type) + ":" + juce::String (kit); }
+    /** Chi sa suonare la batteria sintetizzata (lo installa SampleRender.h, per non legare questo file al synth). */
+    inline static std::function<SampleData::Ptr (int type, int kit)> drumRenderer;
+
     static bool isLibrary (const juce::String& name)     { return name.startsWith (libraryPrefix); }
     static juce::String libraryName (const juce::String& id)   { return libraryPrefix + id; }
 
@@ -129,6 +139,43 @@ public:
 
         if (isLibrary (fileName))
             return loadLibrary (fileName);
+
+        if (isReversed (fileName))
+        {
+            auto* base = load (fileName.substring (4));
+            if (base == nullptr || base->audio.getNumSamples() < 4)
+                return nullptr;
+            // si taglia il silenzio in fondo (al contrario sarebbe un'attesa prima del suono)
+            const float* src = base->audio.getReadPointer (0);
+            int end = base->audio.getNumSamples();
+            while (end > 16 && std::abs (src[end - 1]) < 0.0015f) --end;
+            SampleData::Ptr data = new SampleData();
+            data->name = fileName;
+            data->sampleRate = base->sampleRate;
+            data->rootNote = base->rootNote;
+            data->audio.setSize (1, end);
+            auto* dst = data->audio.getWritePointer (0);
+            for (int i = 0; i < end; ++i) dst[i] = src[end - 1 - i];
+            // dissolvenze brevissime: niente "click" ai bordi
+            const int fadeIn = juce::jmin (end / 4, (int) (0.004 * data->sampleRate)), fadeOut = juce::jmin (end / 4, (int) (0.002 * data->sampleRate));
+            for (int i = 0; i < fadeIn; ++i) dst[i] *= (float) i / (float) fadeIn;
+            for (int i = 0; i < fadeOut; ++i) dst[end - 1 - i] *= (float) i / (float) fadeOut;
+            loaded.add (data);
+            return data.get();
+        }
+
+        if (fileName.startsWith ("drum:"))
+        {
+            const auto parts = juce::StringArray::fromTokens (fileName.substring (5), ":", "");
+            if (parts.size() < 2 || drumRenderer == nullptr)
+                return nullptr;
+            auto data = drumRenderer (parts[0].getIntValue(), parts[1].getIntValue());
+            if (data == nullptr)
+                return nullptr;
+            data->name = fileName;
+            loaded.add (data);
+            return data.get();
+        }
 
         auto file = getFolder().getChildFile (fileName);
         std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (file));
@@ -183,6 +230,14 @@ public:
 
     static juce::String displayName (const juce::String& fileName)
     {
+        if (isReversed (fileName))
+            return displayName (fileName.substring (4)) + " (al contrario)";
+        if (fileName.startsWith ("drum:"))
+        {
+            const auto parts = juce::StringArray::fromTokens (fileName.substring (5), ":", "");
+            return juce::String ("Batteria ") + SoundLibrary::getKitName (parts.size() > 1 ? parts[1].getIntValue() : 0);
+        }
+
         if (isLibrary (fileName))
             if (auto* e = findLibraryEntry (fileName))
                 return juce::String (juce::CharPointer_UTF8 (e->name));

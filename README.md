@@ -14,7 +14,15 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.76)
+## Stato attuale (v0.77)
+
+**0.77**:
+- **Clona canale** come in FL Studio: stesso suono e regolazioni, ma step e note vuoti; nel mixer il clone ha la sua
+  traccia nuova (copia di quella dell'originale: effetti, volume, EQ).
+- **Forma d'onda** del suono che tocchi nel browser dei suoni (su PC nel pannello a sinistra, sul telefono in basso).
+- **Al contrario** (reverse) nelle impostazioni del canale, con la forma d'onda del suono: vale per i campioni, la
+  libreria e anche la batteria sintetizzata (il colpo viene registrato e girato). Si salva nel progetto.
+- Rete di sicurezza nel mixer: un valore non valido (NaN) da un synth o un effetto non zittisce piu' tutto il mix.
 
 **Novita' della 0.76: Controllo del progetto** (icona col battito nella barra in alto). JLoop suona la canzone in
 silenzio (copia del progetto, offline) e cerca: master che va in rosso, canzone troppo piano o troppo forte (LUFS),

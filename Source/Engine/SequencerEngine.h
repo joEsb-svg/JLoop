@@ -457,8 +457,9 @@ public:
         return index;
     }
 
-    /** Copia un canale (suono, regolazioni, step e note di tutti i pattern) subito sotto. */
-    int duplicateChannel (int c)
+    /** Copia un canale subito sotto: suono, regolazioni e traccia del mixer. Come in FL Studio il clone parte
+        senza step e senza note (withNotes = true: li copia). */
+    int duplicateChannel (int c, bool withNotes = false)
     {
         const int n = getNumChannels();
         if (n >= maxChannels || c < 0 || c >= n)
@@ -476,7 +477,45 @@ public:
         copy.solo.store (false);
         copy.name = channels[(size_t) c].name + " 2";
         copy.customName = true;
+        if (! withNotes)
+            for (int pi = 0; pi < numPatterns; ++pi)
+            {
+                auto& pat = patterns[(size_t) pi];
+                for (int st = 0; st < maxSteps; ++st)
+                    clearStep (pat, c + 1, st);
+                for (auto& note : pat.notes[(size_t) c + 1]) note.store (0);
+                pat.noteCount[(size_t) c + 1].store (0);
+            }
+        // nel mixer il clone ha la sua traccia (copia di quella dell'originale: stessi effetti, volume, EQ)
+        const int from = channels[(size_t) c].mixerTrack.load();
+        if (from > 0)
+            if (const int to = findFreeInsert(); to > 0)
+            {
+                copyTrack (from, to);
+                copy.mixerTrack.store (to);
+            }
         return c + 1;
+    }
+
+    /** Copia una traccia del mixer su un'altra (volume, pan, EQ, effetti con le loro regolazioni). */
+    void copyTrack (int from, int to)
+    {
+        if (from == to || from <= 0 || to <= 0) return;
+        resetTrack (to);
+        const auto& a = getTrack (from);
+        auto& b = getTrack (to);
+        b.volume.store (a.volume.load()); b.pan.store (a.pan.load());
+        b.eqLow.store (a.eqLow.load()); b.eqMid.store (a.eqMid.load()); b.eqMidFreq.store (a.eqMidFreq.load()); b.eqHigh.store (a.eqHigh.load());
+        b.colour = a.colour;
+        for (int s = 0; s < mixer::numSlots; ++s)
+        {
+            const auto& x = a.slots[(size_t) s];
+            setTrackEffect (to, s, x.type.load());
+            auto& y = b.slots[(size_t) s];
+            y.bypass.store (x.bypass.load());
+            for (int p = 0; p < mixer::maxParams; ++p)
+                y.params[(size_t) p].store (x.params[(size_t) p].load());
+        }
     }
 
     void removeChannel (int c)
@@ -2127,6 +2166,24 @@ private:
         if (masteringParams.enabled.load())
             masteringChain.process (mixL.data(), mixR.data(), n, mastering::Snapshot::from (masteringParams));
 
+        // Rete di sicurezza del master: un NaN/inf arrivato fin qui si butta e si svuotano riverbero, delay e mastering
+        {
+            float check = 0.0f;
+            for (int i = 0; i < n; ++i) check += mixL[(size_t) i] + mixR[(size_t) i];
+            if (! std::isfinite (check))
+            {
+                juce::FloatVectorOperations::clear (mixL.data(), n);
+                juce::FloatVectorOperations::clear (mixR.data(), n);
+                reverb.reset();
+                for (auto& d : delayBuffer) std::fill (d.begin(), d.end(), 0.0f);
+                delayLp[0] = delayLp[1] = 0.0f;
+                reverbOutPeak = delayOutPeak = 0.0f;
+                masteringChain.reset();
+                trackEq[0].reset();
+                for (auto& sl : tracks[0].slots) if (sl.effect != nullptr) sl.effect->reset();
+            }
+        }
+
         if (analysisTap != nullptr) analysisTap->master (mixL.data(), mixR.data(), n);
 
         for (int s = 0; s < n; ++s)
@@ -2384,6 +2441,19 @@ private:
 
         outPeak = juce::jmax (juce::FloatVectorOperations::findMaximum (L, n) - juce::FloatVectorOperations::findMinimum (L, n),
                               juce::FloatVectorOperations::findMaximum (R, n) - juce::FloatVectorOperations::findMinimum (R, n));
+        // Rete di sicurezza: un valore non valido (NaN/inf, da un synth o un effetto) zittirebbe il mix per sempre
+        // (riverberi e filtri se lo tengono dentro). Si butta questo blocco e si azzerano EQ ed effetti della traccia.
+        float check = 0.0f;
+        for (int i = 0; i < n; ++i) check += L[i] + R[i];
+        if (! std::isfinite (check) || ! std::isfinite (outPeak))
+        {
+            juce::FloatVectorOperations::clear (L, n);
+            juce::FloatVectorOperations::clear (R, n);
+            eq.reset();
+            for (auto& s : tr.slots)
+                if (s.effect != nullptr) s.effect->reset();
+            outPeak = 0.0f;
+        }
     }
 
     void processMixer (double sr, int n) noexcept

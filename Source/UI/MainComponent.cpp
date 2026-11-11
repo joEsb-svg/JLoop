@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+#include "../Engine/SampleRender.h"
 #include "../Instruments/Prisma/Prisma.h"
 #include "../Instruments/Materia/MateriaEditor.h"
 #include "../Platform/OpenWith.h"
@@ -264,6 +265,8 @@ MainComponent::MainComponent()
     addChildComponent (deskMixer);
 
     editor.onChangeSound = [this] (int ch) { openBrowser (ch); };
+    samplerender::install();   // la batteria sintetizzata si puo' disegnare e girare al contrario
+    editor.setSampleStore (&sampleStore);
     editor.onClose = [this] { editor.setVisible (false); };
     pianoRoll.onClose = [this] { pianoRoll.setVisible (false); };
     pianoRoll.getGrid().onEdit = [this] { Haptics::tick (this); };
@@ -2623,6 +2626,14 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
         openBrowser (args[i + 1].getIntValue());
         if (args.size() > i + 3)
             browser.showTabForTest (args[i + 2].getIntValue(), args[i + 3].getIntValue());
+    }
+
+    if (const int i = args.indexOf ("--browser-wave"); i >= 0)   // test: forma d'onda di un suono della libreria nel browser
+    { browser.showLibrarySoundForTest (args[i + 1]); deskBrowser.showLibrarySoundForTest (args[i + 1]); }
+    if (const int i = args.indexOf ("--reverse"); i >= 0)   // test: suono del canale al contrario (poi "--editor N" per vederlo)
+    {
+        samplerender::setReversed (engine, sampleStore, args[i + 1].getIntValue(), true);
+        editor.refreshFromEngine();
     }
 
     if (const int i = args.indexOf ("--add-instrument"); i >= 0)   // test: aggiunge uno strumento

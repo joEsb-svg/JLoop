@@ -5,6 +5,8 @@
 #include "../Engine/SequencerEngine.h"
 #include "Theme.h"
 #include "ChannelRow.h"
+#include "WaveView.h"
+#include "../Engine/SampleRender.h"
 
 //==============================================================================
 /** Manopola con etichetta sopra e valore sotto (il valore si aggiorna mentre giri). */
@@ -99,7 +101,23 @@ public:
         for (auto* k : { &pitch, &tone, &pan })
             k->slider.getProperties().set ("bipolar", true);
         kitButton.onClick     = [this] { showKitMenu(); };
+
+        // forma d'onda del suono e "al contrario"
+        addAndMakeVisible (wave);
+        addAndMakeVisible (reverseButton);
+        reverseButton.setClickingTogglesState (true);
+        reverseButton.setTooltip ("Suona il campione dalla fine all'inizio (come il reverse di FL Studio)");
+        reverseButton.onClick = [this]
+        {
+            if (store == nullptr) return;
+            if (samplerender::setReversed (engine, *store, channel, reverseButton.getToggleState()))
+                engine.previewChannel (channel);
+            refreshFromEngine();
+        };
     }
+
+    /** Il SampleStore serve per disegnare l'onda e girare il suono al contrario. */
+    void setSampleStore (SampleStore* s)    { store = s; }
 
     std::function<void()> onClose;
     std::function<juce::PopupMenu (int channel)> buildSoundMenu;
@@ -142,6 +160,14 @@ public:
         reverb.setValue (c.reverb.load());
         delay.setValue (c.delay.load());
         kitButton.setButtonText (ChannelRow::getSoundLabel (engine, channel) + juce::String (juce::CharPointer_UTF8 ("  \xe2\x96\xbe")));
+        const bool synth = engine.isSynth (channel);
+        wave.setVisible (! synth);
+        reverseButton.setVisible (! synth);
+        reverseButton.setToggleState (SampleStore::isReversed (c.sampleName), juce::dontSendNotification);
+        reverseButton.setButtonText (juce::String (juce::CharPointer_UTF8 ("\xe2\x87\x84  Al contrario")));
+        if (store != nullptr && ! synth)
+            wave.setSample (samplerender::soundOf (engine, *store, channel), juce::Colour (c.colour.load()));
+        resized();
     }
 
     void paint (juce::Graphics& g) override
@@ -186,9 +212,17 @@ public:
         titleArea = top.toFloat();
 
         r.removeFromTop (4);
-        const int rowH = (r.getHeight() - 32) / 2;
 
         soundCaption = r.removeFromTop (16).toFloat();
+        if (wave.isVisible())
+        {
+            auto strip = r.removeFromTop (juce::jlimit (44, 80, r.getHeight() / 5));
+            reverseButton.setBounds (strip.removeFromRight (juce::jmin (150, strip.getWidth() / 3)).reduced (0, juce::jmax (0, (strip.getHeight() - 34) / 2)));
+            strip.removeFromRight (8);
+            wave.setBounds (strip);
+            r.removeFromTop (4);
+        }
+        const int rowH = (r.getHeight() - 16) / 2;
         layoutRow (r.removeFromTop (rowH), { &pitch, &decay, &tone, &drive, &humanize });
         mixCaption = r.removeFromTop (16).toFloat();
         layoutRow (r.removeFromTop (rowH), { &volume, &pan, &filter, &reverb, &delay });
@@ -269,6 +303,9 @@ private:
     LabeledKnob delay    { "Delay",    0.0,   1.0,  0.0, [] (double v) { return juce::String (juce::roundToInt (v * 100.0)) + "%"; } };
 
     juce::Array<LabeledKnob*> soundKnobs;
+    WaveView wave;
+    juce::TextButton reverseButton;
+    SampleStore* store = nullptr;
 
     juce::TextButton prevButton { "<" }, nextButton { ">" }, kitButton, previewButton { "Ascolta" },
                      resetButton { "Reset" }, closeButton { "Chiudi" };

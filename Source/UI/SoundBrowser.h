@@ -8,6 +8,8 @@
 #include "../Engine/SampleStore.h"
 #include "../Instruments/Instruments.h"
 #include "Theme.h"
+#include "WaveView.h"
+#include "../Engine/SampleRender.h"
 #include "Widgets.h"
 
 //==============================================================================
@@ -301,6 +303,8 @@ public:
         tileList.onTap     = [this] (int i) { select (i); };
 
         buildLibraryCategories();
+        addAndMakeVisible (wave);
+        wave.setEmptyText ("Qui vedi la forma d'onda del suono che tocchi");
     }
 
     std::function<void (int channel, const SoundChoice&)> onChoose;
@@ -411,6 +415,8 @@ public:
             footerText = footer.removeFromTop (26).toFloat();
             confirmButton.setBounds (footer.reduced (0, 3));
             r.removeFromBottom (4);
+            wave.setBounds (r.removeFromBottom (juce::jlimit (60, 110, r.getHeight() / 5)));
+            r.removeFromBottom (6);
             treeView.setBounds (r);
             tree.setVisibleWidth (r.getWidth() - 10);
             return;
@@ -424,6 +430,8 @@ public:
         confirmButton.setBounds (footer.removeFromRight (juce::jmin (170, footer.getWidth() / 2)).reduced (0, 3));
         footerText = footer.toFloat().withTrimmedRight (8.0f);
         r.removeFromBottom (4);
+        wave.setBounds (r.removeFromBottom (r.getHeight() > 420 ? 72 : 52));
+        r.removeFromBottom (6);
 
         const bool narrow = r.getWidth() < 520;
         auto left = r.removeFromLeft (juce::jlimit (110, 190, (int) (r.getWidth() * (narrow ? 0.36f : 0.26f))));
@@ -676,6 +684,7 @@ private:
         if (onTap) onTap();
         if (chosen.kind == SoundChoice::importFile) { confirm(); return; }
         preview (chosen);
+        showWave (chosen);
         confirmButton.setEnabled (true);
         repaint();
     }
@@ -711,8 +720,36 @@ private:
         }
 
         preview (chosen);
+        showWave (chosen);
         confirmButton.setEnabled (true);
         repaint();
+    }
+
+public:
+    /** Test: come se si fosse toccato quel suono della libreria. */
+    void showLibrarySoundForTest (const juce::String& id)
+    {
+        SoundChoice c; c.kind = SoundChoice::library; c.id = id;
+        if (auto* e = SampleStore::findLibraryEntry (id)) { c.name = juce::String (juce::CharPointer_UTF8 (e->name)); c.colour = e->colour; }
+        chosen = c;
+        showWave (c);
+        repaint();
+    }
+private:
+    /** La forma d'onda del suono scelto (i synth non ne hanno una fissa). */
+    void showWave (const SoundChoice& c)
+    {
+        const SampleData* s = nullptr;
+        if (c.kind == SoundChoice::library)         s = samples.load (SampleStore::libraryName (c.id));
+        else if (c.kind == SoundChoice::userSample) s = samples.load (c.id);
+        else if (c.kind == SoundChoice::drumSynth)  s = samples.load (SampleStore::drumName (c.drumType, c.kit));
+        else if (c.kind == SoundChoice::drumForgeKit || c.kind == SoundChoice::kitChannels)
+        {
+            const auto& kit = df::factoryKits()[(size_t) juce::jlimit (0, df::Presets::numFactory() - 1, c.kit)];
+            s = samples.load (SampleStore::libraryName (kit.pads[0].sample));
+        }
+        wave.setEmptyText (c.kind == SoundChoice::instrument ? "Uno strumento: il suono dipende dalle note e dal preset" : "Qui vedi la forma d'onda del suono che tocchi");
+        wave.setSample (s, juce::Colour (c.colour));
     }
 
     void preview (const SoundChoice& c)
@@ -768,6 +805,7 @@ private:
     static constexpr int firstDrumSynthCategory = 3;
     SequencerEngine& engine;
     SampleStore& samples;
+    WaveView wave;
     int targetChannel = -1, lastTab = 0;
     std::array<int, 4> lastCategory {};
     std::array<juce::StringArray, 2> groups;      // categorie della libreria: Strumenti, Elettronica
