@@ -907,7 +907,7 @@ private:
             { "Tono ed EQ",        { filter, peq, exciter, vowel } },
             { "Spazio",            { reverb, shimmer, delay, chorus, stereo } },
             { "Movimento",         { gate, tremolo, phaser, flanger } },
-            { "Sporco e lo-fi",    { saturation, bitcrusher, trash, vinyl } },
+            { "Sporco e lo-fi",    { saturation, blood, fet, trash, bitcrusher, vinyl } },
             { "Creativi",          { glitch, pitch, ringmod } },
         };
         for (auto& gr : groups)

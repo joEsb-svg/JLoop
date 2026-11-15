@@ -36,7 +36,7 @@ namespace mixer
     // Tipi di effetto e i loro parametri
 
     enum FxType { none = 0, compressor, saturation, filter, delay, reverb, chorus, bitcrusher, sidechain, stereo, ott, glitch, trash, vowel,
-                  gate, tremolo, phaser, flanger, peq, transient, exciter, vinyl, limiter, pitch, ringmod, shimmer, numFxTypes };
+                  gate, tremolo, phaser, flanger, peq, transient, exciter, vinyl, limiter, pitch, ringmod, shimmer, blood, fet, numFxTypes };
 
     enum class Unit { percent, dB, ms, hz, ratio, choice, track, bits, times, semis };
 
@@ -201,6 +201,25 @@ namespace mixer
                 { "Shimmer", 0.0f, 1.0f, 0.5f, Unit::percent },
                 { "Smorzamento", 0.0f, 1.0f, 0.4f, Unit::percent },
                 { "Mix", 0.0f, 1.0f, 0.35f, Unit::percent } }} },
+            { "blood", "Overdrive Sangue", "Overdrive cattivo con filtro prima e dopo: da caldo a onda quadra col tasto x100", 7, {{
+                { "Pre banda", 0.0f, 1.0f, 0.0f, Unit::percent },
+                { "Colore", 100.0f, 8000.0f, 1000.0f, Unit::hz, 1000.0f },
+                { "Pre amp", 0.0f, 1.0f, 0.4f, Unit::percent },
+                { "x100", 0.0f, 1.0f, 0.0f, Unit::choice, 0.0f, "No|Si'" },
+                { "Post filtro", 200.0f, 20000.0f, 9000.0f, Unit::hz, 3000.0f },
+                { "Mix", 0.0f, 1.0f, 1.0f, Unit::percent },
+                { "Uscita", -24.0f, 6.0f, -6.0f, Unit::dB } }} },
+            { "fet", "Distorsore FET", "High-gain a transistor, tipo ampli da chitarra: tre stadi, toni e cassa. Per chitarre, bassi e lead", 10, {{
+                { "Gain", 0.0f, 1.0f, 0.55f, Unit::percent },
+                { "Bassi", 0.0f, 1.0f, 0.5f, Unit::percent },
+                { "Medi", 0.0f, 1.0f, 0.5f, Unit::percent },
+                { "Alti", 0.0f, 1.0f, 0.5f, Unit::percent },
+                { "Voce", 0.0f, 1.0f, 0.0f, Unit::choice, 0.0f, "Classico|Moderno" },
+                { "Attacco", 0.0f, 1.0f, 0.0f, Unit::choice, 0.0f, "Morbido|Stretto" },
+                { "Cassa", 0.0f, 1.0f, 0.7f, Unit::percent },
+                { "Qualita'", 0.0f, 3.0f, 1.0f, Unit::choice, 0.0f, "1x|2x|4x|8x" },
+                { "Mix", 0.0f, 1.0f, 1.0f, Unit::percent },
+                { "Uscita", -24.0f, 6.0f, -6.0f, Unit::dB } }} },
         }};
         return infos[(size_t) juce::jlimit (0, numFxTypes - 1, type)];
     }
@@ -1761,6 +1780,236 @@ namespace mixer
         float hpz[2] {}, hpx[2] {};
     };
 
+    //==========================================================================
+    /** Sovracampionamento per i distorsori: 2x, 4x o 8x a scelta, a pezzi di lunghezza fissa. */
+    class OverSampler
+    {
+    public:
+        static constexpr int chunk = 256;
+
+        void prepare()
+        {
+            for (int k = 0; k < 3; ++k)
+            {
+                os[k] = std::make_unique<juce::dsp::Oversampling<float>> ((size_t) 2, (size_t) (k + 1),
+                            juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR, true);
+                os[k]->initProcessing ((size_t) chunk);
+            }
+        }
+        void reset()    { for (auto& o : os) if (o != nullptr) o->reset(); }
+
+        /** stage: 0 = niente, 1 = 2x, 2 = 4x, 3 = 8x. work (l, r, quanti, fattore) lavora sul segnale "allargato". */
+        template <typename Work>
+        void run (int stage, float* L, float* R, int n, Work&& work)
+        {
+            stage = juce::jlimit (0, 3, stage);
+            if (stage == 0 || os[stage - 1] == nullptr) { work (L, R, n, 1); return; }
+            auto& o = *os[stage - 1];
+            for (int start = 0; start < n; start += chunk)
+            {
+                const int m = juce::jmin (chunk, n - start);
+                float* chans[2] { L + start, R + start };
+                juce::dsp::AudioBlock<float> block (chans, 2, (size_t) m);
+                auto up = o.processSamplesUp (block);
+                work (up.getChannelPointer (0), up.getChannelPointer (1), (int) up.getNumSamples(), 1 << stage);
+                o.processSamplesDown (block);
+            }
+        }
+
+    private:
+        std::unique_ptr<juce::dsp::Oversampling<float>> os[3];
+    };
+
+    //==========================================================================
+    /** Overdrive Sangue: filtro passa-banda prima (Pre banda + Colore), pre-amplificazione (anche x100),
+        passa-basso dopo e livello di uscita. Lo schema e' quello dei classici overdrive "pre/post". */
+    class Blood : public Effect
+    {
+    public:
+        void prepare (double sampleRate) override   { sr = sampleRate; over.prepare(); reset(); }
+        void reset() override
+        {
+            over.reset(); pre.reset(); post.reset();
+            dc[0] = dc[1] = 0.0f; cacheColour = cachePost = -1.0f;
+        }
+
+        void process (float* L, float* R, int n, const float* p, const Context&) override
+        {
+            for (int start = 0; start < n; start += maxChunk)
+                processChunk (L + start, R + start, juce::jmin (maxChunk, n - start), p);
+        }
+
+    private:
+        static constexpr int maxChunk = 2048;
+        void processChunk (float* L, float* R, int n, const float* p)
+        {
+            const float top = (float) (sr * 0.45);
+            if (cacheColour != p[1])
+            {
+                cacheColour = p[1];
+                const double w = juce::MathConstants<double>::twoPi * juce::jmin (top, p[1]) / sr;
+                const double alpha = std::sin (w) / (2.0 * 0.8), c = std::cos (w);
+                pre.set (alpha, 0.0, -alpha, 1 + alpha, -2 * c, 1 - alpha);       // passa-banda, picco a 0 dB
+            }
+            if (cachePost != p[4])   { cachePost = p[4]; setPass (post, sr, juce::jmin (top, p[4]), false); }
+
+            const float band = p[0], mix = p[5];
+            const float gain = (1.0f + p[2] * p[2] * 30.0f) * (p[3] > 0.5f ? 100.0f : 1.0f);
+            const float out = juce::Decibels::decibelsToGain (p[6]) * 0.8f;
+            const bool usePost = p[4] < 19900.0f && p[4] < top;
+
+            std::copy (L, L + n, dry[0].begin()); std::copy (R, R + n, dry[1].begin());
+
+            for (int i = 0; i < n; ++i)
+            {
+                L[i] += band * (pre.process (L[i], 0) * 2.0f - L[i]);
+                R[i] += band * (pre.process (R[i], 1) * 2.0f - R[i]);
+            }
+            over.run (1, L, R, n, [gain] (float* l, float* r, int m, int)
+            {
+                for (int i = 0; i < m; ++i)
+                {
+                    l[i] = shape (l[i] * gain);
+                    r[i] = shape (r[i] * gain);
+                }
+            });
+            const float dcA = 1.0f - std::exp (-juce::MathConstants<float>::twoPi * 12.0f / (float) sr);
+            for (int i = 0; i < n; ++i)
+            {
+                float l = L[i], r = R[i];
+                dc[0] += dcA * (l - dc[0]); l -= dc[0];
+                dc[1] += dcA * (r - dc[1]); r -= dc[1];
+                if (usePost) { l = post.process (l, 0); r = post.process (r, 1); }
+                L[i] = dry[0][(size_t) i] + mix * (l * out - dry[0][(size_t) i]);
+                R[i] = dry[1][(size_t) i] + mix * (r * out - dry[1][(size_t) i]);
+            }
+        }
+
+        /** Morbido sul positivo, piu' duro sul negativo: armoniche pari e dispari insieme. */
+        static inline float shape (float x) noexcept
+        {
+            return x >= 0.0f ? std::tanh (x) : juce::jmax (-0.85f, x);
+        }
+
+        double sr = 48000.0;
+        OverSampler over;
+        Biquad pre, post;
+        float dc[2] {};
+        float cacheColour = -1.0f, cachePost = -1.0f;
+        std::array<std::array<float, maxChunk>, 2> dry {};
+    };
+
+    //==========================================================================
+    /** Distorsore FET: tre stadi di guadagno a transistor (curva asimmetrica, con i condensatori
+        tra uno stadio e l'altro), controllo dei toni a due voci e simulazione di cassa.
+        Lavora sovracampionato per non sporcare gli alti con l'aliasing. */
+    class Fet : public Effect
+    {
+    public:
+        void prepare (double sampleRate) override   { sr = sampleRate; over.prepare(); reset(); }
+        void reset() override
+        {
+            over.reset();
+            for (auto& b : tone) b.reset();
+            for (auto& b : cab) b.reset();
+            for (auto& c : st) c = {};
+            for (auto& c : cache) c = -999.0f;
+        }
+
+        void process (float* L, float* R, int n, const float* p, const Context&) override
+        {
+            for (int start = 0; start < n; start += maxChunk)
+                processChunk (L + start, R + start, juce::jmin (maxChunk, n - start), p);
+        }
+
+    private:
+        static constexpr int maxChunk = 2048;
+        void processChunk (float* L, float* R, int n, const float* p)
+        {
+            std::copy (L, L + n, dry[0].begin()); std::copy (R, R + n, dry[1].begin());
+
+            const bool modern = p[4] > 0.5f, tight = p[5] > 0.5f;
+            bool changed = false;
+            for (int k = 0; k < 4; ++k)
+                if (cache[(size_t) k] != p[k + 1]) { cache[(size_t) k] = p[k + 1]; changed = true; }
+            if (changed)
+            {
+                const double top = sr * 0.45;
+                tone[0].setLowShelf (sr, modern ? 120.0 : 100.0, (p[1] - 0.5f) * 24.0f);
+                tone[1].setPeak (sr, modern ? 480.0 : 720.0, modern ? 0.55 : 0.8, (p[2] - 0.5f) * 24.0f - (modern ? 5.0f : 0.0f));
+                tone[2].setHighShelf (sr, juce::jmin (top, modern ? 4200.0 : 3000.0), (p[3] - 0.5f) * 24.0f);
+                setPass (cab[0], sr, 75.0, true);
+                setPass (cab[1], sr, juce::jmin (top, 5200.0), false);
+                setPass (cab[2], sr, juce::jmin (top, 6500.0), false);
+                cab[3].setPeak (sr, juce::jmin (top, 2400.0), 1.2, 3.5);
+            }
+
+            const float g = p[0];
+            const float g1 = 2.0f + g * 18.0f, g2 = 2.0f + g * g * 30.0f, g3 = 1.5f + g * 8.0f;
+            const float inHp = tight ? 320.0f : 45.0f, couple = tight ? 90.0f : 25.0f;
+            auto* state = st;
+            const double baseSr = sr;
+
+            over.run ((int) std::round (p[7]), L, R, n, [=] (float* l, float* r, int m, int factor)
+            {
+                const float osr = (float) (baseSr * factor);
+                auto coef = [osr] (float f)   { return 1.0f - std::exp (-juce::MathConstants<float>::twoPi * f / osr); };
+                const float aIn = coef (inHp), aC = coef (couple), aL1 = coef (9000.0f), aL2 = coef (7000.0f);
+                for (int ch = 0; ch < 2; ++ch)
+                {
+                    float* x = ch == 0 ? l : r;
+                    auto& s = state[ch];
+                    for (int i = 0; i < m; ++i)
+                    {
+                        float v = x[i];
+                        s.hpIn += aIn * (v - s.hpIn);   v -= s.hpIn;             // attacco: toglie i bassi prima del gain
+                        v = jfet (v * g1);
+                        s.c1 += aC * (v - s.c1);        v -= s.c1;               // condensatore tra gli stadi
+                        s.l1 += aL1 * (v - s.l1);       v = s.l1;
+                        v = -jfet (-v * g2 * 0.5f);                              // ogni stadio rovescia la fase
+                        s.c2 += aC * (v - s.c2);        v -= s.c2;
+                        s.l2 += aL2 * (v - s.l2);       v = s.l2;
+                        v = jfet (v * g3 * 0.5f);
+                        s.c3 += aC * (v - s.c3);        v -= s.c3;
+                        x[i] = v;
+                    }
+                }
+            });
+
+            const float cabAmount = p[6], mix = p[8];
+            const float out = juce::Decibels::decibelsToGain (p[9]) * 0.7f;
+            for (int i = 0; i < n; ++i)
+                for (int ch = 0; ch < 2; ++ch)
+                {
+                    float& x = ch == 0 ? L[i] : R[i];
+                    float v = x;
+                    for (auto& b : tone) v = b.process (v, ch);
+                    float c = v;
+                    for (auto& b : cab) c = b.process (c, ch);
+                    v += cabAmount * (c - v);
+                    const float d = dry[(size_t) ch][(size_t) i];
+                    x = d + mix * (v * out - d);
+                }
+        }
+
+        /** Curva "a transistor": un lato satura presto e morbido, l'altro tiene di piu' e poi taglia. */
+        static inline float jfet (float x) noexcept
+        {
+            // tanh approssimata (esatta entro lo 0,1% tra -5 e 5): costa meta' della std::tanh
+            auto th = [] (float v) noexcept   { return juce::dsp::FastMathApproximations::tanh (juce::jlimit (-5.0f, 5.0f, v)); };
+            return x >= 0.0f ? th (x) : 1.5f * th (x * (0.8f / 1.5f));
+        }
+
+        struct State { float hpIn = 0, c1 = 0, l1 = 0, c2 = 0, l2 = 0, c3 = 0; };
+
+        double sr = 48000.0;
+        OverSampler over;
+        Biquad tone[3], cab[4];
+        State st[2];
+        std::array<float, 4> cache {};
+        std::array<std::array<float, maxChunk>, 2> dry {};
+    };
+
     inline std::unique_ptr<Effect> createEffect (int type)
     {
         switch (type)
@@ -1790,6 +2039,8 @@ namespace mixer
             case pitch:      return std::make_unique<PitchShift>();
             case ringmod:    return std::make_unique<RingMod>();
             case shimmer:    return std::make_unique<Shimmer>();
+            case blood:      return std::make_unique<Blood>();
+            case fet:        return std::make_unique<Fet>();
             default:         return nullptr;
         }
     }

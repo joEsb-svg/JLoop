@@ -14,7 +14,16 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.77)
+## Stato attuale (v0.78)
+
+**0.78: due distorsori nuovi nel mixer** (menu degli effetti, gruppo "Sporco e lo-fi"):
+- **Overdrive Sangue**: overdrive con filtro prima e dopo. *Pre banda* + *Colore* scelgono quali frequenze mandare in
+  distorsione, *Pre amp* quanto (con *x100* diventa un'onda quadra), *Post filtro* toglie gli alti dopo, piu' Mix e Uscita.
+- **Distorsore FET**: high-gain a transistor, tipo ampli da chitarra. Tre stadi di guadagno con curva asimmetrica,
+  toni Bassi/Medi/Alti in due voci (Classico / Moderno, piu' scavato), *Attacco* Morbido o Stretto (asciuga i bassi
+  prima del gain), simulazione di *Cassa*, sovracampionamento 1x-8x (*Qualita'*), Mix e Uscita.
+- Sono effetti scritti da zero per JLoop: si ispirano allo schema di overdrive e pedali classici, non ne copiano
+  codice, nomi o grafica.
 
 **0.77**:
 - **Clona canale** come in FL Studio: stesso suono e regolazioni, ma step e note vuoti; nel mixer il clone ha la sua
