@@ -6,6 +6,7 @@
 #include "Theme.h"
 #include "Widgets.h"
 #include "ChannelEditor.h"   // LabeledKnob
+#include "FornaceView.h"
 
 //==============================================================================
 /** Conversione volume della traccia (guadagno) <-> dB del fader. */
@@ -636,10 +637,28 @@ public:
             auto* row = slotRows.add (new SlotRow (*this, s));
             addAndMakeVisible (row);
         }
+        openFornaceButton.onClick = [this] { openFornace(); };
+        addChildComponent (openFornaceButton);
     }
+
+    /** Apre la finestra di FORNACE sopra la lista degli effetti (se lo slot scelto e' una FORNACE). */
+    void openFornace (int band = 0)
+    {
+        if (engine.getTrack (track).slots[(size_t) selectedSlot].type.load() != mixer::fornace)
+            return;
+        fornaceView = std::make_unique<FornaceView> (engine, track, selectedSlot);
+        fornaceView->onChanged = [this] { if (onChanged) onChanged(); };
+        fornaceView->onClose = [this] { juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<TrackEffectsView> (this)] { if (safe != nullptr) safe->fornaceView.reset(); }); };
+        fornaceView->selectBand (band);
+        addAndMakeVisible (*fornaceView);
+        fornaceView->setBounds (getLocalBounds());
+    }
+
+    FornaceView* getFornaceView()   { return fornaceView.get(); }
 
     void setTrack (int t)
     {
+        fornaceView.reset();
         track = juce::jlimit (0, mixer::numTracks - 1, t);
         selectedSlot = 0;
         for (int s = 0; s < mixer::numSlots; ++s)
@@ -740,6 +759,8 @@ public:
         detailArea = shortScreen ? juce::Rectangle<float>() : right.removeFromTop (16).toFloat();
         paramsArea = right;
         layoutParams();
+        if (fornaceView != nullptr)
+            fornaceView->setBounds (getLocalBounds());
     }
 
 private:
@@ -907,7 +928,7 @@ private:
             { "Tono ed EQ",        { filter, peq, exciter, vowel } },
             { "Spazio",            { reverb, shimmer, delay, chorus, stereo } },
             { "Movimento",         { gate, tremolo, phaser, flanger } },
-            { "Sporco e lo-fi",    { saturation, blood, fet, trash, bitcrusher, vinyl } },
+            { "Sporco e lo-fi",    { saturation, fornace, blood, fet, trash, bitcrusher, vinyl } },
             { "Creativi",          { glitch, pitch, ringmod } },
         };
         for (auto& gr : groups)
@@ -933,6 +954,8 @@ private:
             safe->selectedSlot = slot;
             safe->refresh();
             safe->rebuildParams();
+            if (result - 1 == mixer::fornace)
+                safe->openFornace();
             if (safe->onChanged) safe->onChanged();
         });
     }
@@ -961,8 +984,12 @@ private:
         glitchView.reset();
         gateView.reset();
         eqView.reset();
+        fornaceView.reset();
+        openFornaceButton.setVisible (shownType == mixer::fornace);
         for (int p = 0; p < inf.numParams; ++p)
         {
+            if (shownType == mixer::fornace)
+                break;   // ha la sua finestra
             if (shownType == mixer::glitch && p > 0)
                 break;   // la griglia sostituisce i parametri 2 e 3
             if (shownType == mixer::gate && p == 0)
@@ -1016,6 +1043,7 @@ private:
 
     void layoutParams()
     {
+        openFornaceButton.setBounds (paramsArea.withSizeKeepingCentre (juce::jmin (260, paramsArea.getWidth() - 20), juce::jmin (54, paramsArea.getHeight())));
         const int n = (int) paramIndex.size();
         if (n == 0 || paramsArea.isEmpty())
             return;
@@ -1071,6 +1099,8 @@ private:
     std::unique_ptr<GlitchGridView> glitchView;
     std::unique_ptr<GateGridView> gateView;
     std::unique_ptr<EqCurveView> eqView;
+    std::unique_ptr<FornaceView> fornaceView;
+    juce::TextButton openFornaceButton { "Apri FORNACE" };
     juce::Rectangle<float> eqCaption, slotsCaption, paramsCaption, detailArea;
     juce::Rectangle<int> paramsArea;
 };

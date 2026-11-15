@@ -30,13 +30,13 @@ namespace mixer
     inline constexpr int numInserts = 32;
     inline constexpr int numTracks  = numInserts + 1;   // 0 = Master
     inline constexpr int numSlots   = 6;
-    inline constexpr int maxParams  = 12;
+    inline constexpr int maxParams  = 44;   // FORNACE ne usa 43; gli altri molti meno
 
     //==========================================================================
     // Tipi di effetto e i loro parametri
 
     enum FxType { none = 0, compressor, saturation, filter, delay, reverb, chorus, bitcrusher, sidechain, stereo, ott, glitch, trash, vowel,
-                  gate, tremolo, phaser, flanger, peq, transient, exciter, vinyl, limiter, pitch, ringmod, shimmer, blood, fet, numFxTypes };
+                  gate, tremolo, phaser, flanger, peq, transient, exciter, vinyl, limiter, pitch, ringmod, shimmer, blood, fet, fornace, numFxTypes };
 
     enum class Unit { percent, dB, ms, hz, ratio, choice, track, bits, times, semis };
 
@@ -220,6 +220,50 @@ namespace mixer
                 { "Qualita'", 0.0f, 3.0f, 1.0f, Unit::choice, 0.0f, "1x|2x|4x|8x" },
                 { "Mix", 0.0f, 1.0f, 1.0f, Unit::percent },
                 { "Uscita", -24.0f, 6.0f, -6.0f, Unit::dB } }} },
+            { "fornace", "FORNACE", "Saturatore a bande: ogni fascia di frequenze ha il suo stile di distorsione, drive, tono e dinamica", 43, {{
+                { "Bande", 0.0f, 3.0f, 3.0f, Unit::choice, 0.0f, "1|2|3|4" },
+                { "Taglio 1", 30.0f, 18000.0f, 120.0f, Unit::hz, 700.0f },
+                { "Taglio 2", 30.0f, 18000.0f, 800.0f, Unit::hz, 700.0f },
+                { "Taglio 3", 30.0f, 18000.0f, 4000.0f, Unit::hz, 700.0f },
+                { "Mix", 0.0f, 1.0f, 1.0f, Unit::percent },
+                { "Uscita", -24.0f, 12.0f, 0.0f, Unit::dB },
+                { "Qualita'", 0.0f, 2.0f, 1.0f, Unit::choice, 0.0f, "1x|2x|4x" },
+                { "B1 Stile", 0.0f, 11.0f, 1.0f, Unit::choice, 0.0f, "Pulito|Valvola calda|Valvola spinta|Nastro|Ampli crunch|Ampli cattivo|Trasformatore|Diodo|Piega-onda|Raddrizza|Schiaccia-bit|Distruggi" },
+                { "B1 Drive", 0.0f, 1.0f, 0.2f, Unit::percent },
+                { "B1 Mix", 0.0f, 1.0f, 1.0f, Unit::percent },
+                { "B1 Livello", -24.0f, 6.0f, 0.0f, Unit::dB },
+                { "B1 Tono", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "B1 Dinamica", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "B1 Feedback", 0.0f, 0.9f, 0.0f, Unit::percent },
+                { "B1 Freq. FB", 40.0f, 5000.0f, 400.0f, Unit::hz, 400.0f },
+                { "B1 Stato", 0.0f, 2.0f, 0.0f, Unit::choice, 0.0f, "Normale|Muta|Solo" },
+                { "B2 Stile", 0.0f, 11.0f, 3.0f, Unit::choice, 0.0f, "Pulito|Valvola calda|Valvola spinta|Nastro|Ampli crunch|Ampli cattivo|Trasformatore|Diodo|Piega-onda|Raddrizza|Schiaccia-bit|Distruggi" },
+                { "B2 Drive", 0.0f, 1.0f, 0.35f, Unit::percent },
+                { "B2 Mix", 0.0f, 1.0f, 1.0f, Unit::percent },
+                { "B2 Livello", -24.0f, 6.0f, 0.0f, Unit::dB },
+                { "B2 Tono", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "B2 Dinamica", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "B2 Feedback", 0.0f, 0.9f, 0.0f, Unit::percent },
+                { "B2 Freq. FB", 40.0f, 5000.0f, 400.0f, Unit::hz, 400.0f },
+                { "B2 Stato", 0.0f, 2.0f, 0.0f, Unit::choice, 0.0f, "Normale|Muta|Solo" },
+                { "B3 Stile", 0.0f, 11.0f, 5.0f, Unit::choice, 0.0f, "Pulito|Valvola calda|Valvola spinta|Nastro|Ampli crunch|Ampli cattivo|Trasformatore|Diodo|Piega-onda|Raddrizza|Schiaccia-bit|Distruggi" },
+                { "B3 Drive", 0.0f, 1.0f, 0.45f, Unit::percent },
+                { "B3 Mix", 0.0f, 1.0f, 1.0f, Unit::percent },
+                { "B3 Livello", -24.0f, 6.0f, 0.0f, Unit::dB },
+                { "B3 Tono", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "B3 Dinamica", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "B3 Feedback", 0.0f, 0.9f, 0.0f, Unit::percent },
+                { "B3 Freq. FB", 40.0f, 5000.0f, 400.0f, Unit::hz, 400.0f },
+                { "B3 Stato", 0.0f, 2.0f, 0.0f, Unit::choice, 0.0f, "Normale|Muta|Solo" },
+                { "B4 Stile", 0.0f, 11.0f, 1.0f, Unit::choice, 0.0f, "Pulito|Valvola calda|Valvola spinta|Nastro|Ampli crunch|Ampli cattivo|Trasformatore|Diodo|Piega-onda|Raddrizza|Schiaccia-bit|Distruggi" },
+                { "B4 Drive", 0.0f, 1.0f, 0.25f, Unit::percent },
+                { "B4 Mix", 0.0f, 1.0f, 1.0f, Unit::percent },
+                { "B4 Livello", -24.0f, 6.0f, 0.0f, Unit::dB },
+                { "B4 Tono", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "B4 Dinamica", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "B4 Feedback", 0.0f, 0.9f, 0.0f, Unit::percent },
+                { "B4 Freq. FB", 40.0f, 5000.0f, 400.0f, Unit::hz, 400.0f },
+                { "B4 Stato", 0.0f, 2.0f, 0.0f, Unit::choice, 0.0f, "Normale|Muta|Solo" } }} },
         }};
         return infos[(size_t) juce::jlimit (0, numFxTypes - 1, type)];
     }
@@ -2010,6 +2054,277 @@ namespace mixer
         std::array<std::array<float, maxChunk>, 2> dry {};
     };
 
+    //==========================================================================
+    /** Dove stanno i parametri di FORNACE. */
+    namespace fornaceParam
+    {
+        enum { bands = 0, cross1, cross2, cross3, mix, out, quality, bandBase, perBand = 9 };
+        enum { style = 0, drive, bandMix, level, tone, dynamics, feedback, fbFreq, state };
+        enum { clean = 0, warmTube, hotTube, tape, crunch, meanAmp, transformer, diode, fold, rectify, crush, destroy, numStyles };
+        inline int at (int band, int what)   { return bandBase + band * perBand + what; }
+    }
+
+    /** Taglio Linkwitz-Riley del 4o ordine: bassi e alti che, sommati, tornano piatti. */
+    struct LrSplit
+    {
+        Biquad lp1, lp2, hp1, hp2;
+        void set (double sr, double f)   { setPass (lp1, sr, f, false); lp2 = copyCoefs (lp1, lp2); setPass (hp1, sr, f, true); hp2 = copyCoefs (hp1, hp2); }
+        void reset()                     { lp1.reset(); lp2.reset(); hp1.reset(); hp2.reset(); }
+        inline void process (float x, int ch, float& lo, float& hi) noexcept
+        {
+            lo = lp2.process (lp1.process (x, ch), ch);
+            hi = hp2.process (hp1.process (x, ch), ch);
+        }
+        inline float allpass (float x, int ch) noexcept   { float lo, hi; process (x, ch, lo, hi); return lo + hi; }
+
+    private:
+        static Biquad copyCoefs (const Biquad& from, Biquad keepState)
+        {
+            keepState.b0 = from.b0; keepState.b1 = from.b1; keepState.b2 = from.b2; keepState.a1 = from.a1; keepState.a2 = from.a2;
+            return keepState;
+        }
+    };
+
+    //==========================================================================
+    /** FORNACE: saturatore a bande. Il suono viene diviso in 1-4 fasce di frequenza; ogni fascia ha
+        il suo stile di distorsione, drive, mix, livello, tono, dinamica e feedback, poi tutto si risomma. */
+    class Fornace : public Effect
+    {
+    public:
+        static constexpr int maxBands = 4;
+        static constexpr int scopeSize = 2048;
+
+        // Per il disegno (thread della UI): ultimo pezzo di suono in ingresso e livello di ogni banda
+        std::array<float, scopeSize> scope {};
+        std::atomic<int> scopePos { 0 };
+        std::array<std::atomic<float>, maxBands> meter {};
+        std::atomic<double> scopeRate { 48000.0 };
+
+        void prepare (double sampleRate) override
+        {
+            sr = sampleRate;
+            scopeRate.store (sr);
+            over.prepare();
+            delaySize = juce::nextPowerOfTwo ((int) (sr * 4.0 / 40.0) + 16);
+            for (auto& b : band)
+                for (auto& d : b.delay) d.assign ((size_t) delaySize, 0.0f);
+            reset();
+        }
+
+        void reset() override
+        {
+            over.reset();
+            for (auto& x : split) x.reset();
+            for (auto& x : comp) x.reset();
+            for (auto& b : band)
+            {
+                for (auto& d : b.delay) std::fill (d.begin(), d.end(), 0.0f);
+                for (int ch = 0; ch < 2; ++ch) { b.env[ch] = b.dynGain[ch] = b.dynTarget[ch] = 0.0f; b.toneLp[ch] = b.tapeLp[ch] = b.dc[ch] = b.held[ch] = 0.0f; b.holdCount[ch] = b.dynCount[ch] = 0; b.dynGain[ch] = b.dynTarget[ch] = 1.0f; }
+                b.writePos = 0;
+            }
+            lastOsr = 0.0; lastCross[0] = lastCross[1] = lastCross[2] = -1.0f;
+        }
+
+        void process (float* L, float* R, int n, const float* p, const Context&) override
+        {
+            for (int start = 0; start < n; start += maxChunk)
+                processChunk (L + start, R + start, juce::jmin (maxChunk, n - start), p);
+        }
+
+        /** La curva di uno stile (per i test e per il disegno): x e' gia' moltiplicato per il gain. */
+        static inline float shape (int style, float x, float d) noexcept
+        {
+            using namespace fornaceParam;
+            auto th = [] (float v) noexcept   { return juce::dsp::FastMathApproximations::tanh (juce::jlimit (-5.0f, 5.0f, v)); };
+            switch (style)
+            {
+                case warmTube:    return th (x + 0.25f) - th (0.25f);
+                case hotTube:     return (th (x + 0.4f) - th (0.4f)) * 1.1f;
+                case tape:        return x / std::sqrt (1.0f + x * x);
+                case crunch:      { const float t = th (x); return th (1.6f * t + 0.2f * t * t); }
+                case meanAmp:     { const float h = juce::jlimit (-1.0f, 1.0f, x); return juce::jlimit (-0.8f, 0.9f, (0.7f * h + 0.3f * th (x * 3.0f)) * 1.8f); }
+                case transformer: return 0.63662f * std::atan (1.5f * x);
+                case diode:       return x >= 0.0f ? 1.6f * x / (1.0f + 1.6f * x) : 1.2f * th (x * 0.5f);
+                case fold:        return std::sin (juce::MathConstants<float>::halfPi * x);
+                case rectify:     return th (x + d * (std::abs (x) - x));
+                case destroy:     return std::sin (3.0f * x + 2.0f * std::sin (1.7f * x)) * th (std::abs (x) * 4.0f);
+                default:          return x;
+            }
+        }
+
+        /** Quanto gain mette il drive (0..1) per uno stile. */
+        static inline float gainFor (int style, float d) noexcept
+        {
+            using namespace fornaceParam;
+            static constexpr float k[numStyles] { 0.0f, 8.0f, 40.0f, 10.0f, 20.0f, 100.0f, 12.0f, 30.0f, 12.0f, 10.0f, 0.0f, 20.0f };
+            return 1.0f + d * d * k[juce::jlimit (0, numStyles - 1, style)];
+        }
+
+    private:
+        static constexpr int maxChunk = 2048;
+
+        struct BandSet
+        {
+            int style = 0;
+            float d = 0, g = 1, comp = 1, mix = 1, level = 1, tilt = 0, dyn = 0, fb = 0;
+            float toneA = 0, tapeA = 1, crushSteps = 4096;
+            int delay = 1, hold = 1;
+            bool audible = true;
+        };
+
+        struct BandState
+        {
+            std::vector<float> delay[2];
+            float env[2] {}, dynGain[2] { 1, 1 }, dynTarget[2] { 1, 1 }, toneLp[2] {}, tapeLp[2] {}, dc[2] {}, held[2] {};
+            int holdCount[2] {}, dynCount[2] {};
+            int writePos = 0;
+        };
+
+        void processChunk (float* L, float* R, int n, const float* p)
+        {
+            using namespace fornaceParam;
+            std::copy (L, L + n, dry[0].begin()); std::copy (R, R + n, dry[1].begin());
+
+            int sp = scopePos.load (std::memory_order_relaxed);
+            for (int i = 0; i < n; ++i) { scope[(size_t) sp] = 0.5f * (L[i] + R[i]); sp = (sp + 1) & (scopeSize - 1); }
+            scopePos.store (sp, std::memory_order_relaxed);
+
+            const int nb = juce::jlimit (1, maxBands, 1 + (int) std::round (p[bands]));
+            const float top = (float) (sr * 0.42);
+            float cross[3];
+            cross[0] = juce::jlimit (30.0f, top * 0.3f, p[cross1]);
+            cross[1] = juce::jlimit (cross[0] * 1.3f, top * 0.55f, p[cross2]);
+            cross[2] = juce::jlimit (cross[1] * 1.3f, top, p[cross3]);
+
+            bool anySolo = false;
+            for (int b = 0; b < nb; ++b) anySolo = anySolo || (int) std::round (p[at (b, state)]) == 2;
+            const int stage = juce::jlimit (0, 2, (int) std::round (p[quality]));
+
+            over.run (stage, L, R, n, [&] (float* l, float* r, int m, int factor)
+            {
+                const double osr = sr * factor;
+                if (osr != lastOsr || cross[0] != lastCross[0] || cross[1] != lastCross[1] || cross[2] != lastCross[2])
+                {
+                    lastOsr = osr;
+                    for (int j = 0; j < 3; ++j) { lastCross[j] = cross[j]; split[j].set (osr, cross[j]); }
+                    comp[0].set (osr, cross[1]); comp[1].set (osr, cross[2]); comp[2].set (osr, cross[2]);
+                }
+                const float fosr = (float) osr;
+                auto coef = [fosr] (float f)   { return 1.0f - std::exp (-juce::MathConstants<float>::twoPi * f / fosr); };
+
+                BandSet set[maxBands];
+                for (int b = 0; b < nb; ++b)
+                {
+                    auto& s = set[b];
+                    s.style = juce::jlimit (0, numStyles - 1, (int) std::round (p[at (b, style)]));
+                    s.d = juce::jlimit (0.0f, 1.0f, p[at (b, drive)]);
+                    s.g = gainFor (s.style, s.d);
+                    s.comp = (s.style == fold || s.style == crush || s.style == clean) ? 1.0f : std::pow (s.g, -0.3f);
+                    s.mix = p[at (b, bandMix)];
+                    s.level = juce::Decibels::decibelsToGain (p[at (b, level)]);
+                    s.tilt = juce::jlimit (-1.0f, 1.0f, p[at (b, tone)]) * 0.6f;
+                    s.dyn = juce::jlimit (-1.0f, 1.0f, p[at (b, dynamics)]);
+                    s.fb = juce::jlimit (0.0f, 0.9f, p[at (b, feedback)]);
+                    const float lo = b == 0 ? 40.0f : cross[b - 1], hi = b == nb - 1 ? 12000.0f : cross[b];
+                    s.toneA = coef (juce::jmin (fosr * 0.4f, std::sqrt (lo * juce::jmax (lo * 1.2f, hi))));
+                    s.tapeA = coef (juce::jmin (fosr * 0.4f, 16000.0f - 11000.0f * s.d));
+                    s.crushSteps = std::pow (2.0f, 11.0f - 9.0f * s.d);
+                    s.hold = 1 + (int) (s.d * s.d * 20.0f * (float) factor);
+                    s.delay = juce::jlimit (1, delaySize - 1, (int) (fosr / juce::jlimit (40.0f, 5000.0f, p[at (b, fbFreq)])));
+                    const int st = (int) std::round (p[at (b, state)]);
+                    s.audible = anySolo ? st == 2 : st != 1;
+                }
+
+                const float aAtk = coef (120.0f), aRel = coef (8.0f), aDc = coef (8.0f), aDyn = coef (60.0f);
+                const int dynEvery = 16 * factor, mask = delaySize - 1;
+                float peak[maxBands] {};
+
+                for (int i = 0; i < m; ++i)
+                {
+                    float outS[2] { 0.0f, 0.0f };
+                    for (int ch = 0; ch < 2; ++ch)
+                    {
+                        float x[maxBands];
+                        float rest = ch == 0 ? l[i] : r[i];
+                        for (int j = 0; j < nb - 1; ++j) { float lo, hi; split[j].process (rest, ch, lo, hi); x[j] = lo; rest = hi; }
+                        x[nb - 1] = rest;
+                        // le bande basse passano dagli stessi sfasamenti dei tagli sopra di loro: cosi' la somma resta piatta
+                        if (nb >= 3) x[0] = comp[0].allpass (x[0], ch);
+                        if (nb >= 4) { x[0] = comp[1].allpass (x[0], ch); x[1] = comp[2].allpass (x[1], ch); }
+
+                        for (int b = 0; b < nb; ++b)
+                        {
+                            const auto& s = set[b];
+                            auto& stt = band[b];
+                            float v = x[b];
+                            const float e = std::abs (v);
+                            stt.env[ch] += (e > stt.env[ch] ? aAtk : aRel) * (e - stt.env[ch]);
+                            if (s.dyn != 0.0f)
+                            {
+                                if (--stt.dynCount[ch] <= 0)
+                                {
+                                    stt.dynCount[ch] = dynEvery;
+                                    const float db = juce::Decibels::gainToDecibels (stt.env[ch], -90.0f);
+                                    const float gDb = s.dyn > 0.0f ? -s.dyn * 0.7f * juce::jmax (0.0f, db + 30.0f)        // comprime sopra -30 dB
+                                                                   : juce::jmax (-48.0f, s.dyn * 2.0f * juce::jmax (0.0f, -30.0f - db));   // espande sotto
+                                    stt.dynTarget[ch] = juce::Decibels::decibelsToGain (gDb + (s.dyn > 0.0f ? s.dyn * 8.0f : 0.0f));
+                                }
+                                stt.dynGain[ch] += aDyn * (stt.dynTarget[ch] - stt.dynGain[ch]);
+                                v *= stt.dynGain[ch];
+                            }
+                            else stt.dynGain[ch] = stt.dynTarget[ch] = 1.0f;
+
+                            auto& line = stt.delay[ch];
+                            // il feedback segue il suono in ingresso: quando la banda tace si spegne, cosi' non fischia da solo
+                            if (s.fb > 0.0f) v += s.fb * juce::jmin (1.0f, stt.env[ch] * 400.0f) * line[(size_t) ((stt.writePos - s.delay) & mask)];
+                            const float in = v;
+
+                            float y;
+                            if (s.style == crush)
+                            {
+                                if (--stt.holdCount[ch] <= 0) { stt.holdCount[ch] = s.hold; stt.held[ch] = std::round (v * s.crushSteps) / s.crushSteps; }
+                                y = stt.held[ch];
+                            }
+                            else
+                            {
+                                y = shape (s.style, v * s.g, s.d) * s.comp;
+                                if (s.style == tape) { stt.tapeLp[ch] += s.tapeA * (y - stt.tapeLp[ch]); y = stt.tapeLp[ch]; }
+                            }
+                            stt.dc[ch] += aDc * (y - stt.dc[ch]);  y -= stt.dc[ch];
+                            stt.toneLp[ch] += s.toneA * (y - stt.toneLp[ch]);
+                            y = stt.toneLp[ch] * (1.0f - s.tilt) + (y - stt.toneLp[ch]) * (1.0f + s.tilt);
+                            y = in + s.mix * (y - in);
+                            line[(size_t) stt.writePos] = juce::dsp::FastMathApproximations::tanh (juce::jlimit (-5.0f, 5.0f, y));
+                            y *= s.level;
+                            peak[b] = juce::jmax (peak[b], std::abs (y));
+                            if (s.audible) outS[ch] += y;
+                        }
+                    }
+                    for (int b = 0; b < nb; ++b)
+                        band[b].writePos = (band[b].writePos + 1) & mask;
+                    l[i] = outS[0]; r[i] = outS[1];
+                }
+                for (int b = 0; b < maxBands; ++b)
+                    if (b < nb) { if (peak[b] > meter[(size_t) b].load (std::memory_order_relaxed)) meter[(size_t) b].store (peak[b], std::memory_order_relaxed); }
+            });
+
+            const float wet = p[mix], gain = juce::Decibels::decibelsToGain (p[out]);
+            for (int i = 0; i < n; ++i)
+            {
+                L[i] = (dry[0][(size_t) i] + wet * (L[i] - dry[0][(size_t) i])) * gain;
+                R[i] = (dry[1][(size_t) i] + wet * (R[i] - dry[1][(size_t) i])) * gain;
+            }
+        }
+
+        double sr = 48000.0, lastOsr = 0.0;
+        float lastCross[3] { -1, -1, -1 };
+        OverSampler over;
+        LrSplit split[3], comp[3];
+        BandState band[maxBands];
+        int delaySize = 8192;
+        std::array<std::array<float, maxChunk>, 2> dry {};
+    };
+
     inline std::unique_ptr<Effect> createEffect (int type)
     {
         switch (type)
@@ -2041,6 +2356,7 @@ namespace mixer
             case shimmer:    return std::make_unique<Shimmer>();
             case blood:      return std::make_unique<Blood>();
             case fet:        return std::make_unique<Fet>();
+            case fornace:    return std::make_unique<Fornace>();
             default:         return nullptr;
         }
     }

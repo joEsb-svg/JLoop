@@ -14,7 +14,19 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.78)
+## Stato attuale (v0.79)
+
+**0.79: FORNACE, saturatore a bande** (mixer, gruppo "Sporco e lo-fi"; si apre in una finestra sua):
+- Il suono viene diviso in **1-4 fasce di frequenza** (tagli Linkwitz-Riley: con gli stili puliti la somma torna identica)
+  e ogni fascia ha il suo **stile** di distorsione tra 12: Pulito, Valvola calda, Valvola spinta, Nastro, Ampli crunch,
+  Ampli cattivo, Trasformatore, Diodo, Piega-onda, Raddrizza, Schiaccia-bit, Distruggi.
+- Per ogni banda: **Drive, Mix, Livello, Tono** (scuro/chiaro), **Dinamica** (a destra comprime, a sinistra espande),
+  **Feedback** con la sua frequenza, **Solo** e **Muta**.
+- **Grafico**: lo spettro del suono che entra, le bande colorate, le linee dei tagli da trascinare; tocchi una banda per
+  sceglierla e trascini su/giu' per il drive.
+- Mix totale, Uscita, sovracampionamento 1x/2x/4x e 9 **preset** di partenza.
+- Scritto da zero per JLoop (lo schema "una distorsione diversa per ogni banda" e' quello dei saturatori multibanda).
+- Non ancora presenti: modulazioni interne (LFO, inviluppi, XY); i parametri si possono comunque automatizzare.
 
 **0.78: due distorsori nuovi nel mixer** (menu degli effetti, gruppo "Sporco e lo-fi"):
 - **Overdrive Sangue**: overdrive con filtro prima e dopo. *Pre banda* + *Colore* scelgono quali frequenze mandare in

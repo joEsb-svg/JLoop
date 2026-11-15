@@ -2781,6 +2781,14 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
     if (const int i = args.indexOf ("--mixer"); i >= 0)   // test: mixer (traccia degli effetti, -1 = strisce)
         openMixer (args.size() > i + 1 ? args[i + 1].getIntValue() : -1);
 
+    if (const int i = args.indexOf ("--fornace"); i >= 0)   // test: finestra di FORNACE (banda, preset)
+    {
+        auto& fxView = mixerPanel.getEffectsView();
+        fxView.openFornace (args[i + 1].getIntValue());
+        if (auto* fv = fxView.getFornaceView(); fv != nullptr && args.size() > i + 2 && args[i + 2].containsOnly ("0123456789"))
+            { fv->applyPreset (args[i + 2].getIntValue()); fv->selectBand (args[i + 1].getIntValue()); }
+    }
+
     if (const int i = args.indexOf ("--add-kit"); i >= 0)   // test: kit di DrumForge (indice, 0 = DrumForge / 1 = canali separati)
     {
         SoundChoice c;
