@@ -230,7 +230,7 @@ public:
             g.fillRoundedRectangle (bar.withWidth (bar.getWidth() * p), 4.0f);
             g.setColour (Theme::textDim);
             g.setFont (Theme::font (12.5f));
-            g.drawFittedText ("JLoop suona la canzone in silenzio e controlla volume, cassa e basso, tonalita' e frequenze.",
+            g.drawFittedText ("AudioNaut suona la canzone in silenzio e controlla volume, cassa e basso, tonalita' e frequenze.",
                               r.withTrimmedTop (8.0f).toNearestInt(), juce::Justification::topLeft, 3);
             return;
         }

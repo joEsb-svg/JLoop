@@ -7,7 +7,7 @@
 
 //==============================================================================
 /**
-    Effetti pronti per le automazioni: in un tocco JLoop mette l'effetto giusto nel mixer
+    Effetti pronti per le automazioni: in un tocco AudioNaut mette l'effetto giusto nel mixer
     (sulla traccia scelta o sul Master) e disegna da solo le curve nella playlist.
 
     Tutto nel tempo della canzone: startBar = prima battuta, bars = quante battute dura.

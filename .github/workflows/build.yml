@@ -57,7 +57,7 @@ jobs:
             CPPFLAGS="-UJUCE_USE_CURL -DJUCE_USE_CURL=0"
 
       - name: Genera il progetto Android
-        run: ci/run-logged.sh "Projucer resave" JUCE/extras/Projucer/Builds/LinuxMakefile/build/Projucer --resave JLoop.jucer
+        run: ci/run-logged.sh "Projucer resave" JUCE/extras/Projucer/Builds/LinuxMakefile/build/Projucer --resave AudioNaut.jucer
 
       - name: Installa NDK e CMake
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;$NDK_VERSION" "cmake;$CMAKE_VERSION" > /dev/null
@@ -88,13 +88,13 @@ jobs:
         run: |
           APK=$(find Builds/Android/app/build/outputs/apk -name "*.apk" | head -n 1)
           echo "Trovato: $APK"
-          cp "$APK" JLoop.apk
+          cp "$APK" AudioNaut.apk
 
       - name: Carica come artifact
         uses: actions/upload-artifact@v4
         with:
-          name: JLoop-apk
-          path: JLoop.apk
+          name: AudioNaut-apk
+          path: AudioNaut.apk
 
   windows:
     runs-on: windows-2022
@@ -124,7 +124,7 @@ jobs:
         run: msbuild JUCE\extras\Projucer\Builds\VisualStudio2022\Projucer.sln /p:Configuration=Release /p:Platform=x64 /m /v:minimal
 
       - name: Genera il progetto Visual Studio
-        run: JUCE\extras\Projucer\Builds\VisualStudio2022\x64\Release\App\Projucer.exe --resave JLoop.jucer
+        run: JUCE\extras\Projucer\Builds\VisualStudio2022\x64\Release\App\Projucer.exe --resave AudioNaut.jucer
 
       # ASIO (schede audio esterne a bassa latenza): SDK di Steinberg, ora con licenza GPLv3.
       # Se il download non riesce si compila lo stesso, senza ASIO.
@@ -139,11 +139,11 @@ jobs:
             else { Write-Host "ASIO SDK scaricato ma senza iasiodrv.h: compilo senza ASIO" }
           } catch { Write-Host "ASIO SDK non scaricato: compilo senza ASIO ($_)" }
 
-      - name: Compila JLoop.exe
+      - name: Compila AudioNaut.exe
         shell: pwsh
         run: |
           if ($env:ASIO_INCLUDE) { $env:CL = "/DJUCE_ASIO=1 /I`"$env:ASIO_INCLUDE`""; Write-Host "Con ASIO" }
-          msbuild Builds\VisualStudio2022\JLoop.sln /p:Configuration=Release /p:Platform=x64 /m /v:minimal
+          msbuild Builds\VisualStudio2022\AudioNaut.sln /p:Configuration=Release /p:Platform=x64 /m /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Installer (Inno Setup)
@@ -151,17 +151,17 @@ jobs:
         run: |
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress; $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
-          $version = ([xml](Get-Content JLoop.jucer)).JUCERPROJECT.version
-          $exe = (Resolve-Path "Builds\VisualStudio2022\x64\Release\App\JLoop.exe").Path
-          & $iscc "/DMyAppVersion=$version" "/DSourceExe=$exe" "ci\windows\jloop.iss"
+          $version = ([xml](Get-Content AudioNaut.jucer)).JUCERPROJECT.version
+          $exe = (Resolve-Path "Builds\VisualStudio2022\x64\Release\App\AudioNaut.exe").Path
+          & $iscc "/DMyAppVersion=$version" "/DSourceExe=$exe" "ci\windows\audionaut.iss"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Get-ChildItem dist
 
       - name: Carica come artifact
         uses: actions/upload-artifact@v4
         with:
-          name: JLoop-windows
-          path: dist/JLoop-Setup.exe
+          name: AudioNaut-windows
+          path: dist/AudioNaut-Setup.exe
 
   publish:
     needs: [android, windows]
@@ -176,7 +176,7 @@ jobs:
         with:
           path: out
 
-      # Pubblica sempre agli stessi link: .../releases/download/latest-build/JLoop.apk e JLoop-Setup.exe
+      # Pubblica sempre agli stessi link: .../releases/download/latest-build/AudioNaut.apk e AudioNaut-Setup.exe
       # (solo se questo commit e' ancora l'ultimo di main: una build vecchia arrivata in ritardo non sovrascrive quella nuova)
       - name: Pubblica release "latest-build"
         env:
@@ -188,15 +188,19 @@ jobs:
             echo "Questo commit ($BUILT) non e' piu' l'ultimo ($LATEST): non pubblico."
             exit 0
           fi
-          FILES="out/JLoop-apk/JLoop.apk"
-          NOTE="APK per Android"
-          if [ -f out/JLoop-windows/JLoop-Setup.exe ]; then
-            FILES="$FILES out/JLoop-windows/JLoop-Setup.exe"
-            NOTE="$NOTE e installer per Windows (JLoop-Setup.exe)"
+          # nomi nuovi (AudioNaut) + copie coi nomi vecchi, cosi' i link di prima continuano a funzionare
+          mkdir -p old
+          cp out/AudioNaut-apk/AudioNaut.apk old/JLoop.apk
+          FILES="out/AudioNaut-apk/AudioNaut.apk old/JLoop.apk"
+          NOTE="APK per Android (AudioNaut.apk)"
+          if [ -f out/AudioNaut-windows/AudioNaut-Setup.exe ]; then
+            cp out/AudioNaut-windows/AudioNaut-Setup.exe old/JLoop-Setup.exe
+            FILES="$FILES out/AudioNaut-windows/AudioNaut-Setup.exe old/JLoop-Setup.exe"
+            NOTE="$NOTE e installer per Windows (AudioNaut-Setup.exe)"
           fi
           gh release delete latest-build --yes --cleanup-tag || true
           gh release create latest-build $FILES \
             --target "$BUILT" \
             --prerelease \
-            --title "JLoop - ultima build (${BUILT::7})" \
+            --title "AudioNaut - ultima build (${BUILT::7})" \
             --notes "$NOTE compilati automaticamente dal commit ${BUILT::7}."

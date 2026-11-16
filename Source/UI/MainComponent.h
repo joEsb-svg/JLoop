@@ -269,7 +269,7 @@ private:
     void shareProject();
     void openProjectFile();
     void openProjectFromUrl (const juce::URL&);
-    void checkOpenWith();   // "Apri con JLoop" da un'altra app
+    void checkOpenWith();   // "Apri con AudioNaut" da un'altra app
     juce::TimedCallback openWithPoll { [this] { checkOpenWith(); } };
     void openRiser (bool downer = false);
     void openVocals (int category = -1, int index = -1, int editChannel = -1);

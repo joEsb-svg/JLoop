@@ -74,7 +74,7 @@ namespace ProjectIO
     inline juce::var toJson (SequencerEngine& engine, bool includeSynthState = true)
     {
         auto* root = new juce::DynamicObject();
-        root->setProperty ("app", "JLoop");
+        root->setProperty ("app", "AudioNaut");
         root->setProperty ("version", formatVersion);
         root->setProperty ("bpm", engine.getBpm());
         root->setProperty ("swing", engine.getSwing());
@@ -330,7 +330,7 @@ namespace ProjectIO
     inline bool fromJson (SequencerEngine& engine, const juce::var& json)
     {
         const auto app = json.getProperty ("app", {}).toString();
-        if (app != "JLoop" && app != "DAWFL")   // accetta anche i progetti salvati col vecchio nome
+        if (app != "AudioNaut" && app != "JLoop" && app != "DAWFL")   // accetta anche i progetti salvati coi nomi vecchi (JLoop, DAWFL)
             return false;
 
         engine.resetProject (true);   // gli effetti del mixer restano (si riusano se sono dello stesso tipo)

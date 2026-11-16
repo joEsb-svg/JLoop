@@ -5,7 +5,7 @@
 /** File aperti da altre app (WhatsApp, gestore file...) e lettura sicura dei content:// di Android. */
 namespace OpenWith
 {
-    /** Se l'app e' stata aperta con "Apri con JLoop", ritorna l'indirizzo del file (una volta sola), altrimenti vuoto. */
+    /** Se l'app e' stata aperta con "Apri con AudioNaut", ritorna l'indirizzo del file (una volta sola), altrimenti vuoto. */
     juce::String takePendingUri();
 
     /** Apre un file scelto dall'utente. Su Android un content:// si legge sempre dal ContentResolver:

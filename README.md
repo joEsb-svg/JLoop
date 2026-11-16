@@ -1,4 +1,4 @@
-# JLoop
+# AudioNaut (ex JLoop)
 
 (ex DAWFL)
 
@@ -14,7 +14,15 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.81)
+## Stato attuale (v0.82)
+
+**0.82: JLoop diventa AudioNaut**
+- Cambia solo il nome (e il logo, dalla 0.81). Tutto il resto resta: stessa app sul telefono (si installa sopra,
+  codice interno `com.joesb.dawfl`), stessa cartella dati, progetti `.jloop` e file condivisi di prima si aprono come sempre.
+- Windows: si aggiorna sopra la versione installata (stesso AppId); il programma ora si chiama AudioNaut.exe.
+- Link: `.../releases/download/latest-build/AudioNaut.apk` e `AudioNaut-Setup.exe` (i vecchi `JLoop.apk` e
+  `JLoop-Setup.exe` restano validi, sono copie).
+- Il repository su GitHub si chiama ancora JLoop.
 
 **0.81: nuovo logo (AudioNaut)**
 - Logo nuovo: il casco da astronauta con l'onda nella visiera (disegno di Joe, scontornato in `tools/logo2/cutout.py`).

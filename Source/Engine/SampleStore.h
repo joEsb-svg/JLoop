@@ -102,7 +102,7 @@ public:
     }
 
     //==============================================================================
-    // Libreria di JLoop (suoni inclusi nell'app). Nei progetti sono salvati come "lib:<id>".
+    // Libreria di AudioNaut (suoni inclusi nell'app). Nei progetti sono salvati come "lib:<id>".
 
     static constexpr const char* libraryPrefix = "lib:";
 
@@ -218,7 +218,7 @@ public:
         return names;
     }
 
-    /** Riser e downer fatti da JLoop (RiserMaker): restano sul disco per i progetti, ma non sono "campioni importati". */
+    /** Riser e downer fatti da AudioNaut (RiserMaker): restano sul disco per i progetti, ma non sono "campioni importati". */
     static bool isGenerated (const juce::String& fileName)
     {
         const auto base = juce::File (fileName).getFileNameWithoutExtension();

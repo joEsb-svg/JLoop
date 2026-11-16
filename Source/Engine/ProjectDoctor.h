@@ -13,7 +13,7 @@
 
 //==============================================================================
 /**
-    CONTROLLO DEL PROGETTO: JLoop ascolta la canzone (in una copia del progetto, offline, come l'esportazione)
+    CONTROLLO DEL PROGETTO: AudioNaut ascolta la canzone (in una copia del progetto, offline, come l'esportazione)
     e cerca i problemi piu' comuni del mix, ognuno con una spiegazione, una guida passo passo e (quasi sempre)
     una correzione automatica.
 
@@ -630,7 +630,7 @@ namespace doctor
             case tooQuiet:
                 s.push_back ({ "Apri il pannello Esporta: in alto c'e' il Mastering.", Go::mastering, "Apri il mastering" });
                 s.push_back ({ "Accendi il Mastering e scegli lo stile \"Club / EDM\" (o quello piu' vicino alla tua musica)." });
-                s.push_back ({ "Tocca \"Automatico\": JLoop ascolta la canzone e regola il volume per arrivare al livello dello stile." });
+                s.push_back ({ "Tocca \"Automatico\": AudioNaut ascolta la canzone e regola il volume per arrivare al livello dello stile." });
                 s.push_back ({ listenText, Go::listen, "Ascolta" });
                 break;
             case tooLoud:
@@ -692,7 +692,7 @@ namespace doctor
     {
     public:
         Analyzer (const juce::var& projectJson, SampleStore& store)
-            : juce::Thread ("JLoop controllo")
+            : juce::Thread ("AudioNaut controllo")
         {
             engine = std::make_unique<SequencerEngine>();
             ProjectIO::fromJson (*engine, projectJson);

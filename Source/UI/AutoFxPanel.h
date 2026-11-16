@@ -10,7 +10,7 @@
 //==============================================================================
 /**
     "Effetti pronti" delle automazioni: scegli l'effetto, dove (Master o una traccia del mixer),
-    da che battuta e per quanto. JLoop mette l'effetto nel mixer e disegna le curve.
+    da che battuta e per quanto. AudioNaut mette l'effetto nel mixer e disegna le curve.
 */
 class AutoFxPanel : public juce::Component
 {
@@ -81,7 +81,7 @@ public:
         g.fillRoundedRectangle (getLocalBounds().toFloat(), Theme::corner);
         g.setColour (Theme::textBright);
         g.setFont (Theme::font (16.0f, true));
-        g.drawFittedText (getWidth() < 640 ? "Effetti pronti" : "Effetti pronti: JLoop mette l'effetto e disegna la curva", titleArea, juce::Justification::centredLeft, 1);
+        g.drawFittedText (getWidth() < 640 ? "Effetti pronti" : "Effetti pronti: AudioNaut mette l'effetto e disegna la curva", titleArea, juce::Justification::centredLeft, 1);
 
         Theme::drawCaption (g, "1. Effetto", fxCaption, juce::Justification::centredLeft);
         Theme::drawCaption (g, "2. Dove", whereCaption, juce::Justification::centredLeft);

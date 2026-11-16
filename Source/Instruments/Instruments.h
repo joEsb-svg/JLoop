@@ -22,7 +22,7 @@
 
 //==============================================================================
 /**
-    Gli strumenti (synth) che JLoop sa ospitare, e chi li possiede.
+    Gli strumenti (synth) che AudioNaut sa ospitare, e chi li possiede.
 
     Ogni canale "strumento" ha il suo AudioProcessor (si possono avere piu' BassForge e piu' PolyForge):
     il motore audio li usa tramite un puntatore, la UI (Host) li crea, ne salva lo stato e li distrugge.

@@ -18,7 +18,7 @@ public:
         // pic: il disegnino della scheda (vedi drawPicture)
         cards =
         {
-            { "Guida rapida di JLoop", "Uno studio musicale in tasca, pensato come FL Studio. Sfoglia le schede (pulsanti o dito a destra/sinistra) "
+            { "Guida rapida di AudioNaut", "Uno studio musicale in tasca, pensato come FL Studio. Sfoglia le schede (pulsanti o dito a destra/sinistra) "
                                        "e chiudi quando vuoi: la ritrovi sempre in MENU > Guida rapida. "
                                        "Sbagliato qualcosa? Tieni premuta la freccia dell'undo per la cronologia delle modifiche.", picLogo },
             { "Il channel rack", "Ogni riga e' un suono: tocca le caselle per accendere i colpi e premi Play. "
@@ -198,7 +198,7 @@ private:
             {
                 g.setColour (Theme::accent);
                 g.setFont (Theme::font (juce::jmin (a.getHeight() * 0.35f, 46.0f), true));
-                g.drawText ("JLoop", a, juce::Justification::centred);
+                g.drawText ("AudioNaut", a, juce::Justification::centred);
                 break;
             }
             case picSteps:

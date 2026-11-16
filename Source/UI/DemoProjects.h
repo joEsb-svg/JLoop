@@ -9,7 +9,7 @@
 /**
     Progetti demo: una canzone breve per genere, costruita qui nel codice (niente file da scaricare).
     Ogni demo ha batteria a step (un canale per suono: si vede e si modifica nel channel rack),
-    basso, accordi e melodia con gli strumenti di JLoop, pattern con nome, una playlist con
+    basso, accordi e melodia con gli strumenti di AudioNaut, pattern con nome, una playlist con
     intro / drop / pausa / finale, sidechain e riverbero nel mixer e un'automazione del filtro.
 */
 namespace demos

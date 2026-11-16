@@ -23,7 +23,7 @@ public:
        #endif
     }
 
-    /** Sul PC: doppio clic su un .jloop con JLoop gia' aperto. */
+    /** Sul PC: doppio clic su un .jloop con AudioNaut gia' aperto. */
     void anotherInstanceStarted (const juce::String& commandLine) override
     {
         if (mainWindow != nullptr)

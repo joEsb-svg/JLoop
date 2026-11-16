@@ -262,7 +262,7 @@ private:
 
     - Strumenti:   pianoforti, chitarre, bassi, archi, fiati, voci, percussioni, batteria acustica...
     - Elettronica: EDM, House, Techno, Electro, Drum and Bass, Dubstep, Trap, synth, effetti
-    - Sintesi:     i synth (BassForge, PolyForge) e la batteria sintetizzata di JLoop (kit per genere)
+    - Sintesi:     i synth (BassForge, PolyForge) e la batteria sintetizzata di AudioNaut (kit per genere)
     - Campioni:    i file importati dall'utente
 
     Tocca un suono per ascoltarlo; "Aggiungi" (o "Usa questo suono") per confermare.

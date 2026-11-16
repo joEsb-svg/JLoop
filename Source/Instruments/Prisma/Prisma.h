@@ -23,7 +23,7 @@ namespace prisma
     inline constexpr int frameSize = 1024;        // campioni per forma
     inline constexpr int numFrames = 32;          // forme per tabella
     inline constexpr int numLevels = 8;           // versioni con 512, 256, ... 4 armonici
-    inline constexpr int numBuiltinTables = 10;   // fatte da JLoop; dopo vengono quelle libere (CC0) da Resources/Prisma
+    inline constexpr int numBuiltinTables = 10;   // fatte da AudioNaut; dopo vengono quelle libere (CC0) da Resources/Prisma
     inline constexpr int maxTables = 64;
     inline constexpr int maxVoices = 8;
     inline constexpr int maxUnison = 7;
@@ -33,7 +33,7 @@ namespace prisma
     inline constexpr int numSpectralWarps = 6;
     inline constexpr int numSpecAmounts = 16;     // passi di "quanto warp" precalcolati
 
-    /** Una tabella dell'utente: da 1 a 32 forme chiave da 1024 campioni; JLoop sfuma tra una e l'altra. */
+    /** Una tabella dell'utente: da 1 a 32 forme chiave da 1024 campioni; AudioNaut sfuma tra una e l'altra. */
     struct UserTable
     {
         juce::String name;

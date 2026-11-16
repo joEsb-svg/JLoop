@@ -9,10 +9,10 @@ class DrumForgeAudioProcessor;
 
 //==============================================================================
 /**
-    DrumForge: la drum machine di JLoop.
+    DrumForge: la drum machine di AudioNaut.
 
     - 16 pad, suonati dalle note 36..51 (C2..D#3: la disposizione classica delle drum machine)
-    - ogni pad ha un campione (dalla libreria di JLoop o dell'utente) con intonazione, decadimento,
+    - ogni pad ha un campione (dalla libreria di AudioNaut o dell'utente) con intonazione, decadimento,
       volume, panorama, filtro passa-basso, mandata al riverbero, velocity e gruppo "choke"
       (es. l'hi-hat chiuso zittisce quello aperto)
     - kit di fabbrica per genere (acustico, 808, 909, house, techno, trap, DnB...) + kit dell'utente

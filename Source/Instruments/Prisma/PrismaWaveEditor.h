@@ -13,7 +13,7 @@
     - Una tabella ha da 1 a 32 FORME CHIAVE; Prisma sfuma da una all'altra quando si muove la posizione.
     - Ogni forma si cambia in due modi: ONDA (la si disegna col dito: matita o linea) o ARMONICHE
       (una barra per armonica, da alzare e abbassare). Sotto si vede sempre l'altra vista.
-    - "Da file audio": JLoop trova l'intonazione del suono e ne prende 32 cicli, dall'inizio alla fine.
+    - "Da file audio": AudioNaut trova l'intonazione del suono e ne prende 32 cicli, dall'inizio alla fine.
     - Mentre si lavora la tabella suona gia' (l'oscillatore passa su "Mia N"): Salva la tiene,
       Annulla rimette tutto com'era.
 */

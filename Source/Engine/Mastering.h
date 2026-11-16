@@ -9,7 +9,7 @@
 
 //==============================================================================
 /**
-    Mastering di JLoop: l'ultimo passaggio prima dell'esportazione (e, se acceso, anche dal vivo).
+    Mastering di AudioNaut: l'ultimo passaggio prima dell'esportazione (e, se acceso, anche dal vivo).
 
     Catena:  guadagno -> EQ (bassi, presenza, aria; sotto i 25 Hz si taglia) -> compressione "colla"
              -> calore (saturazione) -> stereo (bassi in mono) -> limiter con anticipo e tetto

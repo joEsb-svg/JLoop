@@ -18,7 +18,7 @@
 
 //==============================================================================
 /**
-    Il motore audio di JLoop.
+    Il motore audio di AudioNaut.
 
     Gira sul thread audio, che e' "real-time": nel callback niente allocazioni,
     niente lock, niente file. La UI comunica con il motore solo tramite
@@ -1290,7 +1290,7 @@ public:
     }
 
     //==============================================================================
-    // Synth BassForge (un AudioProcessor JUCE ospitato da JLoop)
+    // Synth BassForge (un AudioProcessor JUCE ospitato da AudioNaut)
 
     /** Lo strumento del canale (nullptr se non e' un canale strumento o non e' ancora creato). */
     juce::AudioProcessor* getInstrument (int c) const

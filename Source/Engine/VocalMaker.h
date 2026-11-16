@@ -12,7 +12,7 @@
 
 //==============================================================================
 /**
-    FRASI VOCALI A TEMPO: una libreria di hook cantati, grida, build-up e voci strane, fatte da JLoop.
+    FRASI VOCALI A TEMPO: una libreria di hook cantati, grida, build-up e voci strane, fatte da AudioNaut.
     Ogni frase e' scritta in battiti: viene "cantata" al BPM del progetto e nella sua tonalita',
     e quando cambi i BPM si rifa' da sola (come riser e downer: la ricetta resta nel progetto).
 */

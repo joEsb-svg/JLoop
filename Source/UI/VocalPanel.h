@@ -295,7 +295,7 @@ public:
                      << "Trascina le maniglie per tagliare, doppio tocco = tutta.";
             }
             else
-                info << "Scegli una voce importata (un'acapella...) o \"+ Importa\": JLoop la mette a tempo senza cambiarne l'intonazione.";
+                info << "Scegli una voce importata (un'acapella...) o \"+ Importa\": AudioNaut la mette a tempo senza cambiarne l'intonazione.";
             g.drawFittedText (info, infoArea, juce::Justification::topLeft, 3);
             return;
         }

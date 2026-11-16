@@ -245,7 +245,7 @@ MainComponent::MainComponent()
     };
     addChildComponent (doctorPanel);
     addChildComponent (guideBar);
-    doctorButton.setTooltip ("Controllo del progetto: JLoop ascolta la canzone e ti dice cosa sistemare");
+    doctorButton.setTooltip ("Controllo del progetto: AudioNaut ascolta la canzone e ti dice cosa sistemare");
     doctorButton.onClick = [this] { openDoctor(); };
     addAndMakeVisible (doctorButton);
     exportPanel.getProjectName = [this] { return projectName; };
@@ -329,7 +329,7 @@ MainComponent::MainComponent()
     liveButton.setTooltip ("Live: lancia i pattern al volo");
     addButton.setTooltip ("Aggiungi uno strumento o un suono");
     lengthChip.setTooltip ("Lunghezza del pattern in quarti: frecce, oppure clic per scriverla");
-   #endif   // file aperti con "Apri con JLoop"
+   #endif   // file aperti con "Apri con AudioNaut"
 
    #if JUCE_WINDOWS
     windowsRenderer.engine = settings != nullptr && settings->getBoolValue ("direct2D", false) ? 1 : 0;
@@ -769,7 +769,7 @@ void MainComponent::exportMidi (bool song)
 {
     auto folder = ProjectIO::getRootFolder().getChildFile ("Exports");
     folder.createDirectory();
-    const auto base = juce::File::createLegalFileName ((projectName == untitled ? juce::String ("JLoop") : projectName)
+    const auto base = juce::File::createLegalFileName ((projectName == untitled ? juce::String ("AudioNaut") : projectName)
                                                        + (song ? juce::String (" canzone") : " " + engine.getPatternName (engine.getCurrentPattern())));
     const auto file = folder.getChildFile (base + ".mid");
     juce::String error;
@@ -1139,7 +1139,7 @@ void MainComponent::timerCallback()
     if (juce::Component::getCurrentlyFocusedComponent() == nullptr && isShowing() && juce::Process::isForegroundProcess()
         && juce::ModalComponentManager::getInstance()->getNumModalComponents() == 0)
         grabKeyboardFocus();
-    // Finestre degli strumenti: restano sopra JLoop finche' si usa JLoop (non sopra le altre app)
+    // Finestre degli strumenti: restano sopra AudioNaut finche' si usa AudioNaut (non sopra le altre app)
     {
         const bool front = juce::Process::isForegroundProcess();
         for (auto& [ch, w] : synthWindows)
@@ -1413,7 +1413,7 @@ void MainComponent::showFileMenu()
     menu.addItem (9, "Cronologia delle modifiche...");
     menu.addItem (8, "Guida rapida");
     menu.addSeparator();
-    menu.addItem (-1, "JLoop versione " + juce::String (ProjectInfo::versionString), false);
+    menu.addItem (-1, "AudioNaut versione " + juce::String (ProjectInfo::versionString), false);
 
     juce::Component::SafePointer<MainComponent> safeThis (this);
 
@@ -1938,7 +1938,7 @@ namespace
             setResizable (true, true);
             setResizeLimits (minW, minH, 4000, 3000);
             addKeyListener (&keys);
-            // Finestrella sopra JLoop (non a tutto schermo): grandezza ricordata, una un po' spostata dall'altra
+            // Finestrella sopra AudioNaut (non a tutto schermo): grandezza ricordata, una un po' spostata dall'altra
             auto screen = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->userBounds.toNearestInt();
             int w = juce::jmin (900, screen.getWidth() * 62 / 100), h = juce::jmin (560, screen.getHeight() * 64 / 100);
             if (auto* s = m.getSettings())
@@ -2331,7 +2331,7 @@ void MainComponent::shareProject()
 
 void MainComponent::openProjectFile()
 {
-    projectChooser = std::make_unique<juce::FileChooser> ("Apri un progetto JLoop", juce::File(), "*.jloop;*.dawfl");
+    projectChooser = std::make_unique<juce::FileChooser> ("Apri un progetto AudioNaut", juce::File(), "*.jloop;*.dawfl");
     juce::Component::SafePointer<MainComponent> safe (this);
     projectChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe] (const juce::FileChooser& fc)
     {
@@ -3218,7 +3218,7 @@ juce::String MainComponent::buildPerformanceReport() const
     juce::String r;
     auto* device = const_cast<juce::AudioDeviceManager&> (deviceManager).getCurrentAudioDevice();
     const double seconds = (juce::Time::getMillisecondCounterHiRes() - perfLog.startMs) / 1000.0;
-    r << "JLoop " << ProjectInfo::versionString << "  -  rapporto prestazioni\n"
+    r << "AudioNaut " << ProjectInfo::versionString << "  -  rapporto prestazioni\n"
       << "Dispositivo: " << juce::SystemStats::getDeviceManufacturer() << " " << juce::SystemStats::getDeviceDescription()
       << "  (" << juce::SystemStats::getNumCpus() << " core)\n"
       << "Audio: " << (device != nullptr ? device->getTypeName() + " " + juce::String (device->getCurrentSampleRate(), 0) + " Hz, buffer "

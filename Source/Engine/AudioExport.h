@@ -31,7 +31,7 @@ public:
 
     /** Da creare sul thread della UI: prepara la copia del progetto. */
     AudioExporter (const juce::var& projectJson, SampleStore& store, const Settings& s, const juce::File& destination)
-        : juce::Thread ("JLoop export"), settings (s), file (destination)
+        : juce::Thread ("AudioNaut export"), settings (s), file (destination)
     {
         engine = std::make_unique<SequencerEngine>();
         ProjectIO::fromJson (*engine, projectJson);

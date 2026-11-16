@@ -80,7 +80,7 @@ namespace ProjectShare
         SequencerEngine probe;
         if (jsonText.isEmpty() || ! ProjectIO::fromJson (probe, json))
         {
-            error = "Questo file non e' un progetto JLoop.";
+            error = "Questo file non e' un progetto AudioNaut.";
             return {};
         }
 

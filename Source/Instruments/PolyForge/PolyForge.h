@@ -8,7 +8,7 @@
 
 //==============================================================================
 /**
-    PolyForge: il synth polifonico di JLoop (pad, lead, plucks, accordi, stab).
+    PolyForge: il synth polifonico di AudioNaut (pad, lead, plucks, accordi, stab).
 
     - 2 oscillatori (saw, quadra/pulse, triangolo, sinusoide) con unison fino a 7 voci e detune,
       sub-oscillatore e rumore, apertura stereo

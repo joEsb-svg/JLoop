@@ -17,7 +17,7 @@ class RenderAhead : public juce::AudioIODeviceCallback,
                     private juce::Thread
 {
 public:
-    explicit RenderAhead (juce::AudioIODeviceCallback& source) : juce::Thread ("JLoop audio"), engine (source) {}
+    explicit RenderAhead (juce::AudioIODeviceCallback& source) : juce::Thread ("AudioNaut audio"), engine (source) {}
     ~RenderAhead() override     { stopWorker(); }
 
     /** Millisecondi di riserva (0 = calcolo diretto nel callback della scheda audio). */

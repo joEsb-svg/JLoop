@@ -11,7 +11,7 @@
 
 //==============================================================================
 /**
-    Il mixer di JLoop (come in FL Studio): una traccia Master e 32 tracce "insert".
+    Il mixer di AudioNaut (come in FL Studio): una traccia Master e 32 tracce "insert".
 
     Ogni canale del channel rack manda il suono a una traccia. Ogni traccia ha:
     - volume, panorama, muto, solo e il suo misuratore

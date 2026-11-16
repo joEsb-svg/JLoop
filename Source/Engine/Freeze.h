@@ -19,7 +19,7 @@ class ChannelFreezer : public juce::Thread
 {
 public:
     ChannelFreezer (const juce::var& projectJson, SampleStore& store, int channelIndex, double sampleRateToUse)
-        : juce::Thread ("JLoop freeze"), channel (channelIndex), sampleRate (sampleRateToUse > 0.0 ? sampleRateToUse : 48000.0)
+        : juce::Thread ("AudioNaut freeze"), channel (channelIndex), sampleRate (sampleRateToUse > 0.0 ? sampleRateToUse : 48000.0)
     {
         engine = std::make_unique<SequencerEngine>();
         ProjectIO::fromJson (*engine, projectJson);

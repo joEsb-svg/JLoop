@@ -249,7 +249,7 @@ private:
         if (analyser != nullptr && ! analyser->isFinished())
             return "Ascolto la canzone e regolo il mastering...  " + juce::String (juce::roundToInt (analyser->getProgress() * 100.0f)) + "%";
         if (! m.analysed)
-            return "Tocca \"Automatico\": JLoop ascolta il mix e regola tutto per lo stile scelto. Poi puoi cambiare a mano.";
+            return "Tocca \"Automatico\": AudioNaut ascolta il mix e regola tutto per lo stile scelto. Poi puoi cambiare a mano.";
         const float target = m.loudness.load();
         const float reached = juce::jmin (m.resultLufs, m.analysedLoudness);
         const float expected = target <= reached ? target : juce::jmin (target, m.resultLufs + juce::jmax (0.0f, target - m.analysedLoudness));
@@ -376,8 +376,8 @@ private:
             return;
 
         const auto s = currentSettings();
-        auto name = juce::File::createLegalFileName (getProjectName ? getProjectName() : juce::String ("JLoop"));
-        if (name.isEmpty()) name = "JLoop";
+        auto name = juce::File::createLegalFileName (getProjectName ? getProjectName() : juce::String ("AudioNaut"));
+        if (name.isEmpty()) name = "AudioNaut";
         if (! s.song) name << " - pattern " << (engine.getCurrentPattern() + 1);
 
         auto folder = ProjectIO::getRootFolder().getChildFile ("Exports");
