@@ -14,7 +14,14 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.80)
+## Stato attuale (v0.81)
+
+**0.81: nuovo logo (AudioNaut)**
+- Logo nuovo: il casco da astronauta con l'onda nella visiera (disegno di Joe, scontornato in `tools/logo2/cutout.py`).
+- Icona dell'app (Android e Windows) su fondo "blu notte"; logo piccolo in alto a sinistra.
+- Nuova apertura, muta: tra le stelle un'onda attraversa lo schermo, il casco le compare intorno e l'onda diventa
+  quella della visiera; poi bagliore e scritta AUDIONAUT. Un tocco la salta.
+- Il cambio di nome dell'app (da JLoop ad AudioNaut) arriva nel prossimo passo.
 
 **0.80: Prisma con le idee di Vital**
 - **Le mie onde** (tasto "MIE ONDE" sul disegno della tabella): si creano wavetable proprie in 12 posti ("Mia 1".."Mia 12").
