@@ -174,6 +174,47 @@ namespace frui
         if (auto* p = apvts.getParameter (id))
             slider.setDoubleClickReturnValue (true, (double) p->convertFrom0to1 (p->getDefaultValue()));
         slider.textFromValueFunction = nullptr;
+        slider.addMouseListener (this, false);
+    }
+
+    void Knob::mouseDown (const juce::MouseEvent& e)
+    {
+        if (onLongPress != nullptr && e.eventComponent == &slider) startTimer (550);
+    }
+    void Knob::mouseDrag (const juce::MouseEvent& e)
+    {
+        if (e.getDistanceFromDragStart() > 6) stopTimer();
+    }
+    void Knob::mouseUp (const juce::MouseEvent&)    { stopTimer(); }
+    void Knob::timerCallback()
+    {
+        stopTimer();
+        if (onLongPress != nullptr && slider.isMouseButtonDown()) onLongPress();
+    }
+
+    void Knob::paintOverChildren (juce::Graphics& g)
+    {
+        if (modRing == nullptr) return;
+        const float amount = juce::jlimit (-1.0f, 1.0f, modRing());
+        if (std::abs (amount) < 0.002f) return;
+        const auto sb = slider.getBounds().toFloat();
+        const float size = juce::jmin (sb.getWidth(), sb.getHeight());
+        const float r = size * 0.5f - 2.0f;
+        if (r < 6.0f) return;
+        const auto centre = sb.getCentre();
+        const auto rot = slider.getRotaryParameters();
+        const float pos = (float) slider.valueToProportionOfLength (slider.getValue());
+        const float to = juce::jlimit (0.0f, 1.0f, pos + amount);
+        auto ang = [&rot] (float v) { return rot.startAngleRadians + v * (rot.endAngleRadians - rot.startAngleRadians); };
+        const float ringR = r + 1.0f;
+        juce::Path ring;
+        ring.addCentredArc (centre.x, centre.y, ringR, ringR, 0.0f, ang (juce::jmin (pos, to)), ang (juce::jmax (pos, to)), true);
+        g.setColour (modColour.withAlpha (0.3f));
+        g.strokePath (ring, juce::PathStrokeType (5.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.setColour (modColour);
+        g.strokePath (ring, juce::PathStrokeType (2.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        const float a = ang (to);
+        g.fillEllipse (juce::Rectangle<float> (6.0f, 6.0f).withCentre ({ centre.x + std::sin (a) * ringR, centre.y - std::cos (a) * ringR }));
     }
 
     void Knob::resized()

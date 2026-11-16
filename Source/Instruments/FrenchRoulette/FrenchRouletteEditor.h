@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <functional>
 #include "FrenchRoulette.h"
 
 //==============================================================================
@@ -71,15 +72,29 @@ namespace frui
     };
 
     /** Manopola con nome e valore, collegata a un parametro. */
-    class Knob : public juce::Component
+    class Knob : public juce::Component,
+                 private juce::Timer
     {
     public:
         Knob (juce::AudioProcessorValueTreeState&, const juce::String& id, const juce::String& title, bool big = false);
+        ~Knob() override                  { slider.removeMouseListener (this); }
         void resized() override;
         void paint (juce::Graphics&) override;
+        void paintOverChildren (juce::Graphics&) override;
         juce::Slider slider;
 
+        /** Facoltativi: tocco lungo (senza muovere) e anello di modulazione (-1..1 della corsa, 0 = niente). */
+        std::function<void()> onLongPress;
+        std::function<float()> modRing;
+        juce::Colour modColour { 0xfff0922b };
+        const juce::String& getTitle() const noexcept   { return title; }
+
+        void mouseDown (const juce::MouseEvent&) override;
+        void mouseDrag (const juce::MouseEvent&) override;
+        void mouseUp (const juce::MouseEvent&) override;
+
     private:
+        void timerCallback() override;
         juce::String title;
         juce::Rectangle<int> labelArea;
         bool big;

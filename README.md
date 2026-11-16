@@ -14,7 +14,21 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.79)
+## Stato attuale (v0.80)
+
+**0.80: Prisma con le idee di Vital**
+- **Le mie onde** (tasto "MIE ONDE" sul disegno della tabella): si creano wavetable proprie in 12 posti ("Mia 1".."Mia 12").
+  Ogni tabella ha da 1 a 32 *forme chiave* e Prisma sfuma dall'una all'altra. Ogni forma si cambia disegnando l'onda
+  col dito (Matita, Linea, Liscia, Specchia) oppure alzando e abbassando le prime 32 armoniche (Solo dispari, Solo pari,
+  Piu' scuro, A caso). Parti da: Seno, Sega, Quadra, Triangolo, Rumore, o dalle forme della tabella che stavi usando.
+  Mentre lavori la tabella suona gia'; Salva la tiene, Annulla rimette tutto com'era.
+- **Wavetable da file audio**: scegli un suono, JLoop ne trova l'intonazione e prende 32 cicli dall'inizio alla fine
+  (con i rumori prende 32 fette). Le tabelle "Mie" usate in un progetto viaggiano dentro il progetto.
+- **6 warp spettrali** (lavorano sulle armoniche): Formanti su, Formanti giu', Taglia alti, Taglia bassi, Sfoca,
+  Disperdi fasi. Si aggiungono ai warp di prima e restano senza fruscio sulle note alte.
+- **Modulazione col tocco lungo**: tieni premuta una manopola (posizione, warp, cutoff, risonanza, volume, pan, detune,
+  sub, rumore, drive, velocita' degli LFO) e scegli "Aggiungi LFO 1 / Inviluppo 2 / ...". Un anello arancione intorno alla
+  manopola mostra di quanto si muove; dallo stesso menu si cambia il "quanto" o si toglie il collegamento.
 
 **0.79: FORNACE, saturatore a bande** (mixer, gruppo "Sporco e lo-fi"; si apre in una finestra sua):
 - Il suono viene diviso in **1-4 fasce di frequenza** (tagli Linkwitz-Riley: con gli stili puliti la somma torna identica)

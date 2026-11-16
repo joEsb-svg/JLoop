@@ -177,37 +177,61 @@ namespace prisma
             }
         }
         ensure (0);
+        for (int slot = 0; slot < numUserTables; ++slot)
+        {
+            juce::MemoryBlock mb;
+            if (userDir().getChildFile ("mia_" + juce::String (slot + 1) + ".prismatab").loadFileAsData (mb))
+                if (auto t = UserTable::fromBlock (mb.getData(), mb.getSize()); ! t.empty())
+                    setUser (slot, std::move (t), false);
+        }
     }
 
     juce::StringArray Bank::names() const
     {
         juce::StringArray n { "Analogico", "Formanti", "PWM", "Armonici", "Sync", "FM", "Wavefolder", "Growl", "Bitcrush", "Organo" };
         for (auto& t : imported) n.add (t.name);
+        for (int u = 1; u <= numUserTables; ++u) n.add ("Mia " + juce::String (u));
         return n;
     }
 
-    void Bank::ensure (int t)
+    /** Una forma (1024 campioni) della tabella t, prima della limitazione di banda. */
+    void Bank::sourceFrame (int t, int f, std::vector<float>& out) const
     {
-        if (t < 0 || t >= numTables() || isReady (t)) return;
-        const juce::ScopedLock sl (lock);
-        if (isReady (t)) return;
-        auto buf = std::make_unique<float[]> ((size_t) numFrames * numLevels * frameSize);
+        out.assign ((size_t) frameSize, 0.0f);
+        if (t < builtin) { makeFrame (t, (double) f / (numFrames - 1), out); return; }
+        if (t < userBase())
+        {
+            const auto* src = imported[(size_t) (t - builtin)].samples + (size_t) f * frameSize;
+            for (int i = 0; i < frameSize; ++i)
+            {
+                juce::int16 v;
+                std::memcpy (&v, src + i, 2);   // (allineamento qualsiasi)
+                out[(size_t) i] = (float) v / 32767.0f;
+            }
+            return;
+        }
+        // tabella dell'utente: si sfuma tra le forme chiave
+        const auto& u = users[(size_t) (t - userBase())];
+        if (u.empty()) return;
+        const float x = u.keys == 1 ? 0.0f : (float) f / (float) (numFrames - 1) * (float) (u.keys - 1);
+        const int k0 = juce::jmin ((int) x, juce::jmax (0, u.keys - 2));
+        const int k1 = juce::jmin (k0 + 1, u.keys - 1);
+        const float fr = x - (float) k0;
+        const auto* a = u.samples.data() + (size_t) k0 * frameSize;
+        const auto* b = u.samples.data() + (size_t) k1 * frameSize;
+        for (int i = 0; i < frameSize; ++i)
+            out[(size_t) i] = ((float) a[i] + ((float) b[i] - (float) a[i]) * fr) / 32767.0f;
+    }
+
+    /** Costruisce in buf le 32 forme x 8 livelli di armonici della tabella t. */
+    void Bank::build (float* buf, int t, bool normalise) const
+    {
         juce::dsp::FFT fft (10);   // 1024
         std::vector<float> frameData ((size_t) frameSize), spec ((size_t) frameSize * 2), work ((size_t) frameSize * 2);
         float tablePeak = 1.0e-6f;
         for (int f = 0; f < numFrames; ++f)
         {
-            if (t < builtin) makeFrame (t, (double) f / (numFrames - 1), frameData);
-            else
-            {
-                const auto* src = imported[(size_t) (t - builtin)].samples + (size_t) f * frameSize;
-                for (int i = 0; i < frameSize; ++i)
-                {
-                    juce::int16 v;
-                    std::memcpy (&v, src + i, 2);   // (allineamento qualsiasi)
-                    frameData[(size_t) i] = (float) v / 32767.0f;
-                }
-            }
+            sourceFrame (t, f, frameData);
             std::fill (spec.begin(), spec.end(), 0.0f);
             std::copy (frameData.begin(), frameData.end(), spec.begin());
             fft.performRealOnlyForwardTransform (spec.data(), true);
@@ -218,17 +242,305 @@ namespace prisma
                 work[0] = work[1] = 0.0f;   // via la continua
                 for (int h = maxHarm + 1; h <= frameSize / 2; ++h) { work[(size_t) h * 2] = 0.0f; work[(size_t) h * 2 + 1] = 0.0f; }
                 fft.performRealOnlyInverseTransform (work.data());
-                float* dst = buf.get() + (((size_t) f * numLevels + (size_t) level) * frameSize);
+                float* dst = buf + (((size_t) f * numLevels + (size_t) level) * frameSize);
                 for (int i = 0; i < frameSize; ++i) dst[i] = work[(size_t) i];
                 if (level == 0)
                     for (int i = 0; i < frameSize; ++i) tablePeak = juce::jmax (tablePeak, std::abs (dst[i]));
             }
         }
-        // le tabelle di JLoop: picco a 0.9 su tutta la tabella (il morph non salta); quelle libere hanno gia' il loro volume
-        if (t < builtin)
-            juce::FloatVectorOperations::multiply (buf.get(), 0.9f / tablePeak, numFrames * numLevels * frameSize);
+        // picco a 0.9 su tutta la tabella (il morph non salta); quelle libere hanno gia' il loro volume
+        if (normalise && tablePeak > 1.0e-4f)
+            juce::FloatVectorOperations::multiply (buf, 0.9f / tablePeak, numFrames * numLevels * frameSize);
+    }
+
+    void Bank::ensure (int t)
+    {
+        if (t < 0 || t >= userBase() || isReady (t)) return;   // quelle dell'utente si costruiscono in setUser
+        const juce::ScopedLock sl (lock);
+        if (isReady (t)) return;
+        auto buf = std::make_unique<float[]> ((size_t) numFrames * numLevels * frameSize);
+        build (buf.get(), t, t < builtin);
         data[(size_t) t] = std::move (buf);
         ready[(size_t) t].store (true, std::memory_order_release);
+    }
+
+    //==========================================================================
+    // Le tabelle dell'utente
+
+    juce::MemoryBlock UserTable::toBlock() const
+    {
+        juce::MemoryOutputStream out;
+        out.write ("PRUT", 4);
+        out.writeInt (keys);
+        out.writeString (name);
+        out.write (samples.data(), (size_t) keys * frameSize * sizeof (juce::int16));
+        return out.getMemoryBlock();
+    }
+
+    UserTable UserTable::fromBlock (const void* d, size_t size)
+    {
+        UserTable t;
+        juce::MemoryInputStream in (d, size, false);
+        char magic[4] {};
+        if (in.read (magic, 4) != 4 || std::memcmp (magic, "PRUT", 4) != 0) return t;
+        const int keys = in.readInt();
+        t.name = in.readString();
+        if (keys < 1 || keys > numFrames || in.getNumBytesRemaining() < (juce::int64) keys * frameSize * 2) return t;
+        t.samples.resize ((size_t) keys * frameSize);
+        in.read (t.samples.data(), (int) (t.samples.size() * sizeof (juce::int16)));
+        t.keys = keys;
+        return t;
+    }
+
+    juce::File Bank::userDir()
+    {
+        return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory).getChildFile ("Prisma").getChildFile ("Onde");
+    }
+
+    void Bank::setUser (int slot, UserTable table, bool saveToDisk)
+    {
+        if (slot < 0 || slot >= numUserTables) return;
+        const juce::ScopedLock sl (lock);
+        const int t = userBase() + slot;
+        users[(size_t) slot] = std::move (table);
+        const auto& u = users[(size_t) slot];
+        if (u.empty())
+            ready[(size_t) t].store (false, std::memory_order_release);   // la memoria resta: chi suona ricade sulla tabella 0
+        else
+        {
+            const size_t count = (size_t) numFrames * numLevels * frameSize;
+            auto buf = std::make_unique<float[]> (count);
+            build (buf.get(), t, true);
+            // la prima volta si alloca; poi si riscrive sul posto, cosi' il thread audio non perde mai la memoria che sta leggendo
+            if (data[(size_t) t] == nullptr) data[(size_t) t] = std::move (buf);
+            else std::memcpy (data[(size_t) t].get(), buf.get(), count * sizeof (float));
+            ready[(size_t) t].store (true, std::memory_order_release);
+        }
+        versions[(size_t) slot].fetch_add (1);
+        if (saveToDisk)
+        {
+            const auto file = userDir().getChildFile ("mia_" + juce::String (slot + 1) + ".prismatab");
+            if (u.empty()) file.deleteFile();
+            else { userDir().createDirectory(); file.replaceWithData (u.toBlock().getData(), u.toBlock().getSize()); }
+        }
+    }
+
+    //==========================================================================
+    // Warp spettrali: lavorano sulle armoniche (ampiezza e fase) di ogni forma
+
+    std::shared_ptr<const SpecTable> Bank::spectral (int table, int mode)
+    {
+        if (mode < firstSpectralWarp || mode >= firstSpectralWarp + numSpectralWarps || table < 0 || table >= numTables())
+            return {};
+        ensure (table);
+        const juce::ScopedLock sl (lock);
+        if (! isReady (table)) table = 0;
+        const int version = userVersion (table);
+        for (auto it = specCache.begin(); it != specCache.end();)
+        {
+            auto sp = it->lock();
+            if (sp == nullptr) { it = specCache.erase (it); continue; }
+            if (sp->table == table && sp->mode == mode && sp->version == version) return sp;
+            ++it;
+        }
+
+        auto st = std::make_shared<SpecTable>();
+        st->table = table; st->mode = mode; st->version = version;
+        size_t total = 0;
+        for (int l = 0; l < numLevels; ++l)
+        {
+            st->size[l] = juce::jlimit (32, frameSize, (frameSize >> l) * 4);
+            st->offset[l] = total;
+            total += (size_t) st->size[l];
+        }
+        st->perCycle = total;
+        st->data.assign ((size_t) numSpecAmounts * numFrames * total, 0.0f);
+
+        constexpr int H = frameSize / 2;   // 512 armoniche
+        juce::dsp::FFT fft (10);
+        std::unique_ptr<juce::dsp::FFT> small[11];
+        for (int o = 5; o <= 10; ++o) small[o] = std::make_unique<juce::dsp::FFT> (o);
+        std::vector<float> spec ((size_t) frameSize * 2), work ((size_t) frameSize * 2);
+        std::vector<float> mag ((size_t) H + 2), ph ((size_t) H + 2), om ((size_t) H + 2), op ((size_t) H + 2);
+        juce::Random rnd (1234);
+        std::vector<float> noise ((size_t) H + 2);
+        for (auto& v : noise) v = rnd.nextFloat() * 2.0f - 1.0f;
+        auto magAt = [&mag] (float h) { if (h < 1.0f || h > (float) H) return 0.0f; const int i = (int) h; const float f = h - (float) i; return mag[(size_t) i] + (mag[(size_t) juce::jmin (H, i + 1)] - mag[(size_t) i]) * f; };
+
+        for (int f = 0; f < numFrames; ++f)
+        {
+            std::fill (spec.begin(), spec.end(), 0.0f);
+            std::copy (frame (table, f, 0), frame (table, f, 0) + frameSize, spec.begin());
+            fft.performRealOnlyForwardTransform (spec.data(), true);
+            double srcEnergy = 0.0;
+            mag[0] = ph[0] = 0.0f;
+            for (int h = 1; h <= H; ++h)
+            {
+                const float re = spec[(size_t) h * 2], im = spec[(size_t) h * 2 + 1];
+                mag[(size_t) h] = std::sqrt (re * re + im * im);
+                ph[(size_t) h] = std::atan2 (im, re);
+                srcEnergy += (double) mag[(size_t) h] * mag[(size_t) h];
+            }
+            for (int a = 0; a < numSpecAmounts; ++a)
+            {
+                const float amt = (float) a / (float) (numSpecAmounts - 1);
+                bool keepEnergy = false;
+                for (int h = 1; h <= H; ++h)
+                {
+                    const float fh = (float) h;
+                    float m = mag[(size_t) h], p = ph[(size_t) h];
+                    switch (mode - firstSpectralWarp)
+                    {
+                        case 0: m = magAt (1.0f + (fh - 1.0f) / (1.0f + 3.0f * amt)); keepEnergy = true; break;        // formanti su
+                        case 1: m = magAt (1.0f + (fh - 1.0f) * (1.0f + 3.0f * amt)); keepEnergy = true; break;        // formanti giu'
+                        case 2: { const float c = std::pow ((float) H, 1.0f - amt); if (fh > c) m *= std::exp (-(fh - c) / (0.2f * c + 0.5f)); break; }   // taglia alti
+                        case 3: { const float c = std::pow (96.0f, amt); if (fh < c) m *= std::exp (-(c - fh) / (0.15f * c + 0.3f) * 2.0f); break; }      // taglia bassi
+                        case 4:                                                                                         // sfoca
+                        {
+                            const int w = (int) std::round (amt * (2.0f + fh * 0.25f));
+                            if (w > 0)
+                            {
+                                float sum = 0.0f; int cnt = 0;
+                                for (int k = juce::jmax (1, h - w); k <= juce::jmin (H, h + w); ++k) { sum += mag[(size_t) k]; ++cnt; }
+                                m = sum / (float) juce::jmax (1, cnt);
+                            }
+                            p += amt * noise[(size_t) h] * juce::MathConstants<float>::pi;
+                            keepEnergy = true;
+                            break;
+                        }
+                        default: p += amt * 0.12f * fh * fh; break;                                                     // disperdi le fasi
+                    }
+                    om[(size_t) h] = m; op[(size_t) h] = p;
+                }
+                if (keepEnergy)
+                {
+                    double e = 0.0;
+                    for (int h = 1; h <= H; ++h) e += (double) om[(size_t) h] * om[(size_t) h];
+                    const float gain = e > 1.0e-12 ? (float) juce::jmin (4.0, std::sqrt (srcEnergy / e)) : 1.0f;
+                    for (int h = 1; h <= H; ++h) om[(size_t) h] *= gain;
+                }
+                for (int l = 0; l < numLevels; ++l)
+                {
+                    const int m = st->size[l];
+                    const int maxHarm = juce::jmin (H >> l, m / 2 - 1);
+                    const float scale = (float) m / (float) frameSize;
+                    std::fill (work.begin(), work.begin() + (size_t) m * 2, 0.0f);
+                    for (int h = 1; h <= maxHarm; ++h)
+                    {
+                        work[(size_t) h * 2] = om[(size_t) h] * std::cos (op[(size_t) h]) * scale;
+                        work[(size_t) h * 2 + 1] = om[(size_t) h] * std::sin (op[(size_t) h]) * scale;
+                    }
+                    int order = 0; while ((1 << order) < m) ++order;
+                    small[order]->performRealOnlyInverseTransform (work.data());
+                    float* dst = st->data.data() + ((size_t) (a * numFrames + f) * total + st->offset[l]);
+                    for (int i = 0; i < m; ++i) dst[i] = juce::jlimit (-1.5f, 1.5f, work[(size_t) i]);
+                }
+            }
+        }
+        specCache.push_back (st);
+        return st;
+    }
+
+    //==========================================================================
+    // Da un file audio a una tabella
+
+    UserTable tableFromAudio (const float* x, int n, double sr, const juce::String& name)
+    {
+        UserTable t;
+        t.name = name;
+        if (x == nullptr || n < 256 || sr < 8000.0) return t;
+
+        // via il silenzio in testa e in coda
+        float peak = 0.0f;
+        for (int i = 0; i < n; ++i) peak = juce::jmax (peak, std::abs (x[i]));
+        if (peak < 1.0e-4f) return t;
+        int a = 0, b = n - 1;
+        while (a < b && std::abs (x[a]) < peak * 0.03f) ++a;
+        while (b > a && std::abs (x[b]) < peak * 0.03f) --b;
+        int len = b - a + 1;
+        if (len < 512) { a = 0; len = n; }
+
+        // intonazione: differenza media normalizzata (come YIN) su una finestra presa a un terzo del suono
+        double period = 0.0;
+        {
+            const int minLag = juce::jmax (8, (int) (sr / 1500.0)), maxLag = juce::jmin (len / 3, (int) (sr / 35.0));
+            const int win = juce::jmin (len - maxLag - 1, (int) (sr * 0.06));
+            if (maxLag > minLag * 2 && win > minLag * 2)
+            {
+                const float* w = x + a + juce::jmax (0, juce::jmin (len - maxLag - win - 1, len / 3));
+                std::vector<double> d ((size_t) maxLag + 1, 0.0);
+                for (int lag = 1; lag <= maxLag; ++lag)
+                {
+                    double sum = 0.0;
+                    for (int i = 0; i < win; ++i) { const double v = (double) w[i] - (double) w[i + lag]; sum += v * v; }
+                    d[(size_t) lag] = sum;
+                }
+                double run = 0.0; int best = 0;
+                std::vector<double> c ((size_t) maxLag + 1, 1.0);
+                for (int lag = 1; lag <= maxLag; ++lag) { run += d[(size_t) lag]; c[(size_t) lag] = run > 0.0 ? d[(size_t) lag] * lag / run : 1.0; }
+                for (int lag = minLag; lag < maxLag; ++lag)
+                    if (c[(size_t) lag] < 0.15 && c[(size_t) lag] <= c[(size_t) lag + 1]) { best = lag; break; }
+                if (best > 0)
+                {
+                    // minimo preciso con una parabola
+                    const double y0 = c[(size_t) best - 1], y1 = c[(size_t) best], y2 = c[(size_t) best + 1];
+                    const double den = y0 - 2.0 * y1 + y2;
+                    period = best + (std::abs (den) > 1.0e-12 ? 0.5 * (y0 - y2) / den : 0.0);
+                }
+            }
+        }
+        const bool pitched = period > 0.0;
+        if (! pitched) period = juce::jmin ((double) len * 0.5, 2048.0 * sr / 48000.0);   // rumori e batterie: fette lunghe uguali
+
+        auto sample = [x, n] (double pos)
+        {
+            const int i = (int) std::floor (pos);
+            const float f = (float) (pos - i);
+            auto at = [x, n] (int k) { return x[juce::jlimit (0, n - 1, k)]; };
+            const float y0 = at (i - 1), y1 = at (i), y2 = at (i + 1), y3 = at (i + 2);
+            const float c1 = 0.5f * (y2 - y0), c2 = y0 - 2.5f * y1 + 2.0f * y2 - 0.5f * y3, c3 = 0.5f * (y3 - y0) + 1.5f * (y1 - y2);
+            return ((c3 * f + c2) * f + c1) * f + y1;
+        };
+
+        std::vector<float> frames ((size_t) numFrames * frameSize);
+        std::vector<float> framePeak ((size_t) numFrames, 0.0f);
+        const double span = juce::jmax (0.0, (double) len - period - 2.0);
+        for (int f = 0; f < numFrames; ++f)
+        {
+            double start = a + span * (double) f / (double) (numFrames - 1);
+            if (pitched)
+            {
+                // parte da un passaggio per lo zero in salita: le forme restano in fase tra loro
+                const int from = (int) start, lim = (int) juce::jmin ((double) (a + len - (int) period - 2), start + period);
+                for (int i = from; i < lim; ++i)
+                    if (x[juce::jlimit (0, n - 1, i)] <= 0.0f && x[juce::jlimit (0, n - 1, i + 1)] > 0.0f) { start = i; break; }
+            }
+            float* dst = frames.data() + (size_t) f * frameSize;
+            double mean = 0.0;
+            for (int i = 0; i < frameSize; ++i) { dst[i] = sample (start + period * (double) i / frameSize); mean += dst[i]; }
+            // il ciclo deve chiudersi: si toglie la differenza tra la fine e l'inizio con una rampa
+            const float gap = sample (start + period) - dst[0];
+            mean /= frameSize;
+            for (int i = 0; i < frameSize; ++i)
+            {
+                dst[i] -= (float) mean + gap * ((float) i / (float) frameSize - 0.5f);
+                if (! pitched)   // fette di rumore: dissolvenza ai bordi
+                    dst[i] *= juce::jmin (1.0f, (float) juce::jmin (i, frameSize - 1 - i) / 48.0f);
+                framePeak[(size_t) f] = juce::jmax (framePeak[(size_t) f], std::abs (dst[i]));
+            }
+        }
+        float maxPeak = 1.0e-6f;
+        for (float v : framePeak) maxPeak = juce::jmax (maxPeak, v);
+        t.samples.resize ((size_t) numFrames * frameSize);
+        for (int f = 0; f < numFrames; ++f)
+        {
+            // le forme piu' deboli si alzano un po' (non del tutto: resta l'andamento del suono)
+            const float g = framePeak[(size_t) f] > maxPeak * 0.01f ? std::pow (maxPeak / framePeak[(size_t) f], 0.7f) / maxPeak * 0.9f : 0.0f;
+            for (int i = 0; i < frameSize; ++i)
+                t.samples[(size_t) f * frameSize + (size_t) i] = (juce::int16) juce::jlimit (-32767.0f, 32767.0f, frames[(size_t) f * frameSize + (size_t) i] * g * 32767.0f);
+        }
+        t.keys = numFrames;
+        return t;
     }
 
     Bank& Bank::get()
@@ -315,7 +627,8 @@ namespace prisma
             choice (P + "On", N + "acceso", { "OFF", "ON" }, o == 0 ? 1 : 0);
             choice (P + "Table", N + "tabella", tableNames(), o == 0 ? 0 : 1);
             flt (P + "Pos", N + "posizione", { 0.0f, 1.0f }, 0.0f, pct);
-            choice (P + "Warp", N + "warp", { "Niente", "Sync", "Bend +", "Bend -", "Specchio", "Quantizza", "Allunga", o == 0 ? "FM da B" : "FM da A" }, 0);
+            choice (P + "Warp", N + "warp", { "Niente", "Sync", "Bend +", "Bend -", "Specchio", "Quantizza", "Allunga", o == 0 ? "FM da B" : "FM da A",
+                                                      "Formanti su", "Formanti giu'", "Taglia alti", "Taglia bassi", "Sfoca", "Disperdi fasi" }, 0);
             flt (P + "WarpAmt", N + "quanto warp", { 0.0f, 1.0f }, 0.0f, pct);
             choice (P + "Oct", N + "ottava", { "OTT -3", "OTT -2", "OTT -1", "OTT 0", "OTT +1", "OTT +2" }, 3);
             flt (P + "Semi", N + "semitoni", { -12.0f, 12.0f, 1.0f }, 0.0f, [] (float x, int) { return (x > 0 ? "+" : "") + String (roundToInt (x)) + " st"; });
@@ -531,6 +844,7 @@ struct PrismaAudioProcessor::Block
 {
     struct Osc { bool on; int table, warp, oct, uni; float pos, warpAmt, semi, fine, detune, blend, level, pan; };
     Osc osc[2];
+    const prisma::SpecTable* spec[2] { nullptr, nullptr };   // warp spettrale pronto (o niente)
     bool subOn; int subShape, subOct; float subLevel, noise, noiseColor;
     int fltType; float cutoff, res, drive, fltEnv, keytrack;
     float env[4], env2[4];
@@ -552,16 +866,18 @@ PrismaAudioProcessor::PrismaAudioProcessor()
         for (auto* suffix : { "Src", "Dst", "Amt" })
             p.push_back (apvts.getRawParameterValue ("m" + juce::String (s) + suffix));
     for (auto* x : p) jassert (x != nullptr);
-    apvts.addParameterListener ("aTable", this);
-    apvts.addParameterListener ("bTable", this);
+    for (auto* id : { "aTable", "bTable", "aWarp", "bWarp" })
+        apvts.addParameterListener (id, this);
     presets.loadFactory (0);
     ensureTables();
+    updateSpectral();
 }
 
 PrismaAudioProcessor::~PrismaAudioProcessor()
 {
-    apvts.removeParameterListener ("aTable", this);
-    apvts.removeParameterListener ("bTable", this);
+    cancelPendingUpdate();
+    for (auto* id : { "aTable", "bTable", "aWarp", "bWarp" })
+        apvts.removeParameterListener (id, this);
 }
 
 /** Le tabelle scelte si preparano subito (di solito dal thread della UI: preset, scelta della tabella). */
@@ -571,7 +887,41 @@ void PrismaAudioProcessor::ensureTables()
         prisma::Bank::get().ensure ((int) apvts.getRawParameterValue (id)->load());
 }
 
-void PrismaAudioProcessor::parameterChanged (const juce::String&, float)   { ensureTables(); }
+void PrismaAudioProcessor::parameterChanged (const juce::String&, float)
+{
+    ensureTables();
+    // i warp spettrali si calcolano (qualche decimo di secondo): mai nel thread audio
+    if (juce::MessageManager::existsAndIsCurrentThread()) updateSpectral();
+    else triggerAsyncUpdate();
+}
+
+void PrismaAudioProcessor::updateSpectral()
+{
+    auto& bank = prisma::Bank::get();
+    const juce::ScopedLock sl (specLock);
+    const auto now = juce::Time::getMillisecondCounter();
+    for (int o = 0; o < 2; ++o)
+    {
+        const int table = (int) apvts.getRawParameterValue (o == 0 ? "aTable" : "bTable")->load();
+        const int warp = (int) apvts.getRawParameterValue (o == 0 ? "aWarp" : "bWarp")->load();
+        const bool spectral = warp >= prisma::firstSpectralWarp && bank.isReady (table);
+        auto& held = specHeld[o];
+        if (! spectral)
+        {
+            if (held != nullptr) { specNow[o].store (nullptr); specRetired.push_back ({ std::move (held), now }); held = nullptr; }
+            continue;
+        }
+        if (held != nullptr && held->table == table && held->mode == warp && held->version == bank.userVersion (table))
+            continue;
+        auto fresh = bank.spectral (table, warp);
+        specNow[o].store (fresh.get());
+        if (held != nullptr) specRetired.push_back ({ std::move (held), now });
+        held = std::move (fresh);
+    }
+    // le tabelle sostituite restano vive qualche secondo: il thread audio potrebbe stare ancora leggendo
+    specRetired.erase (std::remove_if (specRetired.begin(), specRetired.end(),
+                                       [now] (const auto& r) { return now - r.second > 4000u; }), specRetired.end());
+}
 
 void PrismaAudioProcessor::readBlock (Block& b)
 {
@@ -586,6 +936,8 @@ void PrismaAudioProcessor::readBlock (Block& b)
         s.warpAmt = P (base + oWarpAmt); s.oct = (int) P (base + oOct) - 3; s.semi = P (base + oSemi); s.fine = P (base + oFine);
         s.uni = unisonCounts[juce::jlimit (0, 5, (int) P (base + oUni))]; s.detune = P (base + oDetune); s.blend = P (base + oBlend);
         s.level = P (base + oLevel); s.pan = P (base + oPan);
+        const auto* sp = s.warp >= firstSpectralWarp ? specNow[o].load() : nullptr;
+        b.spec[o] = sp != nullptr && sp->mode == s.warp && sp->table == s.table ? sp : nullptr;
     }
     const int m = 2 * numOscIds;
     auto M = [&] (int i) { return P (m + i); };
@@ -764,7 +1116,7 @@ void PrismaAudioProcessor::render (float* L, float* R, int n, const Block& b, do
 
             v.pitch += (v.targetPitch - v.pitch) * (1.0 - std::pow (1.0 - (double) glideCoef, (double) len));
 
-            struct OscNow { bool on; int table, warp, level, uni; float pos, warpAmt, gain; double inc[maxUnison]; float gl[maxUnison], gr[maxUnison]; };
+            struct OscNow { bool on; int table, warp, level, uni; const SpecTable* spec; float pos, warpAmt, gain; double inc[maxUnison]; float gl[maxUnison], gr[maxUnison]; };
             OscNow o[2];
             for (int k = 0; k < 2; ++k)
             {
@@ -772,7 +1124,7 @@ void PrismaAudioProcessor::render (float* L, float* R, int n, const Block& b, do
                 auto& on = o[k];
                 on.on = s.on;
                 if (! s.on) continue;
-                on.table = s.table; on.warp = s.warp; on.uni = s.uni;
+                on.table = s.table; on.warp = s.warp; on.uni = s.uni; on.spec = b.spec[k];
                 on.pos = juce::jlimit (0.0f, 1.0f, s.pos + b.morph + mod[k == 0 ? dstPosA : dstPosB]);
                 on.warpAmt = juce::jlimit (0.0f, 1.0f, s.warpAmt + mod[k == 0 ? dstWarpA : dstWarpB]);
                 on.gain = juce::jlimit (0.0f, 1.5f, s.level * (1.0f + mod[k == 0 ? dstLevelA : dstLevelB])) / std::sqrt ((float) s.uni);
@@ -826,10 +1178,15 @@ void PrismaAudioProcessor::render (float* L, float* R, int n, const Block& b, do
                     for (int u = 0; u < on.uni; ++u)
                     {
                         double& ph = v.phase[(size_t) k][(size_t) u];
-                        double rp;
-                        if (on.warp == 7) { rp = ph + on.warpAmt * 0.5 * other; rp -= std::floor (rp); }
-                        else rp = warpPhase (on.warp, on.warpAmt, ph);
-                        const float s = bank.read (on.table, on.pos, rp, on.level);
+                        float s;
+                        if (on.spec != nullptr) s = on.spec->read (on.warpAmt, on.pos, ph, on.level);
+                        else
+                        {
+                            double rp;
+                            if (on.warp == 7) { rp = ph + on.warpAmt * 0.5 * other; rp -= std::floor (rp); }
+                            else rp = warpPhase (on.warp, on.warpAmt, ph);
+                            s = bank.read (on.table, on.pos, rp, on.level);
+                        }
                         l += s * on.gl[u];
                         r += s * on.gr[u];
                         if (u == 0) sum = s;
@@ -948,7 +1305,24 @@ juce::AudioProcessorEditor* PrismaAudioProcessor::createEditor()   { return new 
 
 void PrismaAudioProcessor::getStateInformation (juce::MemoryBlock& d)
 {
-    if (auto xml = apvts.copyState().createXml()) copyXmlToBinary (*xml, d);
+    if (auto xml = apvts.copyState().createXml())
+    {
+        // le tabelle "Mie" usate viaggiano col progetto: su un altro dispositivo il suono resta lo stesso
+        auto& bank = prisma::Bank::get();
+        for (int slot = 0; slot < prisma::numUserTables; ++slot)
+        {
+            bool used = false;
+            for (auto* id : { "aTable", "bTable" })
+                used = used || (int) apvts.getRawParameterValue (id)->load() == bank.userBase() + slot;
+            if (used && ! bank.user (slot).empty())
+            {
+                auto* e = xml->createNewChildElement ("UserTable");
+                e->setAttribute ("slot", slot);
+                e->setAttribute ("data", bank.user (slot).toBlock().toBase64Encoding());
+            }
+        }
+        copyXmlToBinary (*xml, d);
+    }
 }
 
 void PrismaAudioProcessor::setStateInformation (const void* data, int size)
@@ -956,7 +1330,21 @@ void PrismaAudioProcessor::setStateInformation (const void* data, int size)
     if (auto xml = getXmlFromBinary (data, size))
         if (xml->hasTagName (apvts.state.getType()))
         {
+            auto& bank = prisma::Bank::get();
+            while (auto* e = xml->getChildByName ("UserTable"))
+            {
+                juce::MemoryBlock mb;
+                const int slot = e->getIntAttribute ("slot", -1);
+                if (slot >= 0 && slot < prisma::numUserTables && mb.fromBase64Encoding (e->getStringAttribute ("data")))
+                    if (auto t = prisma::UserTable::fromBlock (mb.getData(), mb.getSize()); ! t.empty() && ! (t == bank.user (slot)))
+                    {
+                        const bool wasEmpty = bank.user (slot).empty();
+                        bank.setUser (slot, std::move (t), wasEmpty);   // se qui lo spazio era libero, la tabella resta anche su questo dispositivo
+                    }
+                xml->removeChildElement (e, true);
+            }
             apvts.replaceState (juce::ValueTree::fromXml (*xml));
             ensureTables();
+            updateSpectral();
         }
 }

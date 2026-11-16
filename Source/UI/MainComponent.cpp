@@ -1,4 +1,6 @@
 #include "MainComponent.h"
+#include "../Instruments/Prisma/PrismaEditor.h"
+#include "../Instruments/Prisma/PrismaWaveEditor.h"
 #include "../Engine/SampleRender.h"
 #include "../Instruments/Prisma/Prisma.h"
 #include "../Instruments/Materia/MateriaEditor.h"
@@ -2818,6 +2820,17 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
             if (auto* mt = dynamic_cast<MateriaAudioProcessor*> (engine.getInstrument (args[i + 1].getIntValue())))
                 mt->getPresets().loadFactory (args[k + 1].getIntValue());
         openSynthPanel (args[i + 1].getIntValue());
+        if (const int k = args.indexOf ("--prisma-waves"); k >= 0)   // test: "Le mie onde" (oscillatore, 1 = armoniche, file audio)
+            if (auto* pe = dynamic_cast<PrismaEditor*> (synthPanel->getEditorForTest()))
+            {
+                pe->openWaveEditor (args[k + 1].getIntValue());
+                if (auto* we = pe->getWaveEditor())
+                {
+                    if (args.size() > k + 3 && args[k + 3].isNotEmpty() && ! args[k + 3].startsWith ("--"))
+                        { if (args[k + 3].containsOnly ("0123456789")) we->fillFromTableForTest (args[k + 3].getIntValue()); else we->loadAudioForTest (juce::File (args[k + 3])); }
+                    we->setHarmonicsMode (args[k + 2].getIntValue() == 1);
+                }
+            }
         if (args.size() > i + 2)
         {
             if (auto* pfEditor = dynamic_cast<ForgeEditorBase*> (synthPanel->getEditorForTest()))

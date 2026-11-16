@@ -45,6 +45,7 @@ NeonEditor::NeonEditor (juce::AudioProcessor& p, juce::AudioProcessorValueTreeSt
         addAndMakeVisible (bigPanel[k]);
         bigKnob[k] = std::make_unique<frui::Knob> (apvts, big[k].id, big[k].title, true);
         bigPanel[k].addAndMakeVisible (*bigKnob[k]);
+        knobList.push_back ({ big[k].id, bigKnob[k].get() });
         if (big[k].lcdParam.isNotEmpty())
             bigCaption[k] = std::make_unique<frui::Lcd> (apvts, big[k].lcdParam, big[k].caption);
         else if (big[k].caption.isNotEmpty())
@@ -75,12 +76,15 @@ NeonEditor::Section& NeonEditor::section (int tabIndex, const juce::String& titl
     return *sections[(size_t) tabIndex].back();
 }
 
-void NeonEditor::knob (Section& s, const juce::String& id, const juce::String& title)
+frui::Knob& NeonEditor::knob (Section& s, const juce::String& id, const juce::String& title)
 {
     auto k = std::make_unique<frui::Knob> (apvts, id, title);
+    auto& ref = *k;
     s.panel->addAndMakeVisible (*k);
     s.items.push_back (k.get());
+    knobList.push_back ({ id, k.get() });
     owned.push_back (std::move (k));
+    return ref;
 }
 
 void NeonEditor::segment (Section& s, const juce::String& id, juce::StringArray labels)
