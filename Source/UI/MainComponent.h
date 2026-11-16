@@ -25,6 +25,7 @@
 #include "LivePanel.h"
 #include "HoloDisplay.h"
 #include "Haptics.h"
+#include "MainMenuPanel.h"
 
 //==============================================================================
 /** La schermata principale: barra del trasporto + channel rack. */
@@ -64,6 +65,9 @@ private:
 
     // Menu e finestre
     void showFileMenu();
+    void openMainMenu (int sectionForTest = -1);
+    void runMenuCommand (int command);
+    MainMenuPanel::State menuState();
     void showPatternMenu();
     void showKitMenu();
     void askProjectName (const juce::String& title, std::function<void (juce::String)> onName);
@@ -197,6 +201,7 @@ private:
     std::unique_ptr<Instruments::Host> instruments;      // gli strumenti dei canali (distrutti dopo il pannello)
     std::unique_ptr<SynthPanel> synthPanel;
     std::unique_ptr<JLoopSplash> splash;
+    std::unique_ptr<MainMenuPanel> mainMenu;
     std::unique_ptr<QuickGuide> guide;
     LivePanel livePanel { engine };
     juce::TextButton liveButton { "LIVE" };

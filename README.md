@@ -14,9 +14,16 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.83)
+## Stato attuale (v0.84)
 
-**0.83**: sul telefono in orizzontale (e su PC) il channel rack mostra tutto il pattern fino a 8 battute (32 step)
+**0.84: menu nuovo.** Il tasto con le tre righe apre un pannello che esce da sinistra, con le sezioni Progetto, Crea,
+Esporta, Impostazioni e Aiuto (tutte le voci di prima, nessuna tolta). Progetto: Salva grande, i progetti salvati
+da aprire con un tocco (con "Tutti i progetti"), demo, apri da file, condividi, elimina. Impostazioni senza
+sottomenu: latenza, allineamento delle note registrate e dimensione dell'interfaccia sono scelte su una riga, il
+resto sono interruttori. Si chiude toccando fuori, con Indietro (Android) o Esc. In verticale le sezioni diventano
+icone con il nome sotto e le voci vanno in una colonna.
+
+**0.83**:: sul telefono in orizzontale (e su PC) il channel rack mostra tutto il pattern fino a 8 battute (32 step)
 senza scorrere: con un pattern da 5-8 battute le caselle si stringono, fino a 4 battute restano grandi come prima.
 
 **0.82**:

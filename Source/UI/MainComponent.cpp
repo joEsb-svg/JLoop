@@ -64,7 +64,7 @@ MainComponent::MainComponent()
     presetBrowser.onSaveRequest = [this] (int ch) { handleSoundMenu (ch, 660); };
 
     // --- Menu file
-    fileButton.onClick = [this] { showFileMenu(); };
+    fileButton.onClick = [this] { openMainMenu(); };
     logoImage = juce::ImageCache::getFromMemory (BinaryData::logo_mark_png, BinaryData::logo_mark_pngSize);
     addAndMakeVisible (fileButton);
 
@@ -1361,6 +1361,76 @@ void MainComponent::saveSession()
 }
 
 //==============================================================================
+MainMenuPanel::State MainComponent::menuState()
+{
+    MainMenuPanel::State st;
+    st.projectName = projectName;
+    st.version = ProjectInfo::versionString;
+    const auto now = juce::Time::getCurrentTime();
+    for (auto& name : ProjectIO::listProjects())
+    {
+        const auto t = ProjectIO::getProjectFile (name).getLastModificationTime();
+        const int days = (int) ((juce::Time (now.getYear(), now.getMonth(), now.getDayOfMonth(), 0, 0) - juce::Time (t.getYear(), t.getMonth(), t.getDayOfMonth(), 0, 0)).inDays() + 0.5);
+        const juce::String when = days <= 0 ? juce::String ("oggi") : days == 1 ? juce::String ("ieri") : days < 7 ? juce::String (days) + " giorni fa"
+                                : days < 14 ? juce::String ("settimana scorsa") : t.formatted ("%d/%m/%Y");
+        st.projects.push_back ({ name, when });
+    }
+    for (auto& d : demos::list())
+        st.demos.add (juce::String (d.name) + "  -  " + d.description);
+    st.hasSong = ! engine.getClips().empty();
+    st.haptics = Haptics::enabled();
+    st.lowPower = perf::lowPower();
+    st.desk = settings == nullptr || settings->getBoolValue ("deskLayout", true);
+    st.synthWindows = useSynthWindows();
+   #if JUCE_WINDOWS
+    st.direct2D = windowsRenderer.engine == 1;
+    st.isWindows = true;
+   #endif
+   #if ! (JUCE_ANDROID || JUCE_IOS)
+    st.isDesktop = true;
+   #endif
+    st.quantize = recordQuantize;
+    if (auto* device = deviceManager.getCurrentAudioDevice())
+    {
+        st.buffer = device->getCurrentBufferSizeSamples();
+        st.sampleRate = device->getCurrentSampleRate();
+        // le misure classiche che la scheda accetta (al massimo 6, cosi' stanno in una riga)
+        const auto avail = device->getAvailableBufferSizes();
+        for (int size : { 64, 128, 256, 512, 1024, 2048 })
+            if (avail.contains (size)) st.buffers.push_back (size);
+        if (st.buffers.empty())
+            for (int size : avail)
+                if (size >= 32 && size <= 2048 && st.buffers.size() < 6) st.buffers.push_back (size);
+        if (std::find (st.buffers.begin(), st.buffers.end(), st.buffer) == st.buffers.end() && st.buffers.size() < 7)
+            { st.buffers.push_back (st.buffer); std::sort (st.buffers.begin(), st.buffers.end()); }
+    }
+    st.uiScalePct = juce::roundToInt (juce::Desktop::getInstance().getGlobalScaleFactor() * 100.0f);
+    for (auto& d : juce::MidiInput::getAvailableDevices())
+        st.midiDevices.add (d.name);
+    st.bluetooth = juce::BluetoothMidiDevicePairingDialogue::isAvailable();
+    return st;
+}
+
+void MainComponent::openMainMenu (int sectionForTest)
+{
+    if (mainMenu == nullptr)
+    {
+        mainMenu = std::make_unique<MainMenuPanel>();
+        mainMenu->logo = logoImage;
+        juce::Component::SafePointer<MainComponent> safe (this);
+        mainMenu->getState = [safe] { return safe != nullptr ? safe->menuState() : MainMenuPanel::State(); };
+        mainMenu->onCommand = [safe] (int cmd) { if (safe != nullptr) safe->runMenuCommand (cmd); };
+        mainMenu->onClosed = [safe] { if (safe != nullptr && safe->mainMenu != nullptr) { safe->removeChildComponent (safe->mainMenu.get()); safe->mainMenu.reset(); } };
+    }
+    addAndMakeVisible (*mainMenu);
+    mainMenu->setBounds (getLocalBounds());
+    mainMenu->toFront (true);
+    if (sectionForTest >= 0) mainMenu->showForTest (sectionForTest);
+    else mainMenu->open();
+    Haptics::tick (this);
+}
+
+//==============================================================================
 void MainComponent::showFileMenu()
 {
     juce::PopupMenu openMenu, deleteMenu;
@@ -1429,76 +1499,81 @@ void MainComponent::showFileMenu()
 
     juce::Component::SafePointer<MainComponent> safeThis (this);
 
+    juce::Component::SafePointer<MainComponent> safe2 (this);
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&fileButton),
-                        [safeThis, projects] (int result)
-                        {
-                            if (safeThis == nullptr || result <= 0)
-                                return;
+                        [safe2] (int result) { if (safe2 != nullptr) safe2->runMenuCommand (result); });
+}
 
-                            auto& self = *safeThis;
+void MainComponent::runMenuCommand (int result)
+{
+    if (result <= 0)
+        return;
 
-                            if (result == 1)
-                                self.newProject();
-                            else if (result == 2)
-                            {
-                                if (self.projectName == untitled)
-                                    self.askProjectName ("Salva progetto", [safeThis] (juce::String n) { if (safeThis) safeThis->saveProjectAs (n, true); });
-                                else
-                                    self.saveProjectAs (self.projectName, false);
-                            }
-                            else if (result == 3)
-                                self.askProjectName ("Salva con nome", [safeThis] (juce::String n) { if (safeThis) safeThis->saveProjectAs (n, true); });
-                            else if (result == 4)
-                                self.showAudioInfo();
-                            else if (result == 15)
-                                self.showAudioSetup();
-                            else if (result == 16)
-                                self.showShortcuts();
-                            else if (result == 18)
-                            {
-                                self.settings->setValue ("deskLayout", ! self.settings->getBoolValue ("deskLayout", true));
-                                self.settings->saveIfNeeded();
-                                self.resized();
-                            }
-                            else if (result == 19)
-                            {
-                                self.settings->setValue ("synthWindows", ! self.useSynthWindows());
-                                self.settings->saveIfNeeded();
-                                self.closeAllSynthWindows();
-                            }
-                            else if (result == 2101 || result == 2102)
-                                self.exportMidi (result == 2102);
-                            else if (result > 1700 && result <= 1900)
-                                self.setUiScale ((float) (result - 1700) / 100.0f);
-                            else if (result == 6)
-                                self.openExport();
-                            else if (result == 7)
-                                self.openMixer();
-                            else if (result == 8)
-                                self.showGuide();
-                            else if (result == 9)
-                                self.showUndoHistory();
-                            else if (result == 10)
-                                self.openLive();
-                            else if (result == 11)
-                                self.shareProject();
-                            else if (result == 12)
-                                self.openProjectFile();
-                            else if (result == 13)
-                                self.openRiser();
-                            else if (result == 14)
-                                self.openRiser (true);
-                            else if (result == 22)
-                                self.openVocals();
-                            else if (result >= 3000 && result < 4000)
-                                self.loadDemo (result - 3000);
-                            else if (result >= 5000 && result < 9000)
-                                self.handleSettingsResult (result);
-                            else if (result >= 2000)
-                                self.deleteProject (projects[result - 2000]);
-                            else if (result >= 1000)
-                                self.openProject (projects[result - 1000]);
-                        });
+    auto& self = *this;
+    juce::Component::SafePointer<MainComponent> safeThis (this);
+    const auto projects = ProjectIO::listProjects();
+
+    if (result == 1)
+        self.newProject();
+    else if (result == 2)
+    {
+        if (self.projectName == untitled)
+            self.askProjectName ("Salva progetto", [safeThis] (juce::String n) { if (safeThis) safeThis->saveProjectAs (n, true); });
+        else
+            self.saveProjectAs (self.projectName, false);
+    }
+    else if (result == 3)
+        self.askProjectName ("Salva con nome", [safeThis] (juce::String n) { if (safeThis) safeThis->saveProjectAs (n, true); });
+    else if (result == 4)
+        self.showAudioInfo();
+    else if (result == 15)
+        self.showAudioSetup();
+    else if (result == 16)
+        self.showShortcuts();
+    else if (result == 18)
+    {
+        self.settings->setValue ("deskLayout", ! self.settings->getBoolValue ("deskLayout", true));
+        self.settings->saveIfNeeded();
+        self.resized();
+    }
+    else if (result == 19)
+    {
+        self.settings->setValue ("synthWindows", ! self.useSynthWindows());
+        self.settings->saveIfNeeded();
+        self.closeAllSynthWindows();
+    }
+    else if (result == 2101 || result == 2102)
+        self.exportMidi (result == 2102);
+    else if (result > 1700 && result <= 1900)
+        self.setUiScale ((float) (result - 1700) / 100.0f);
+    else if (result == 6)
+        self.openExport();
+    else if (result == 7)
+        self.openMixer();
+    else if (result == 8)
+        self.showGuide();
+    else if (result == 9)
+        self.showUndoHistory();
+    else if (result == 10)
+        self.openLive();
+    else if (result == 11)
+        self.shareProject();
+    else if (result == 12)
+        self.openProjectFile();
+    else if (result == 13)
+        self.openRiser();
+    else if (result == 14)
+        self.openRiser (true);
+    else if (result == 22)
+        self.openVocals();
+    else if (result >= 3000 && result < 4000)
+        self.loadDemo (result - 3000);
+    else if (result >= 5000 && result < 9000)
+        self.handleSettingsResult (result);
+    else if (result >= 2000)
+        self.deleteProject (projects[result - 2000]);
+    else if (result >= 1000)
+        self.openProject (projects[result - 1000]);
 }
 
 void MainComponent::askProjectName (const juce::String& title, std::function<void (juce::String)> onName)
@@ -2795,6 +2870,9 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
     if (const int i = args.indexOf ("--mixer"); i >= 0)   // test: mixer (traccia degli effetti, -1 = strisce)
         openMixer (args.size() > i + 1 ? args[i + 1].getIntValue() : -1);
 
+    if (const int i = args.indexOf ("--main-menu"); i >= 0)   // test: il menu principale aperto su una sezione (0..4)
+        openMainMenu (args[i + 1].getIntValue());
+
     if (const int i = args.indexOf ("--fornace"); i >= 0)   // test: finestra di FORNACE (banda, preset)
     {
         auto& fxView = mixerPanel.getEffectsView();
@@ -3374,6 +3452,11 @@ void MainComponent::handleSettingsResult (int result)
 
 bool MainComponent::handleBackButton()
 {
+    if (mainMenu != nullptr)   // il menu principale si chiude per primo (o torna indietro dalla sua lista)
+    {
+        mainMenu->keyPressed (juce::KeyPress (juce::KeyPress::escapeKey));
+        return true;
+    }
     // Chiude il pannello in primo piano, come il tasto Indietro di ogni app Android
     if (splash != nullptr)
         return true;
