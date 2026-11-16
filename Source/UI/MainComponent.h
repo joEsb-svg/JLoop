@@ -99,6 +99,8 @@ private:
     void openEditor (int channel);
     void openPianoRoll (int channel);
     int getVisibleSteps() const;
+    int stepsOnScreen (bool portrait, bool tablet) const;
+    bool rackPortrait = false, rackTablet = false;   // come sono state disposte le righe l'ultima volta
     float getFirstVisibleStep() const;
     void layoutLandscape (juce::Rectangle<int> area);
     void layoutPortrait (juce::Rectangle<int> area);

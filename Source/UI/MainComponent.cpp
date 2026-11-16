@@ -681,10 +681,11 @@ void MainComponent::layoutRack (juce::Rectangle<int> full, bool portrait)
     const int w = rack.getWidth() - (contentH > rack.getHeight() ? 9 : 0);   // spazio per la barra di scorrimento
 
     rackContent.setSize (w, contentH);
+    rackPortrait = portrait; rackTablet = tablet;
     int y = 0;
     for (auto* row : rows)
     {
-        row->setLayout (portrait ? 8 : tablet ? 32 : 16, portrait);
+        row->setLayout (stepsOnScreen (portrait, tablet), portrait);
         row->setBounds (0, y, w, rowH);
         y += rowH + gap;
     }
@@ -1131,9 +1132,20 @@ juce::String MainComponent::getKitLabel() const
 }
 
 //==============================================================================
+/** Quanti step si vedono insieme: in verticale 8; in orizzontale tutto il pattern fino a 8 battute (32 step). */
+int MainComponent::stepsOnScreen (bool portrait, bool tablet) const
+{
+    if (portrait) return 8;
+    if (tablet) return 32;
+    return engine.getPatternLength() > 16 ? 32 : 16;
+}
+
 void MainComponent::timerCallback()
 {
     checkFreezer();
+    // pattern allungato o accorciato (anche da progetto caricato o annulla): le caselle si ridimensionano
+    if (! rows.isEmpty() && rows.getFirst()->getVisibleSteps() != stepsOnScreen (rackPortrait, rackTablet))
+        resized();
    #if ! (JUCE_ANDROID || JUCE_IOS)
     // Sul PC la tastiera deve arrivare all'app (scorciatoie, tastiera-pianoforte) anche dopo un pannello chiuso
     if (juce::Component::getCurrentlyFocusedComponent() == nullptr && isShowing() && juce::Process::isForegroundProcess()
