@@ -14,9 +14,13 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.84)
+## Stato attuale (v0.85)
 
-**0.84: menu nuovo.** Il tasto con le tre righe apre un pannello che esce da sinistra, con le sezioni Progetto, Crea,
+**0.85**: la scelta dell'effetto nel mixer usa lo stesso pannello laterale del menu: a sinistra i gruppi (Dinamica,
+Tono ed EQ, Spazio, Movimento, Sporco e lo-fi, Creativi; un pallino arancione segna quello dell'effetto attuale), a
+destra gli effetti con una riga che spiega cosa fanno, piu' "Togli l'effetto". Si apre sul gruppo dell'effetto attuale.
+
+**0.84**: menu nuovo. Il tasto con le tre righe apre un pannello che esce da sinistra, con le sezioni Progetto, Crea,
 Esporta, Impostazioni e Aiuto (tutte le voci di prima, nessuna tolta). Progetto: Salva grande, i progetti salvati
 da aprire con un tocco (con "Tutti i progetti"), demo, apri da file, condividi, elimina. Impostazioni senza
 sottomenu: latenza, allineamento delle note registrate e dimensione dell'interfaccia sono scelte su una riga, il

@@ -2870,6 +2870,9 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
     if (const int i = args.indexOf ("--mixer"); i >= 0)   // test: mixer (traccia degli effetti, -1 = strisce)
         openMixer (args.size() > i + 1 ? args[i + 1].getIntValue() : -1);
 
+    if (const int i = args.indexOf ("--fx-picker"); i >= 0)   // test: scelta dell'effetto nel mixer, su un gruppo
+        mixerPanel.getEffectsView().showTypePickerForTest (args[i + 1].getIntValue());
+
     if (const int i = args.indexOf ("--main-menu"); i >= 0)   // test: il menu principale aperto su una sezione (0..4)
         openMainMenu (args[i + 1].getIntValue());
 
@@ -3452,6 +3455,8 @@ void MainComponent::handleSettingsResult (int result)
 
 bool MainComponent::handleBackButton()
 {
+    if (mixerPanel.getEffectsView().closePicker())   // la scelta dell'effetto del mixer
+        return true;
     if (mainMenu != nullptr)   // il menu principale si chiude per primo (o torna indietro dalla sua lista)
     {
         mainMenu->keyPressed (juce::KeyPress (juce::KeyPress::escapeKey));

@@ -7,6 +7,7 @@
 #include "Widgets.h"
 #include "ChannelEditor.h"   // LabeledKnob
 #include "FornaceView.h"
+#include "SidePicker.h"
 
 //==============================================================================
 /** Conversione volume della traccia (guadagno) <-> dB del fader. */
@@ -916,14 +917,12 @@ private:
         if (onChanged) onChanged();
     }
 
-    void showTypeMenu (int slot, juce::Component& target)
+    void showTypeMenu (int slot, juce::Component&)
     {
         const int current = engine.getTrack (track).slots[(size_t) slot].type.load();
-        juce::PopupMenu menu;
-        menu.addSectionHeader ("Slot " + juce::String (slot + 1));
         using namespace mixer;
-        struct Group { const char* name; std::initializer_list<int> types; };
-        const Group groups[] {
+        struct G { const char* name; std::initializer_list<int> types; };
+        const G groups[] {
             { "Dinamica",          { compressor, ott, transient, limiter, sidechain } },
             { "Tono ed EQ",        { filter, peq, exciter, vowel } },
             { "Spazio",            { reverb, shimmer, delay, chorus, stereo } },
@@ -931,18 +930,33 @@ private:
             { "Sporco e lo-fi",    { saturation, fornace, blood, fet, trash, bitcrusher, vinyl } },
             { "Creativi",          { glitch, pitch, ringmod } },
         };
+
+        // pannello laterale come il menu principale, sopra la finestra intera
+        auto* top = getTopLevelComponent();
+        picker = std::make_unique<SidePicker>();
+        picker->title = "Effetto - slot " + juce::String (slot + 1);
         for (auto& gr : groups)
         {
-            menu.addSectionHeader (gr.name);
+            SidePicker::Group g { gr.name, {} };
             for (int t : gr.types)
-                menu.addItem (t + 1, mixer::info (t).name, true, t == current);
+                g.entries.push_back ({ mixer::info (t).name, mixer::info (t).detail, t + 1, t == current });
+            picker->groups.push_back (std::move (g));
         }
-        menu.addSeparator();
-        menu.addItem (1, "Togli l'effetto", current != mixer::none);
+        picker->extraAction = "Togli l'effetto";
+        picker->extraId = mixer::none + 1;
+        picker->extraEnabled = current != mixer::none;
 
         juce::Component::SafePointer<TrackEffectsView> safe (this);
         const int trackIndex = track;
-        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&target), [safe, slot, trackIndex] (int result)
+        picker->onClosed = [safe]
+        {
+            if (safe != nullptr && safe->picker != nullptr)
+            {
+                if (auto* p = safe->picker->getParentComponent()) p->removeChildComponent (safe->picker.get());
+                safe->picker.reset();
+            }
+        };
+        picker->onPick = [safe, slot, trackIndex] (int result)
         {
             if (safe == nullptr || result <= 0 || safe->track != trackIndex)
                 return;
@@ -957,9 +971,32 @@ private:
             if (result - 1 == mixer::fornace)
                 safe->openFornace();
             if (safe->onChanged) safe->onChanged();
-        });
+        };
+        top->addAndMakeVisible (*picker);
+        picker->setBounds (top->getLocalBounds());
+        picker->toFront (true);
+        picker->open (! forTest);
     }
 
+public:
+    /** Per le foto di prova: apre la scelta dell'effetto dello slot 1 su un gruppo. */
+    void showTypePickerForTest (int groupIndex)
+    {
+        forTest = true;
+        showTypeMenu (selectedSlot, *this);
+        forTest = false;
+        if (picker != nullptr) picker->showGroupForTest (groupIndex);
+    }
+
+    /** Indietro / Esc: chiude prima la scelta dell'effetto, se e' aperta. */
+    bool closePicker()
+    {
+        if (picker == nullptr) return false;
+        picker->close();
+        return true;
+    }
+
+private:
     int findKickTrack() const
     {
         for (int c = 0; c < engine.getNumChannels(); ++c)
@@ -1100,6 +1137,8 @@ private:
     std::unique_ptr<GateGridView> gateView;
     std::unique_ptr<EqCurveView> eqView;
     std::unique_ptr<FornaceView> fornaceView;
+    std::unique_ptr<SidePicker> picker;
+    bool forTest = false;
     juce::TextButton openFornaceButton { "Apri FORNACE" };
     juce::Rectangle<float> eqCaption, slotsCaption, paramsCaption, detailArea;
     juce::Rectangle<int> paramsArea;
