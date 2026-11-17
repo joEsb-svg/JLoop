@@ -2870,6 +2870,13 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
     if (const int i = args.indexOf ("--mixer"); i >= 0)   // test: mixer (traccia degli effetti, -1 = strisce)
         openMixer (args.size() > i + 1 ? args[i + 1].getIntValue() : -1);
 
+    if (const int i = args.indexOf ("--fx-click"); i >= 0)   // test: tocco sul nome dello slot, dopo un attimo
+    {
+        const int slot = args[i + 1].getIntValue();
+        juce::Component::SafePointer<MainComponent> safe (this);
+        juce::Timer::callAfterDelay (1500, [safe, slot] { if (safe != nullptr) safe->mixerPanel.getEffectsView().clickSlotNameForTest (slot); });
+    }
+
     if (const int i = args.indexOf ("--fx-picker"); i >= 0)   // test: scelta dell'effetto nel mixer, su un gruppo
         mixerPanel.getEffectsView().showTypePickerForTest (args[i + 1].getIntValue());
 

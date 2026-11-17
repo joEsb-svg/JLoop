@@ -772,6 +772,8 @@ private:
     class SlotRow : public juce::Component
     {
     public:
+        void clickNameForTest()   { nameButton.triggerClick(); }
+    public:
         SlotRow (TrackEffectsView& v, int s) : view (v), slot (s)
         {
             nameButton.onClick = [this] { view.selectSlot (slot); view.showTypeMenu (slot, nameButton); };
@@ -931,8 +933,12 @@ private:
             { "Creativi",          { glitch, pitch, ringmod } },
         };
 
-        // pannello laterale come il menu principale, sopra la finestra intera
-        auto* top = getTopLevelComponent();
+        // pannello laterale come il menu principale, sopra tutta l'app: si mette nel componente principale
+        // (dentro la finestra, come il menu), non nella finestra stessa (su Android li' non riceveva i tocchi)
+        juce::Component* top = getTopLevelComponent();
+        if (auto* window = dynamic_cast<juce::ResizableWindow*> (top))
+            if (auto* main = window->getContentComponent())
+                top = main;
         picker = std::make_unique<SidePicker>();
         picker->title = "Effetto - slot " + juce::String (slot + 1);
         for (auto& gr : groups)
@@ -986,6 +992,12 @@ public:
         showTypeMenu (selectedSlot, *this);
         forTest = false;
         if (picker != nullptr) picker->showGroupForTest (groupIndex);
+    }
+
+    /** Per le prove: tocca il nome di uno slot come farebbe il dito. */
+    void clickSlotNameForTest (int s)
+    {
+        if (s >= 0 && s < slotRows.size()) slotRows[s]->clickNameForTest();
     }
 
     /** Indietro / Esc: chiude prima la scelta dell'effetto, se e' aperta. */

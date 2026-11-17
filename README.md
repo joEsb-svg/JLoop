@@ -14,7 +14,10 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.86)
+## Stato attuale (v0.86.1)
+
+**0.86.1**: correzione: su Android la scelta dell'effetto nel mixer non si apriva bene (a volte l'app si bloccava).
+Il pannello ora sta dentro l'app come il menu principale, non sopra la finestra.
 
 **0.86**: nel piano roll, per i synth che lo permettono (Prisma, Materia, MegaSaw, FMForge, PolyForge, French Roulette),
 c'e' il tasto "Note: ..." nella seconda riga: *Insieme* (accordi, come prima), *Una alla volta* (la nota nuova prende il
