@@ -31,6 +31,8 @@
 /** La schermata principale: barra del trasporto + channel rack. */
 class MainComponent : public juce::Component,
                       public juce::FileDragAndDropTarget,
+                      public juce::DragAndDropContainer,
+                      public juce::DragAndDropTarget,
                       private juce::Timer,
                       private juce::MidiInputCallback
 {
@@ -66,6 +68,15 @@ private:
     // Menu e finestre
     void showFileMenu();
     void openMainMenu (int sectionForTest = -1);
+    // Suoni trascinati dal pannello a sinistra (PC): su un canale lo cambiano, nel vuoto del rack aggiungono un canale
+    bool isInterestedInDragSource (const SourceDetails&) override;
+    void itemDragMove (const SourceDetails&) override;
+    void itemDragExit (const SourceDetails&) override;
+    void itemDropped (const SourceDetails&) override;
+    void paintSoundDrop (juce::Graphics&);
+    /** Dove cade un suono trascinato: il canale (>= 0), -1 = nuovo canale, -2 = fuori dal rack. */
+    int dropTargetAt (juce::Point<int> posInThis) const;
+    int dropHover = -3;
     void runMenuCommand (int command);
     MainMenuPanel::State menuState();
     void showPatternMenu();

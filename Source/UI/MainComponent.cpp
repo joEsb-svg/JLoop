@@ -799,6 +799,7 @@ void MainComponent::exportMidi (bool song)
 
 void MainComponent::paintOverChildren (juce::Graphics& g)
 {
+    paintSoundDrop (g);
     if (! dropHighlight) return;
     g.setColour (Theme::accent.withAlpha (0.12f));
     g.fillRect (getLocalBounds());
@@ -1358,6 +1359,74 @@ void MainComponent::saveSession()
     // a meta', il file vecchio resta intero
     if (file.replaceWithText (text))
         lastSavedJson = text;
+}
+
+//==============================================================================
+bool MainComponent::isInterestedInDragSource (const SourceDetails& d)
+{
+    return d.description.toString() == SoundBrowser::dragDescription;
+}
+
+int MainComponent::dropTargetAt (juce::Point<int> p) const
+{
+    if (! rackView.isShowing() || ! rackView.getBounds().contains (p)) return -2;
+    if (deskBrowser.isVisible() && deskBrowser.getBounds().contains (p)) return -2;
+    for (int i = 0; i < rows.size(); ++i)
+        if (rows[i]->isShowing() && getLocalArea (rows[i], rows[i]->getLocalBounds()).contains (p))
+            return i;
+    return -1;
+}
+
+void MainComponent::itemDragMove (const SourceDetails& d)
+{
+    const int t = dropTargetAt (d.localPosition.toInt());
+    if (t != dropHover) { dropHover = t; repaint(); }
+}
+
+void MainComponent::itemDragExit (const SourceDetails&)
+{
+    dropHover = -3;
+    repaint();
+}
+
+void MainComponent::itemDropped (const SourceDetails& d)
+{
+    const int t = dropTargetAt (d.localPosition.toInt());
+    dropHover = -3;
+    repaint();
+    const auto choice = deskBrowser.takeDragged (d.description);
+    if (t == -2 || choice.kind == SoundChoice::none) return;
+    applySoundChoice (t, choice);
+    deskBrowser.setTarget (t >= 0 ? t : engine.getNumChannels() - 1);
+    Haptics::tick (this);
+}
+
+void MainComponent::paintSoundDrop (juce::Graphics& g)
+{
+    if (dropHover < -1) return;
+    // dove cadra' il suono: il canale sotto il mouse, oppure "nuovo canale" in fondo al rack
+    juce::Rectangle<int> area;
+    juce::String text;
+    if (dropHover >= 0 && dropHover < rows.size())
+    {
+        area = getLocalArea (rows[dropHover], rows[dropHover]->getLocalBounds());
+        text = "Cambia il suono di \"" + engine.getChannel (dropHover).name + "\"";
+    }
+    else
+    {
+        area = rackView.getBounds().removeFromBottom (48).reduced (8, 4);
+        text = "Lascia qui: nuovo canale";
+    }
+    g.setColour (Theme::accent.withAlpha (0.14f));
+    g.fillRoundedRectangle (area.toFloat(), 8.0f);
+    g.setColour (Theme::accent);
+    g.drawRoundedRectangle (area.toFloat().reduced (1.0f), 8.0f, 2.0f);
+    auto label = area.toFloat().removeFromRight (juce::jmin ((float) area.getWidth() * 0.6f, 320.0f)).withSizeKeepingCentre (juce::jmin ((float) area.getWidth() * 0.6f, 300.0f), 26.0f);
+    g.setColour (Theme::bg.withAlpha (0.9f));
+    g.fillRoundedRectangle (label, 6.0f);
+    g.setColour (Theme::textBright);
+    g.setFont (Theme::font (13.0f, true));
+    g.drawFittedText (text, label.toNearestInt().reduced (8, 0), juce::Justification::centred, 1, 0.8f);
 }
 
 //==============================================================================
@@ -2870,6 +2939,9 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
     if (const int i = args.indexOf ("--mixer"); i >= 0)   // test: mixer (traccia degli effetti, -1 = strisce)
         openMixer (args.size() > i + 1 ? args[i + 1].getIntValue() : -1);
 
+    if (const int i = args.indexOf ("--desk-tree"); i >= 0)   // test: pannello a sinistra aperto (cartella, sottocartella, voce)
+        deskBrowser.openTreeForTest (args[i + 1].getIntValue(), args[i + 2].getIntValue(), args[i + 3].getIntValue());
+
     if (const int i = args.indexOf ("--fx-click"); i >= 0)   // test: tocco sul nome dello slot, dopo un attimo
     {
         const int slot = args[i + 1].getIntValue();
@@ -4043,6 +4115,8 @@ void MainComponent::applySoundChoice (int channel, const SoundChoice& choice)
 
         engine.makeInstrumentChannel (channel, choice.id, name, choice.colour);
         instruments->resolve();          // crea lo strumento
+        if (choice.preset >= 0)          // scelto dal pannello a sinistra: direttamente un preset
+            Instruments::loadFactory (engine.getInstrument (channel), choice.preset);
         if (! ch.customName)
             ch.name = name;
     }

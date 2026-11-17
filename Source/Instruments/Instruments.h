@@ -94,6 +94,28 @@ namespace Instruments
     //==========================================================================
     // Preset (ogni synth ha il suo sistema: qui un'interfaccia comune)
 
+    /** I nomi dei preset di fabbrica di un synth, dal suo id, senza crearlo. */
+    inline juce::StringArray factoryPresetNames (const juce::String& id)
+    {
+        juce::StringArray names;
+        auto fill = [&names] (int n, auto nameOf) { for (int i = 0; i < n; ++i) names.add (nameOf (i)); };
+        if (id == "bassforge")           fill (bf::PresetManager::numFactory(), [] (int i) { return bf::PresetManager::factoryName (i); });
+        else if (id == "polyforge")      fill (pf::Presets::numFactory(), [] (int i) { return pf::Presets::factoryName (i); });
+        else if (id == "fmforge")        fill (fm::Presets::numFactory(), [] (int i) { return fm::Presets::factoryName (i); });
+        else if (id == "drumforge")      fill (df::Presets::numFactory(), [] (int i) { return df::Presets::factoryName (i); });
+        else if (id == "frenchroulette") fill (fr::Presets::numFactory(), [] (int i) { return fr::Presets::factoryName (i); });
+        else if (id == "slicer")         fill (slicer::Presets::numFactory(), [] (int i) { return slicer::Presets::factoryName (i); });
+        else if (id == "megasaw")        fill (ms::Presets::numFactory(), [] (int i) { return ms::Presets::factoryName (i); });
+        else if (id == "wubforge")       fill (wf::Presets::numFactory(), [] (int i) { return wf::Presets::factoryName (i); });
+        else if (id == "robovox")        fill (rv::Presets::numFactory(), [] (int i) { return rv::Presets::factoryName (i); });
+        else if (id == "psyforge")       fill (psy::Presets::numFactory(), [] (int i) { return psy::Presets::factoryName (i); });
+        else if (id == "acidline")       fill (acid::Presets::numFactory(), [] (int i) { return acid::Presets::factoryName (i); });
+        else if (id == "zapfm")          fill (zap::Presets::numFactory(), [] (int i) { return zap::Presets::factoryName (i); });
+        else if (id == "prisma")         fill (prisma::Presets::numFactory(), [] (int i) { return prisma::Presets::factoryName (i); });
+        else if (id == "materia")        fill (materia::Presets::numFactory(), [] (int i) { return materia::Presets::factoryName (i); });
+        return names;
+    }
+
     inline juce::StringArray factoryPresets (juce::AudioProcessor* p)
     {
         juce::StringArray names;

@@ -4,6 +4,7 @@
 #include <functional>
 #include <vector>
 #include <set>
+#include <map>
 #include "../Engine/SequencerEngine.h"
 #include "../Engine/SampleStore.h"
 #include "../Instruments/Instruments.h"
@@ -23,6 +24,7 @@ struct SoundChoice
     juce::String name;          // nome da dare al canale
     juce::uint32 colour = 0xff8aa0b8;
     int drumType = 0, kit = 0;
+    int preset = -1;            // synth: preset di fabbrica da caricare (-1 = quello iniziale)
 };
 
 //==============================================================================
@@ -155,6 +157,8 @@ public:
     };
 
     std::function<void (int row)> onClick, onDoubleClick;
+    std::function<void (int row)> onDragStart;     // il mouse ha trascinato una voce (per lasciarla su un canale)
+    std::function<bool (int row)> canDrag;
 
     void setRows (std::vector<Row> newRows)     { rows = std::move (newRows); updateSize(); repaint(); }
     const std::vector<Row>& getRows() const     { return rows; }
@@ -216,6 +220,14 @@ public:
                 g.setColour (i == selected ? Theme::textBright : Theme::text);
                 g.setFont (Theme::font (13.0f));
             }
+            if (row.detail.isNotEmpty() && row.folder)
+            {
+                g.drawText (row.text, content, juce::Justification::centredLeft, true);
+                g.setColour (Theme::textDim);
+                g.setFont (Theme::font (10.5f));
+                g.drawText (row.detail, content.withTrimmedRight (4.0f), juce::Justification::centredRight, true);
+                continue;
+            }
             if (row.detail.isNotEmpty() && ! row.folder)
             {
                 const float tw = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), row.text);
@@ -232,8 +244,21 @@ public:
     void mouseMove (const juce::MouseEvent& e) override     { setHover (e.y / rowH); }
     void mouseExit (const juce::MouseEvent&) override       { setHover (-1); }
 
+    void mouseDown (const juce::MouseEvent&) override   { dragging = false; }
+    void mouseDrag (const juce::MouseEvent& e) override
+    {
+        if (dragging || e.getDistanceFromDragStart() < 8 || onDragStart == nullptr) return;
+        const int i = e.getMouseDownY() / rowH;
+        if (i >= 0 && i < (int) rows.size() && (canDrag == nullptr || canDrag (i)))
+        {
+            dragging = true;
+            onDragStart (i);
+        }
+    }
+
     void mouseUp (const juce::MouseEvent& e) override
     {
+        if (dragging) { dragging = false; return; }
         if (e.getDistanceFromDragStart() > 10 || e.getLengthOfMousePress() > 800) return;
         const int i = e.getMouseDownY() / rowH;
         if (i >= 0 && i < (int) rows.size() && onClick) onClick (i);
@@ -253,6 +278,7 @@ private:
 
     std::vector<Row> rows;
     int selected = -1, hover = -1, width = 100;
+    bool dragging = false;
 };
 
 //==============================================================================
@@ -296,6 +322,8 @@ public:
         addChildComponent (treeView);
         tree.onClick = [this] (int r) { treeClick (r); };
         tree.onDoubleClick = [this] (int r) { treeClick (r); confirm(); };
+        tree.onDragStart = [this] (int r) { startDrag (r); };
+        tree.canDrag = [this] (int r) { const auto c = choiceForRow (r); return c.kind != SoundChoice::none && c.kind != SoundChoice::importFile; };
 
         categoryView.setViewedComponent (&categoryList, false);
         tileView.setViewedComponent (&tileList, false);
@@ -360,6 +388,8 @@ public:
         categoryView.setVisible (! e);
         tileView.setVisible (! e);
         treeView.setVisible (e);
+        // sul PC il mouse trascina i suoni (la rotella scorre); col dito si scorre come prima
+        treeView.setScrollOnDragMode (e ? juce::Viewport::ScrollOnDragMode::nonHover : juce::Viewport::ScrollOnDragMode::all);
         if (e) rebuildTree (false);
         resized(); repaint();
     }
@@ -387,6 +417,25 @@ public:
         g.setColour (Theme::accent);
         g.fillRect (title.removeFromLeft (4.0f).reduced (0.0f, 6.0f));
         title.removeFromLeft (8.0f);
+        if (embedded)
+        {
+            // "SUONO DEL CANALE / Kick Complextro" (o, senza canale, come si aggiunge)
+            g.setColour (Theme::textDim);
+            g.setFont (Theme::font (9.5f, true).withExtraKerningFactor (0.14f));
+            g.drawText (targetChannel < 0 ? juce::String ("SUONI") : juce::String ("SUONO DEL CANALE"), title.removeFromTop (15.0f), juce::Justification::bottomLeft, false);
+            g.setColour (Theme::textBright);
+            g.setFont (Theme::font (16.0f, true));
+            g.drawFittedText (targetChannel < 0 ? juce::String ("Trascina un suono sul rack") : engine.getChannel (targetChannel).name,
+                              title.toNearestInt(), juce::Justification::centredLeft, 1, 0.8f);
+            g.setColour (chosen.kind == SoundChoice::none ? Theme::textDim : Theme::text);
+            g.setFont (Theme::font (12.0f, chosen.kind != SoundChoice::none));
+            g.drawFittedText (chosen.kind == SoundChoice::none ? juce::String ("Tocca un suono per sentirlo, poi trascinalo su un canale")
+                                                               : juce::String (juce::CharPointer_UTF8 ("\xe2\x99\xaa  ")) + chosen.name
+                                                                 + (chosen.preset >= 0 ? juce::String (juce::CharPointer_UTF8 (" \xc2\xb7 ")) + chosenLabel : juce::String())
+                                                                 + juce::String ("   (trascinalo su un canale)"),
+                              footerText.toNearestInt(), juce::Justification::centredLeft, 1, 0.8f);
+            return;
+        }
         g.setColour (Theme::textBright);
         g.setFont (Theme::font (17.0f, true));
         const auto heading = embedded ? (targetChannel < 0 ? juce::String ("Suoni") : "Suoni  " + juce::String (juce::CharPointer_UTF8 ("\xe2\x86\x92  ")) + engine.getChannel (targetChannel).name)
@@ -411,12 +460,12 @@ public:
 
         if (embedded)
         {
-            auto footer = r.removeFromBottom (68);
-            footerText = footer.removeFromTop (26).toFloat();
-            confirmButton.setBounds (footer.reduced (0, 3));
+            confirmButton.setVisible (false);   // i suoni si trascinano sul rack (doppio clic: sul canale scelto)
+            titleArea = titleArea.withHeight (40.0f);
+            r.removeFromTop (8);
+            wave.setBounds (r.removeFromBottom (juce::jlimit (70, 120, r.getHeight() / 5)));
+            footerText = r.removeFromBottom (24).toFloat();
             r.removeFromBottom (4);
-            wave.setBounds (r.removeFromBottom (juce::jlimit (60, 110, r.getHeight() / 5)));
-            r.removeFromBottom (6);
             treeView.setBounds (r);
             tree.setVisibleWidth (r.getWidth() - 10);
             return;
@@ -612,46 +661,107 @@ private:
         return juce::Colour (cols[juce::jlimit (0, 3, tab)]);
     }
 
+    // Le cartelle dell'albero: Batteria, Suoni, Synth (con i preset dentro), Kit, I miei campioni
+    enum TreeTop { topDrums, topSounds, topSynth, topKits, topMine, numTops };
+
+    static juce::Colour topColour (int top)
+    {
+        static const juce::uint32 cols[] { 0xffff8a5b, 0xff4fe3ff, 0xffb07cff, 0xffff6b5b, 0xffe8c35a };
+        return juce::Colour (cols[juce::jlimit (0, numTops - 1, top)]);
+    }
+
+    /** Le sottocartelle di una cartella principale (nome, dettaglio a destra, colore). */
+    std::vector<TreeList::Row> subFolders (int top) const
+    {
+        std::vector<TreeList::Row> out;
+        auto add = [&out, top] (const juce::String& text, const juce::String& detail, juce::Colour c)
+        {
+            TreeList::Row r; r.level = 1; r.tab = top; r.category = (int) out.size(); r.text = text; r.detail = detail; r.colour = c;
+            out.push_back (r);
+        };
+        if (top == topDrums || top == topSounds)
+            for (auto& c : groups[(size_t) top]) add (c, {}, topColour (top).withMultipliedSaturation (0.5f));
+        else if (top == topSynth)
+            for (auto& info : Instruments::list())
+            {
+                const int n = Instruments::factoryPresetNames (info.id).size();
+                add (info.name, n > 0 ? juce::String (n) + " preset" : juce::String(), juce::Colour (info.colour));
+            }
+        else if (top == topKits)
+        {
+            const auto cats = categoriesFor (2);
+            for (int c = 1; c < (int) cats.size(); ++c)
+                add (cats[(size_t) c].text, {}, cats[(size_t) c].colour == Theme::textDim ? topColour (top).withMultipliedSaturation (0.5f) : cats[(size_t) c].colour);
+        }
+        return out;
+    }
+
+    /** I suoni dentro una sottocartella (o dentro "I miei campioni", che non ne ha). */
+    void treeSounds (int top, int sub, std::vector<SoundChoice>& ch, std::vector<TileList::Item>& items) const
+    {
+        ch.clear(); items.clear();
+        if (top == topDrums || top == topSounds) soundsFor (top, sub, ch, items);
+        else if (top == topKits)                 soundsFor (2, sub + 1, ch, items);
+        else if (top == topMine)                 soundsFor (3, 0, ch, items);
+        else if (top == topSynth)
+        {
+            const auto& list = Instruments::list();
+            if (sub < 0 || sub >= (int) list.size()) return;
+            const auto& info = list[(size_t) sub];
+            const auto names = Instruments::factoryPresetNames (info.id);
+            for (int i = 0; i < names.size(); ++i)
+            {
+                SoundChoice c;
+                c.kind = SoundChoice::instrument;
+                c.id = info.id; c.name = info.name; c.colour = info.colour; c.preset = i;
+                ch.push_back (c);
+                items.push_back ({ names[i], {}, juce::Colour (info.colour), true });
+            }
+        }
+    }
+
     void rebuildTree (bool scrollToCurrent)
     {
-        static const char* tabNames[] { "Batteria", "Suoni", "Sintesi", "Campioni" };
+        static const char* topNames[] { "Batteria", "Suoni", "Synth", "Kit", "I miei campioni" };
         std::vector<TreeList::Row> rows;
         treeChoices.clear();
         int selectedRow = -1, currentRow = -1;
-        for (int tab = 0; tab < 4; ++tab)
+        auto addLeaves = [&] (int top, int sub, int level)
         {
-            TreeList::Row top;
-            top.level = 0; top.tab = tab; top.open = openTabs.count (tab) > 0;
-            top.text = tabNames[tab]; top.colour = tabColour (tab);
-            rows.push_back (top);
-            if (! top.open) continue;
-
-            const auto cats = categoriesFor (tab);
-            for (int c = 0; c < (int) cats.size(); ++c)
+            std::vector<SoundChoice> ch;
+            std::vector<TileList::Item> items;
+            treeSounds (top, sub, ch, items);
+            for (int k = 0; k < (int) ch.size(); ++k)
             {
-                TreeList::Row sub;
-                sub.level = 1; sub.tab = tab; sub.category = c; sub.open = openCats.count ({ tab, c }) > 0;
-                sub.text = cats[(size_t) c].text;
-                sub.colour = cats[(size_t) c].colour == Theme::textDim ? tabColour (tab).withMultipliedSaturation (0.5f) : cats[(size_t) c].colour;
+                TreeList::Row leaf;
+                leaf.level = level; leaf.folder = false; leaf.tab = top; leaf.category = sub;
+                leaf.sound = (int) treeChoices.size();
+                leaf.text = items[(size_t) k].text; leaf.detail = items[(size_t) k].detail;
+                leaf.colour = items[(size_t) k].colour;
+                leaf.current = targetChannel >= 0 && isCurrentSound (ch[(size_t) k]);
+                if (leaf.current) currentRow = (int) rows.size();
+                if (sameChoice (ch[(size_t) k], chosen)) selectedRow = (int) rows.size();
+                treeChoices.push_back (ch[(size_t) k]);
+                rows.push_back (leaf);
+            }
+        };
+        for (int top = 0; top < numTops; ++top)
+        {
+            TreeList::Row t;
+            t.level = 0; t.tab = top; t.open = openTabs.count (top) > 0;
+            t.text = topNames[top]; t.colour = topColour (top);
+            rows.push_back (t);
+            if (! t.open) continue;
+            if (top == topMine) { addLeaves (top, 0, 1); continue; }
+            for (auto sub : subFolders (top))
+            {
+                sub.open = openCats.count ({ top, sub.category }) > 0;
+                // il synth del canale: si vede subito quale e'
+                if (top == topSynth && targetChannel >= 0 && engine.isSynth (targetChannel)
+                    && engine.getChannel (targetChannel).instrumentKind == juce::String (Instruments::list()[(size_t) sub.category].id))
+                    sub.current = true;
                 rows.push_back (sub);
-                if (! sub.open) continue;
-
-                std::vector<SoundChoice> ch;
-                std::vector<TileList::Item> items;
-                soundsFor (tab, c, ch, items);
-                for (int k = 0; k < (int) ch.size(); ++k)
-                {
-                    TreeList::Row leaf;
-                    leaf.level = 2; leaf.folder = false; leaf.tab = tab; leaf.category = c;
-                    leaf.sound = (int) treeChoices.size();
-                    leaf.text = items[(size_t) k].text; leaf.detail = items[(size_t) k].detail;
-                    leaf.colour = items[(size_t) k].colour;
-                    leaf.current = targetChannel >= 0 && isCurrentSound (ch[(size_t) k]);
-                    if (leaf.current) currentRow = (int) rows.size();
-                    if (sameChoice (ch[(size_t) k], chosen)) selectedRow = (int) rows.size();
-                    treeChoices.push_back (ch[(size_t) k]);
-                    rows.push_back (leaf);
-                }
+                if (sub.open) addLeaves (top, sub.category, 2);
             }
         }
         tree.setRows (std::move (rows));
@@ -660,9 +770,49 @@ private:
             treeView.setViewPosition (0, juce::jmax (0, currentRow * TreeList::rowH - treeView.getHeight() / 3));
     }
 
+    /** La voce trascinabile di una riga: un suono, oppure un synth intero (senza scegliere il preset). */
+    SoundChoice choiceForRow (int r) const
+    {
+        const auto& rows = tree.getRows();
+        if (r < 0 || r >= (int) rows.size()) return {};
+        const auto& row = rows[(size_t) r];
+        if (! row.folder) return treeChoices[(size_t) row.sound];
+        if (row.level == 1 && row.tab == topSynth)
+        {
+            const auto& info = Instruments::list()[(size_t) row.category];
+            SoundChoice c; c.kind = SoundChoice::instrument; c.id = info.id; c.name = info.name; c.colour = info.colour;
+            return c;
+        }
+        return {};
+    }
+
+    void startDrag (int r)
+    {
+        const auto c = choiceForRow (r);
+        if (c.kind == SoundChoice::none || c.kind == SoundChoice::importFile) return;
+        dragged = c;
+        auto* container = juce::DragAndDropContainer::findParentDragContainerFor (this);
+        if (container == nullptr) return;
+        // l'etichetta che segue il mouse
+        const auto label = tree.getRows()[(size_t) r].text;
+        const int w = juce::jlimit (90, 260, juce::GlyphArrangement::getStringWidthInt (Theme::font (13.0f, true), label) + 30);
+        juce::Image img (juce::Image::ARGB, w, 28, true);
+        {
+            juce::Graphics g (img);
+            g.setColour (Theme::raisedHi.withAlpha (0.95f));
+            g.fillRoundedRectangle (img.getBounds().toFloat().reduced (1.0f), 6.0f);
+            g.setColour (juce::Colour (c.colour));
+            g.fillRect (8, 6, 3, 16);
+            g.setColour (Theme::textBright);
+            g.setFont (Theme::font (13.0f, true));
+            g.drawText (label, 18, 0, w - 22, 28, juce::Justification::centredLeft, true);
+        }
+        container->startDragging (dragDescription, &tree, juce::ScaledImage (img), false);
+    }
+
     static bool sameChoice (const SoundChoice& a, const SoundChoice& b)
     {
-        return a.kind != SoundChoice::none && a.kind == b.kind && a.id == b.id && a.kit == b.kit && a.drumType == b.drumType;
+        return a.kind != SoundChoice::none && a.kind == b.kind && a.id == b.id && a.kit == b.kit && a.drumType == b.drumType && a.preset == b.preset;
     }
 
     void treeClick (int r)
@@ -680,6 +830,7 @@ private:
             return;
         }
         chosen = treeChoices[(size_t) row.sound];
+        chosenLabel = row.text;
         tree.setSelected (r);
         if (onTap) onTap();
         if (chosen.kind == SoundChoice::importFile) { confirm(); return; }
@@ -698,7 +849,10 @@ private:
             case SoundChoice::userSample: return ch.sampleName == c.id;
             case SoundChoice::drumSynth:  return engine.isDrumSynthChannel (targetChannel) && ! engine.isSynth (targetChannel)
                                                  && ch.drumType.load() == c.drumType && ch.kit.load() == c.kit;
-            case SoundChoice::instrument: return engine.isSynth (targetChannel) && ch.instrumentKind == c.id;
+            case SoundChoice::instrument:
+                if (! engine.isSynth (targetChannel) || ch.instrumentKind != c.id) return false;
+                if (c.preset < 0) return true;
+                return Instruments::presetName (engine.getInstrument (targetChannel)) == Instruments::factoryPresetNames (c.id)[c.preset];
             default: return false;
         }
     }
@@ -748,7 +902,11 @@ private:
             const auto& kit = df::factoryKits()[(size_t) juce::jlimit (0, df::Presets::numFactory() - 1, c.kit)];
             s = samples.load (SampleStore::libraryName (kit.pads[0].sample));
         }
-        wave.setEmptyText (c.kind == SoundChoice::instrument ? "Uno strumento: il suono dipende dalle note e dal preset" : "Qui vedi la forma d'onda del suono che tocchi");
+        if (c.kind == SoundChoice::instrument && c.preset >= 0)
+            s = synthPreview (c);
+        wave.setEmptyText (c.kind == SoundChoice::instrument ? (c.preset >= 0 ? "Questo preset da solo non fa suono (gli serve un campione o una voce)"
+                                                                               : "Apri il synth per vedere i suoi preset")
+                                                             : "Qui vedi la forma d'onda del suono che tocchi");
         wave.setSample (s, juce::Colour (c.colour));
     }
 
@@ -774,6 +932,11 @@ private:
             if (auto* s = samples.load (SampleStore::libraryName (kit.pads[0].sample)))
                 engine.previewSample (s);
         }
+        else if (c.kind == SoundChoice::instrument && c.preset >= 0)
+        {
+            if (auto* s = synthPreview (c))
+                engine.previewSample (s);
+        }
         else if (c.kind == SoundChoice::instrument)
         {
             // Anteprima: se nel progetto c'e' gia' uno strumento di questo tipo, fa sentire quello
@@ -786,6 +949,74 @@ private:
         }
     }
 
+    /** Un preset di un synth suonato una volta (un Do, poco piu' di un secondo), per sentirlo e vederne l'onda.
+        Si fa la prima volta che lo tocchi e poi resta pronto. */
+    const SampleData* synthPreview (const SoundChoice& c)
+    {
+        const auto key = c.id + ":" + juce::String (c.preset);
+        if (auto it = previews.find (key); it != previews.end()) return it->second.get();
+        auto p = Instruments::create (c.id);
+        if (p == nullptr) return nullptr;
+        Instruments::loadFactory (p.get(), c.preset);
+        const double sr = 44100.0;
+        const int block = 512, total = (int) (sr * 1.6), noteOff = (int) (sr * 0.9);
+        p->setPlayConfigDetails (0, 2, sr, block);
+        p->prepareToPlay (sr, block);
+        const bool drums = c.id == "drumforge";
+        const int note = drums ? 36 : 48;
+        juce::AudioBuffer<float> buf (2, block);
+        SampleData::Ptr out (new SampleData());
+        out->name = key; out->sampleRate = sr;
+        out->audio.setSize (1, total);
+        out->audio.clear();
+        for (int pos = 0; pos < total; pos += block)
+        {
+            const int n = juce::jmin (block, total - pos);
+            juce::MidiBuffer m;
+            if (pos == 0) m.addEvent (juce::MidiMessage::noteOn (1, note, 0.85f), 0);
+            if (noteOff >= pos && noteOff < pos + n) m.addEvent (juce::MidiMessage::noteOff (1, note), noteOff - pos);
+            buf.setSize (2, n, false, false, true);
+            buf.clear();
+            p->processBlock (buf, m);
+            out->audio.addFrom (0, pos, buf, 0, 0, n, 0.5f);
+            if (buf.getNumChannels() > 1) out->audio.addFrom (0, pos, buf, 1, 0, n, 0.5f);
+        }
+        p->releaseResources();
+        const float peak = out->audio.getMagnitude (0, 0, total);
+        if (! std::isfinite (peak) || peak < 1.0e-4f) { previews[key] = nullptr; return nullptr; }
+        out->audio.applyGain (0.7f / peak);
+        // via il silenzio in coda
+        int end = total;
+        while (end > 2000 && std::abs (out->audio.getSample (0, end - 1)) < 0.002f) --end;
+        out->audio.setSize (1, end, true, true, true);
+        previews[key] = out;
+        return out.get();
+    }
+
+public:
+    /** Il suono che si sta trascinando sul rack (vuoto se non e' un trascinamento di questo pannello). */
+    SoundChoice takeDragged (const juce::var& description)
+    {
+        if (description.toString() != dragDescription) return {};
+        return dragged;
+    }
+    static inline const juce::String dragDescription { "audionaut-sound" };
+
+    /** Per le foto di prova: apre una cartella principale e una sottocartella e sceglie una voce. */
+    void openTreeForTest (int top, int sub, int leaf)
+    {
+        openTabs.insert (top);
+        if (sub >= 0) openCats.insert ({ top, sub });
+        rebuildTree (false);
+        const auto& rows = tree.getRows();
+        int found = -1, count = 0;
+        for (int i = 0; i < (int) rows.size(); ++i)
+            if (! rows[(size_t) i].folder && rows[(size_t) i].tab == top && (sub < 0 || rows[(size_t) i].category == sub))
+                if (count++ == leaf) found = i;
+        if (found >= 0) { treeClick (found); treeView.setViewPosition (0, juce::jmax (0, found * TreeList::rowH - treeView.getHeight() / 2)); }
+    }
+
+private:
     void confirm()
     {
         if (chosen.kind == SoundChoice::none)
@@ -810,7 +1041,9 @@ private:
     std::array<int, 4> lastCategory {};
     std::array<juce::StringArray, 2> groups;      // categorie della libreria: Strumenti, Elettronica
     std::vector<SoundChoice> choices;
-    SoundChoice chosen;
+    SoundChoice chosen, dragged;
+    juce::String chosenLabel;
+    std::map<juce::String, SampleData::Ptr> previews;
 
     SegmentedControl tabs { { "Batteria", "Suoni", "Sintesi", "Campioni" } };
     juce::Viewport categoryView, tileView, treeView;

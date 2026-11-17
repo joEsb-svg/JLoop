@@ -14,7 +14,13 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.86.1)
+## Stato attuale (v0.87)
+
+**0.87: pannello dei suoni a sinistra (PC) rifatto.** Cartelle Batteria, Suoni, Synth, Kit, I miei campioni; dentro
+Synth ogni strumento e' una cartella con i suoi preset ("Prisma > Reese Bass"). Toccando un suono lo senti e ne vedi
+l'onda (anche per i preset dei synth, che vengono suonati una volta su un Do). I suoni si **trascinano col mouse**: su
+un canale ne cambiano il suono, nel vuoto del rack creano un canale nuovo (un riquadro arancione mostra dove cadra').
+In alto "Suono del canale" e il nome del canale scelto. Tolto il tasto "Usa sul canale" (resta il doppio clic).
 
 **0.86.1**: correzione: su Android la scelta dell'effetto nel mixer non si apriva bene (a volte l'app si bloccava).
 Il pannello ora sta dentro l'app come il menu principale, non sopra la finestra.
