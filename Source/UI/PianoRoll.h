@@ -970,6 +970,82 @@ private:
 };
 
 //==============================================================================
+/** Come suonano le note che si sovrappongono, per i synth che lo permettono:
+    0 = insieme (accordi), 1 = una alla volta (la nota nuova prende il posto, poi torna a quella tenuta),
+    2 = una alla volta e scivola (glide). Usa i parametri del plugin: il modo "Poly / Mono / Legato"
+    (qualunque nome abbia: voiceMode, playMode, mode) e "glide". Cosi' resta salvato col suono. */
+namespace noteVoicing
+{
+    struct Params
+    {
+        juce::AudioParameterChoice* mode = nullptr;
+        int polyIndex = -1, legatoIndex = -1;
+        juce::RangedAudioParameter* glide = nullptr;
+        bool usable() const   { return mode != nullptr && polyIndex >= 0 && legatoIndex >= 0; }
+    };
+
+    inline Params find (juce::AudioProcessor* p)
+    {
+        Params r;
+        if (p == nullptr) return r;
+        for (auto* param : p->getParameters())
+        {
+            auto* withId = dynamic_cast<juce::AudioProcessorParameterWithID*> (param);
+            if (withId == nullptr) continue;
+            const auto id = withId->paramID;
+            if (auto* c = dynamic_cast<juce::AudioParameterChoice*> (param); c != nullptr && r.mode == nullptr
+                && (id == "voiceMode" || id == "playMode" || id == "mode"))
+            {
+                const int poly = c->choices.indexOf ("Poly", true), legato = c->choices.indexOf ("Legato", true);   // (Materia li scrive in maiuscolo)
+                if (poly >= 0 && legato >= 0) { r.mode = c; r.polyIndex = poly; r.legatoIndex = legato; }
+            }
+            if (id == "glide")
+                r.glide = dynamic_cast<juce::RangedAudioParameter*> (param);
+        }
+        return r;
+    }
+
+    inline int current (const Params& p)
+    {
+        if (! p.usable()) return 0;
+        if (p.mode->getIndex() == p.polyIndex) return 0;
+        return p.glide != nullptr && p.glide->convertFrom0to1 (p.glide->getValue()) > 0.005f ? 2 : 1;
+    }
+
+    inline void set (juce::AudioParameterChoice& c, int index)
+    {
+        c.beginChangeGesture();
+        c.setValueNotifyingHost (c.convertTo0to1 ((float) index));
+        c.endChangeGesture();
+    }
+
+    inline void apply (const Params& p, int how)
+    {
+        if (! p.usable()) return;
+        set (*p.mode, how == 0 ? p.polyIndex : p.legatoIndex);
+        if (p.glide != nullptr && how > 0)
+        {
+            const float now = p.glide->convertFrom0to1 (p.glide->getValue());
+            float want = now;
+            if (how == 1) want = 0.0f;
+            else if (now < 0.02f) want = 0.07f;   // scivola: un glide corto, se non ce n'era gia' uno
+            if (want != now)
+            {
+                p.glide->beginChangeGesture();
+                p.glide->setValueNotifyingHost (p.glide->convertTo0to1 (want));
+                p.glide->endChangeGesture();
+            }
+        }
+    }
+
+    inline juce::String label (int how)
+    {
+        static const char* t[] { "Note: insieme", "Note: una alla volta", "Note: scivola" };
+        return t[juce::jlimit (0, 2, how)];
+    }
+}
+
+//==============================================================================
 /** Il piano roll completo: barra degli strumenti + griglia. Si apre sopra il channel rack. */
 class PianoRoll : public juce::Component
 {
@@ -1005,6 +1081,7 @@ public:
             return b;
         };
         scaleButton = addTool ("Scala", [this] { showScalePanel(); }, 104);
+        voicingButton = addTool ("Note: insieme", [this] { showVoicingMenu(); }, 150);
         chordButton = addTool ("Accordi", [this] { grid.setChordMode (! grid.isChordMode()); }, 72);
         chordButton->setClickingTogglesState (true);
         chordTypeButton = addTool ("Triade", [this] { grid.setChordType ((grid.getChordType() + 1) % theory::numChordTypes); }, 76);
@@ -1068,6 +1145,43 @@ public:
         return done;
     }
 
+    /** I tasti in fila nella seconda riga (quelli nascosti non lasciano buchi). */
+    void layoutTools()
+    {
+        const int h = toolView.getHeight();
+        if (h <= 0) return;
+        int x = 0;
+        for (auto* b : tools)
+        {
+            if (! b->isVisible()) continue;
+            const int w = (int) b->getProperties()["w"];
+            b->setBounds (x, 1, w, h - 2);
+            x += w + 4;
+        }
+        toolStrip.setSize (juce::jmax (x, toolView.getWidth()), h);
+    }
+
+    /** "Note: insieme / una alla volta / scivola" per il synth di questo canale. */
+    void showVoicingMenu()
+    {
+        const auto vp = noteVoicing::find (engine.getInstrument (channel));
+        if (! vp.usable()) return;
+        const int now = noteVoicing::current (vp);
+        juce::PopupMenu menu;
+        menu.addSectionHeader ("Quando le note si sovrappongono");
+        menu.addItem (1, "Insieme (accordi, come prima)", true, now == 0);
+        menu.addItem (2, "Una alla volta: la nota nuova prende il posto", true, now == 1);
+        menu.addItem (3, "Una alla volta e scivola (glide)", true, now == 2);
+        juce::Component::SafePointer<PianoRoll> safe (this);
+        const int ch = channel;
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (voicingButton), [safe, ch] (int r)
+        {
+            if (safe == nullptr || r <= 0 || safe->channel != ch) return;
+            noteVoicing::apply (noteVoicing::find (safe->engine.getInstrument (ch)), r - 1);
+            safe->updateTools();
+        });
+    }
+
     void updateTools()
     {
         chordButton->setToggleState (grid.isChordMode(), juce::dontSendNotification);
@@ -1079,6 +1193,13 @@ public:
         scaleButton->setButtonText (st > 0 ? juce::String (theory::noteName (engine.getScaleRoot())) + " "
                                              + juce::String (theory::scales()[(size_t) st].name).toLowerCase().substring (0, 9)
                                            : juce::String ("Scala..."));
+        {
+            const auto vp = noteVoicing::find (engine.getInstrument (channel));
+            voicingButton->setVisible (vp.usable());
+            if (vp.usable())
+                voicingButton->setButtonText (noteVoicing::label (noteVoicing::current (vp)) + juce::String (juce::CharPointer_UTF8 (" \xe2\x96\xbe")));
+            layoutTools();
+        }
         selectButton->setToggleState (grid.isSelectMode(), juce::dontSendNotification);
         const int sel = grid.getSelectionSize();
         selectButton->setButtonText (sel > 0 ? "Sel. (" + juce::String (sel) + ")" : juce::String ("Seleziona"));
@@ -1149,14 +1270,7 @@ public:
         r.removeFromTop (4);
         auto toolRow = r.removeFromTop (30);
         toolView.setBounds (toolRow);
-        int x = 0;
-        for (auto* b : tools)
-        {
-            const int w = (int) b->getProperties()["w"];
-            b->setBounds (x, 1, w, toolRow.getHeight() - 2);
-            x += w + 4;
-        }
-        toolStrip.setSize (juce::jmax (x, toolRow.getWidth()), toolRow.getHeight());
+        layoutTools();
 
         r.removeFromTop (4);
         // Corsia dei volumi sotto la griglia (si nasconde col pulsante "Volumi")
@@ -1220,6 +1334,7 @@ private:
     juce::Viewport toolView;
     juce::Component toolStrip;
     juce::OwnedArray<juce::TextButton> tools;
+    juce::TextButton* voicingButton = nullptr;
     juce::TextButton* selectButton = nullptr, *scaleButton = nullptr, *chordButton = nullptr, *chordTypeButton = nullptr, *ghostButton = nullptr, *laneButton = nullptr;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PianoRoll)

@@ -14,7 +14,12 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.85)
+## Stato attuale (v0.86)
+
+**0.86**: nel piano roll, per i synth che lo permettono (Prisma, Materia, MegaSaw, FMForge, PolyForge, French Roulette),
+c'e' il tasto "Note: ..." nella seconda riga: *Insieme* (accordi, come prima), *Una alla volta* (la nota nuova prende il
+posto di quella tenuta e poi si torna a quella) oppure *Una alla volta e scivola* (con glide). Cambia il modo Voci/Glide
+del synth, quindi resta salvato col suono e col progetto.
 
 **0.85**: la scelta dell'effetto nel mixer usa lo stesso pannello laterale del menu: a sinistra i gruppi (Dinamica,
 Tono ed EQ, Spazio, Movimento, Sporco e lo-fi, Creativi; un pallino arancione segna quello dell'effetto attuale), a
