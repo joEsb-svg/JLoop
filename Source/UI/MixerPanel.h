@@ -7,6 +7,7 @@
 #include "Widgets.h"
 #include "ChannelEditor.h"   // LabeledKnob
 #include "FornaceView.h"
+#include "ShaperView.h"
 #include "SidePicker.h"
 
 //==============================================================================
@@ -638,7 +639,7 @@ public:
             auto* row = slotRows.add (new SlotRow (*this, s));
             addAndMakeVisible (row);
         }
-        openFornaceButton.onClick = [this] { openFornace(); };
+        openFornaceButton.onClick = [this] { if (shownType == mixer::shaper) openShaper(); else openFornace(); };
         addChildComponent (openFornaceButton);
     }
 
@@ -657,8 +658,23 @@ public:
 
     FornaceView* getFornaceView()   { return fornaceView.get(); }
 
+    /** Apre la finestra del Curvatore (se lo slot scelto e' un Curvatore). */
+    void openShaper()
+    {
+        if (engine.getTrack (track).slots[(size_t) selectedSlot].type.load() != mixer::shaper)
+            return;
+        shaperView = std::make_unique<ShaperView> (engine, track, selectedSlot);
+        shaperView->onChanged = [this] { if (onChanged) onChanged(); };
+        shaperView->onClose = [this] { juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<TrackEffectsView> (this)] { if (safe != nullptr) safe->shaperView.reset(); }); };
+        addAndMakeVisible (*shaperView);
+        shaperView->setBounds (getLocalBounds());
+    }
+
+    ShaperView* getShaperView()     { return shaperView.get(); }
+
     void setTrack (int t)
     {
+        shaperView.reset();
         fornaceView.reset();
         track = juce::jlimit (0, mixer::numTracks - 1, t);
         selectedSlot = 0;
@@ -762,6 +778,8 @@ public:
         layoutParams();
         if (fornaceView != nullptr)
             fornaceView->setBounds (getLocalBounds());
+        if (shaperView != nullptr)
+            shaperView->setBounds (getLocalBounds());
     }
 
 private:
@@ -929,7 +947,7 @@ private:
             { "Tono ed EQ",        { filter, peq, exciter, vowel } },
             { "Spazio",            { reverb, shimmer, delay, chorus, stereo } },
             { "Movimento",         { gate, tremolo, phaser, flanger } },
-            { "Sporco e lo-fi",    { saturation, fornace, blood, fet, trash, bitcrusher, vinyl } },
+            { "Sporco e lo-fi",    { saturation, shaper, fornace, blood, fet, trash, bitcrusher, vinyl } },
             { "Creativi",          { glitch, pitch, ringmod } },
         };
 
@@ -976,6 +994,8 @@ private:
             safe->rebuildParams();
             if (result - 1 == mixer::fornace)
                 safe->openFornace();
+            if (result - 1 == mixer::shaper)
+                safe->openShaper();
             if (safe->onChanged) safe->onChanged();
         };
         top->addAndMakeVisible (*picker);
@@ -1034,11 +1054,13 @@ private:
         gateView.reset();
         eqView.reset();
         fornaceView.reset();
-        openFornaceButton.setVisible (shownType == mixer::fornace);
+        shaperView.reset();
+        openFornaceButton.setVisible (shownType == mixer::fornace || shownType == mixer::shaper);
+        openFornaceButton.setButtonText (shownType == mixer::shaper ? "Apri CURVATORE" : "Apri FORNACE");
         for (int p = 0; p < inf.numParams; ++p)
         {
-            if (shownType == mixer::fornace)
-                break;   // ha la sua finestra
+            if (shownType == mixer::fornace || shownType == mixer::shaper)
+                break;   // hanno la loro finestra
             if (shownType == mixer::glitch && p > 0)
                 break;   // la griglia sostituisce i parametri 2 e 3
             if (shownType == mixer::gate && p == 0)
@@ -1149,6 +1171,7 @@ private:
     std::unique_ptr<GateGridView> gateView;
     std::unique_ptr<EqCurveView> eqView;
     std::unique_ptr<FornaceView> fornaceView;
+    std::unique_ptr<ShaperView> shaperView;
     std::unique_ptr<SidePicker> picker;
     bool forTest = false;
     juce::TextButton openFornaceButton { "Apri FORNACE" };

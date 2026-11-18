@@ -14,7 +14,14 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.87)
+## Stato attuale (v0.88)
+
+**0.88: CURVATORE** (mixer, gruppo "Sporco e lo-fi"; tipo Fruity WaveShaper). Si disegna la curva della distorsione:
+tocca per aggiungere un punto (fino a 12), trascinalo, doppio tocco per toglierlo; il pallino azzurro a meta' di ogni
+tratto lo piega (doppio tocco: di nuovo dritto). "Speculare" disegna solo la meta' destra e la ribalta a sinistra.
+Curve di partenza: Morbida, Dura, Piega, Gradini, Raddrizza, Seno, Trash, Dritta. A destra l'onda prima (grigio) e dopo
+(arancio); sulla curva una zona azzurrina mostra fin dove arriva il suono. Manopole Prima, Dopo, Mix, Tono e Qualita'
+(sovracampionamento 1x/2x/4x). La continua creata dalle curve storte viene tolta da sola.
 
 **0.87: pannello dei suoni a sinistra (PC) rifatto.** Cartelle Batteria, Suoni, Synth, Kit, I miei campioni; dentro
 Synth ogni strumento e' una cartella con i suoi preset ("Prisma > Reese Bass"). Toccando un suono lo senti e ne vedi

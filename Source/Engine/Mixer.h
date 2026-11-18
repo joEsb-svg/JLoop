@@ -36,7 +36,7 @@ namespace mixer
     // Tipi di effetto e i loro parametri
 
     enum FxType { none = 0, compressor, saturation, filter, delay, reverb, chorus, bitcrusher, sidechain, stereo, ott, glitch, trash, vowel,
-                  gate, tremolo, phaser, flanger, peq, transient, exciter, vinyl, limiter, pitch, ringmod, shimmer, blood, fet, fornace, numFxTypes };
+                  gate, tremolo, phaser, flanger, peq, transient, exciter, vinyl, limiter, pitch, ringmod, shimmer, blood, fet, fornace, shaper, numFxTypes };
 
     enum class Unit { percent, dB, ms, hz, ratio, choice, track, bits, times, semis };
 
@@ -264,6 +264,50 @@ namespace mixer
                 { "B4 Feedback", 0.0f, 0.9f, 0.0f, Unit::percent },
                 { "B4 Freq. FB", 40.0f, 5000.0f, 400.0f, Unit::hz, 400.0f },
                 { "B4 Stato", 0.0f, 2.0f, 0.0f, Unit::choice, 0.0f, "Normale|Muta|Solo" } }} },
+            { "shaper", "Curvatore", "Disegni tu la curva della distorsione (tipo WaveShaper): da morbida a piegata, a gradini, trash", 43, {{
+                { "Prima", -12.0f, 36.0f, 6.0f, Unit::dB },
+                { "Dopo", -24.0f, 12.0f, -3.0f, Unit::dB },
+                { "Mix", 0.0f, 1.0f, 1.0f, Unit::percent },
+                { "Tono", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "Qualita'", 0.0f, 2.0f, 1.0f, Unit::choice, 0.0f, "1x|2x|4x" },
+                { "Speculare", 0.0f, 1.0f, 1.0f, Unit::choice, 0.0f, "No|Si'" },
+                { "Punti", 2.0f, 12.0f, 2.0f, Unit::choice, 0.0f, "0|1|2|3|4|5|6|7|8|9|10|11|12" },
+                { "P1 X", -1.0f, 1.0f, -1.0f, Unit::percent },
+                { "P1 Y", -1.0f, 1.0f, -1.0f, Unit::percent },
+                { "P1 Curva", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P2 X", -1.0f, 1.0f, 1.0f, Unit::percent },
+                { "P2 Y", -1.0f, 1.0f, 1.0f, Unit::percent },
+                { "P2 Curva", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P3 X", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P3 Y", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P3 Curva", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P4 X", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P4 Y", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P4 Curva", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P5 X", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P5 Y", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P5 Curva", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P6 X", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P6 Y", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P6 Curva", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P7 X", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P7 Y", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P7 Curva", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P8 X", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P8 Y", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P8 Curva", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P9 X", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P9 Y", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P9 Curva", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P10 X", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P10 Y", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P10 Curva", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P11 X", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P11 Y", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P11 Curva", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P12 X", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P12 Y", -1.0f, 1.0f, 0.0f, Unit::percent },
+                { "P12 Curva", -1.0f, 1.0f, 0.0f, Unit::percent } }} },
         }};
         return infos[(size_t) juce::jlimit (0, numFxTypes - 1, type)];
     }
@@ -2325,6 +2369,141 @@ namespace mixer
         std::array<std::array<float, maxChunk>, 2> dry {};
     };
 
+    //==========================================================================
+    /** Dove stanno i parametri del Curvatore. La curva e' fatta di 2-12 punti (x, y in -1..1, ordinati per x);
+        "Curva" piega il tratto tra un punto e il successivo (-1..1, 0 = dritto). */
+    namespace shaperParam
+    {
+        enum { pre = 0, post, mix, tone, quality, mirror, count, firstPoint, maxPoints = 12 };
+        inline int px (int i)    { return firstPoint + i * 3; }
+        inline int py (int i)    { return firstPoint + i * 3 + 1; }
+        inline int bend (int i)  { return firstPoint + i * 3 + 2; }
+
+        /** Il tratto tra due punti: t 0..1 diventa 0..1 piegato verso l'alto o verso il basso. */
+        inline float bendT (float t, float b) noexcept
+        {
+            if (std::abs (b) < 1.0e-4f) return t;
+            return b > 0.0f ? std::pow (t, 1.0f + 4.0f * b) : 1.0f - std::pow (1.0f - t, 1.0f - 4.0f * b);
+        }
+
+        /** La curva letta dai parametri, in una tabella di n valori per x da -1 a 1. */
+        template <typename Get>
+        inline void buildTable (Get&& get, float* table, int n)
+        {
+            const int count = juce::jlimit (2, (int) maxPoints, (int) std::round (get (shaperParam::count)));
+            float xs[maxPoints], ys[maxPoints], bs[maxPoints];
+            for (int i = 0; i < count; ++i) { xs[i] = juce::jlimit (-1.0f, 1.0f, get (px (i))); ys[i] = juce::jlimit (-1.0f, 1.0f, get (py (i))); bs[i] = get (bend (i)); }
+            // per sicurezza: in ordine di x
+            for (int i = 1; i < count; ++i)
+                for (int j = i; j > 0 && xs[j] < xs[j - 1]; --j) { std::swap (xs[j], xs[j - 1]); std::swap (ys[j], ys[j - 1]); std::swap (bs[j], bs[j - 1]); }
+            int seg = 0;
+            for (int k = 0; k < n; ++k)
+            {
+                const float x = -1.0f + 2.0f * (float) k / (float) (n - 1);
+                if (x <= xs[0]) { table[k] = ys[0]; continue; }
+                if (x >= xs[count - 1]) { table[k] = ys[count - 1]; continue; }
+                while (seg < count - 2 && x > xs[seg + 1]) ++seg;
+                const float w = xs[seg + 1] - xs[seg];
+                const float t = w > 1.0e-6f ? (x - xs[seg]) / w : 1.0f;
+                table[k] = ys[seg] + (ys[seg + 1] - ys[seg]) * bendT (t, bs[seg]);
+            }
+        }
+    }
+
+    /** Curvatore: la distorsione con la curva disegnata (ingresso -> uscita), come un WaveShaper.
+        Guadagno prima e dopo, tono, mix e sovracampionamento. */
+    class Shaper : public Effect
+    {
+    public:
+        static constexpr int tableSize = 2049;
+        static constexpr int scopeSize = 2048;
+
+        // per il disegno (thread della UI): l'ultimo pezzo di suono in ingresso, gia' col guadagno "Prima"
+        std::array<float, scopeSize> scope {};
+        std::atomic<int> scopePos { 0 };
+        std::atomic<float> inputPeak { 0.0f };
+
+        void prepare (double sampleRate) override   { sr = sampleRate; over.prepare(); reset(); }
+        void reset() override
+        {
+            over.reset();
+            for (auto& v : dc) v = 0.0f;
+            for (auto& v : lp) v = 0.0f;
+            signature = -1.0;
+        }
+
+        void process (float* L, float* R, int n, const float* p, const Context&) override
+        {
+            for (int start = 0; start < n; start += maxChunk)
+                processChunk (L + start, R + start, juce::jmin (maxChunk, n - start), p);
+        }
+
+    private:
+        static constexpr int maxChunk = 2048;
+
+        void processChunk (float* L, float* R, int n, const float* p)
+        {
+            using namespace shaperParam;
+            // la tabella si rifa' solo quando la curva cambia
+            double sig = 0.0;
+            for (int i = count; i < firstPoint + maxPoints * 3; ++i) sig = sig * 1.000003 + (double) p[i] * (double) (i + 1);
+            if (sig != signature)
+            {
+                signature = sig;
+                buildTable ([p] (int i) { return p[i]; }, table.data(), tableSize);
+            }
+            std::copy (L, L + n, dry[0].begin()); std::copy (R, R + n, dry[1].begin());
+
+            const float g = juce::Decibels::decibelsToGain (p[pre]);
+            float pk = 0.0f;
+            int sp = scopePos.load (std::memory_order_relaxed);
+            for (int i = 0; i < n; ++i)
+            {
+                L[i] *= g; R[i] *= g;
+                const float m = 0.5f * (L[i] + R[i]);
+                scope[(size_t) sp] = m; sp = (sp + 1) & (scopeSize - 1);
+                pk = juce::jmax (pk, std::abs (L[i]), std::abs (R[i]));
+            }
+            scopePos.store (sp, std::memory_order_relaxed);
+            if (pk > inputPeak.load (std::memory_order_relaxed)) inputPeak.store (pk, std::memory_order_relaxed);
+
+            const float* tab = table.data();
+            over.run ((int) std::round (p[quality]), L, R, n, [tab] (float* l, float* r, int m, int)
+            {
+                auto shape = [tab] (float x) noexcept
+                {
+                    const float pos = (juce::jlimit (-1.0f, 1.0f, x) + 1.0f) * 0.5f * (float) (tableSize - 1);
+                    const int i0 = juce::jmin ((int) pos, tableSize - 2);
+                    const float f = pos - (float) i0;
+                    return tab[i0] + (tab[i0 + 1] - tab[i0]) * f;
+                };
+                for (int i = 0; i < m; ++i) { l[i] = shape (l[i]); r[i] = shape (r[i]); }
+            });
+
+            const float t = juce::jlimit (-1.0f, 1.0f, p[tone]) * 0.85f;
+            const float aLp = 1.0f - std::exp (-juce::MathConstants<float>::twoPi * 800.0f / (float) sr);
+            const float aDc = 1.0f - std::exp (-juce::MathConstants<float>::twoPi * 10.0f / (float) sr);
+            const float out = juce::Decibels::decibelsToGain (p[post]), wet = p[mix];
+            for (int i = 0; i < n; ++i)
+                for (int ch = 0; ch < 2; ++ch)
+                {
+                    float& x = ch == 0 ? L[i] : R[i];
+                    float v = x;
+                    dc[ch] += aDc * (v - dc[ch]); v -= dc[ch];                 // via la continua (curve non simmetriche)
+                    lp[ch] += aLp * (v - lp[ch]);
+                    v = lp[ch] * (1.0f - t) + (v - lp[ch]) * (1.0f + t);       // tono: scuro <-> chiaro
+                    const float d = dry[(size_t) ch][(size_t) i];
+                    x = d + wet * (v * out - d);
+                }
+        }
+
+        double sr = 48000.0, signature = -1.0;
+        OverSampler over;
+        std::array<float, tableSize> table {};
+        float dc[2] {}, lp[2] {};
+        std::array<std::array<float, maxChunk>, 2> dry {};
+    };
+
     inline std::unique_ptr<Effect> createEffect (int type)
     {
         switch (type)
@@ -2357,6 +2536,7 @@ namespace mixer
             case blood:      return std::make_unique<Blood>();
             case fet:        return std::make_unique<Fet>();
             case fornace:    return std::make_unique<Fornace>();
+            case shaper:     return std::make_unique<Shaper>();
             default:         return nullptr;
         }
     }

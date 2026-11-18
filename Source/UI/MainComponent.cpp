@@ -2955,6 +2955,17 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
     if (const int i = args.indexOf ("--main-menu"); i >= 0)   // test: il menu principale aperto su una sezione (0..4)
         openMainMenu (args[i + 1].getIntValue());
 
+    if (const int i = args.indexOf ("--shaper"); i >= 0)   // test: finestra del Curvatore (curva di partenza)
+    {
+        auto& fxView = mixerPanel.getEffectsView();
+        fxView.openShaper();
+        if (auto* sv = fxView.getShaperView())
+        {
+            if (args[i + 1].containsOnly ("0123456789") && args[i + 1].isNotEmpty()) sv->applyPreset (args[i + 1].getIntValue());
+            sv->showTestSignal (0.85f);
+        }
+    }
+
     if (const int i = args.indexOf ("--fornace"); i >= 0)   // test: finestra di FORNACE (banda, preset)
     {
         auto& fxView = mixerPanel.getEffectsView();
