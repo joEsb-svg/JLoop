@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <JUCERPROJECT name="AudioNaut" projectType="guiapp" bundleIdentifier="com.joesb.dawfl"
-              version="0.90.0" companyName="joEsb" id="DwFl01" useAppConfig="0"
+              version="0.91.0" companyName="joEsb" id="DwFl01" useAppConfig="0"
               addUsingNamespaceToJuceHeader="0" cppLanguageStandard="20" defines="JucePlugin_Name=&quot;BassForge&quot;&#10;JUCE_STRICT_REFCOUNTEDPOINTER=1"
               jucerFormatVersion="1">
   <MAINGROUP id="Mg0001" name="AudioNaut">
@@ -863,6 +863,33 @@
         <FILE id="Lb0736" name="x_k_electrofunk_cym.ogg" compile="0" resource="1" file="Resources/Library/x_k_electrofunk_cym.ogg"/>
         <FILE id="Lb0737" name="x_k_electrofunk_perc1.ogg" compile="0" resource="1" file="Resources/Library/x_k_electrofunk_perc1.ogg"/>
         <FILE id="Lb0738" name="x_k_electrofunk_perc2.ogg" compile="0" resource="1" file="Resources/Library/x_k_electrofunk_perc2.ogg"/>
+        <FILE id="Lb0739" name="x_k_electrotrash_kick.ogg" compile="0" resource="1" file="Resources/Library/x_k_electrotrash_kick.ogg"/>
+        <FILE id="Lb0740" name="x_k_electrotrash_snare.ogg" compile="0" resource="1" file="Resources/Library/x_k_electrotrash_snare.ogg"/>
+        <FILE id="Lb0741" name="x_k_electrotrash_clap.ogg" compile="0" resource="1" file="Resources/Library/x_k_electrotrash_clap.ogg"/>
+        <FILE id="Lb0742" name="x_k_electrotrash_hat.ogg" compile="0" resource="1" file="Resources/Library/x_k_electrotrash_hat.ogg"/>
+        <FILE id="Lb0743" name="x_k_electrotrash_ohat.ogg" compile="0" resource="1" file="Resources/Library/x_k_electrotrash_ohat.ogg"/>
+        <FILE id="Lb0744" name="x_k_electrotrash_tom.ogg" compile="0" resource="1" file="Resources/Library/x_k_electrotrash_tom.ogg"/>
+        <FILE id="Lb0745" name="x_k_electrotrash_cym.ogg" compile="0" resource="1" file="Resources/Library/x_k_electrotrash_cym.ogg"/>
+        <FILE id="Lb0746" name="x_k_electrotrash_perc1.ogg" compile="0" resource="1" file="Resources/Library/x_k_electrotrash_perc1.ogg"/>
+        <FILE id="Lb0747" name="x_k_electrotrash_perc2.ogg" compile="0" resource="1" file="Resources/Library/x_k_electrotrash_perc2.ogg"/>
+        <FILE id="Lb0748" name="x_k_fidget_kick.ogg" compile="0" resource="1" file="Resources/Library/x_k_fidget_kick.ogg"/>
+        <FILE id="Lb0749" name="x_k_fidget_snare.ogg" compile="0" resource="1" file="Resources/Library/x_k_fidget_snare.ogg"/>
+        <FILE id="Lb0750" name="x_k_fidget_clap.ogg" compile="0" resource="1" file="Resources/Library/x_k_fidget_clap.ogg"/>
+        <FILE id="Lb0751" name="x_k_fidget_hat.ogg" compile="0" resource="1" file="Resources/Library/x_k_fidget_hat.ogg"/>
+        <FILE id="Lb0752" name="x_k_fidget_ohat.ogg" compile="0" resource="1" file="Resources/Library/x_k_fidget_ohat.ogg"/>
+        <FILE id="Lb0753" name="x_k_fidget_tom.ogg" compile="0" resource="1" file="Resources/Library/x_k_fidget_tom.ogg"/>
+        <FILE id="Lb0754" name="x_k_fidget_cym.ogg" compile="0" resource="1" file="Resources/Library/x_k_fidget_cym.ogg"/>
+        <FILE id="Lb0755" name="x_k_fidget_perc1.ogg" compile="0" resource="1" file="Resources/Library/x_k_fidget_perc1.ogg"/>
+        <FILE id="Lb0756" name="x_k_fidget_perc2.ogg" compile="0" resource="1" file="Resources/Library/x_k_fidget_perc2.ogg"/>
+        <FILE id="Lb0757" name="x_k_complextro_kick.ogg" compile="0" resource="1" file="Resources/Library/x_k_complextro_kick.ogg"/>
+        <FILE id="Lb0758" name="x_k_complextro_snare.ogg" compile="0" resource="1" file="Resources/Library/x_k_complextro_snare.ogg"/>
+        <FILE id="Lb0759" name="x_k_complextro_clap.ogg" compile="0" resource="1" file="Resources/Library/x_k_complextro_clap.ogg"/>
+        <FILE id="Lb0760" name="x_k_complextro_hat.ogg" compile="0" resource="1" file="Resources/Library/x_k_complextro_hat.ogg"/>
+        <FILE id="Lb0761" name="x_k_complextro_ohat.ogg" compile="0" resource="1" file="Resources/Library/x_k_complextro_ohat.ogg"/>
+        <FILE id="Lb0762" name="x_k_complextro_tom.ogg" compile="0" resource="1" file="Resources/Library/x_k_complextro_tom.ogg"/>
+        <FILE id="Lb0763" name="x_k_complextro_cym.ogg" compile="0" resource="1" file="Resources/Library/x_k_complextro_cym.ogg"/>
+        <FILE id="Lb0764" name="x_k_complextro_perc1.ogg" compile="0" resource="1" file="Resources/Library/x_k_complextro_perc1.ogg"/>
+        <FILE id="Lb0765" name="x_k_complextro_perc2.ogg" compile="0" resource="1" file="Resources/Library/x_k_complextro_perc2.ogg"/>
       </GROUP>
       <FILE id="IcOn01" name="icon.png" compile="0" resource="0" file="Resources/icon.png"/>
       <FILE id="SpLsh3" name="splash_front.png" compile="0" resource="1" file="Resources/splash_front.png"/>
@@ -983,7 +1010,7 @@
   </MAINGROUP>
   <EXPORTFORMATS>
     <ANDROIDSTUDIO targetFolder="Builds/Android" androidActivitySubClassName="com.joesb.dawfl.JLoopActivity" androidAdditionalJavaFolders="Source/Android/java" androidManifestCustomXmlElements="&lt;manifest&gt;&#10;  &lt;application&gt;&#10;    &lt;activity&gt;&#10;      &lt;intent-filter&gt;&#10;        &lt;action android:name=&quot;android.intent.action.MAIN&quot;/&gt;&#10;        &lt;category android:name=&quot;android.intent.category.LAUNCHER&quot;/&gt;&#10;      &lt;/intent-filter&gt;&#10;      &lt;intent-filter&gt;&#10;        &lt;action android:name=&quot;android.intent.action.VIEW&quot;/&gt;&#10;        &lt;category android:name=&quot;android.intent.category.DEFAULT&quot;/&gt;&#10;        &lt;category android:name=&quot;android.intent.category.BROWSABLE&quot;/&gt;&#10;        &lt;data android:scheme=&quot;content&quot;/&gt;&#10;        &lt;data android:scheme=&quot;file&quot;/&gt;&#10;        &lt;data android:mimeType=&quot;application/octet-stream&quot;/&gt;&#10;        &lt;data android:mimeType=&quot;application/zip&quot;/&gt;&#10;        &lt;data android:mimeType=&quot;application/x-zip-compressed&quot;/&gt;&#10;        &lt;data android:mimeType=&quot;application/x-jloop&quot;/&gt;&#10;      &lt;/intent-filter&gt;&#10;      &lt;intent-filter&gt;&#10;        &lt;action android:name=&quot;android.intent.action.VIEW&quot;/&gt;&#10;        &lt;category android:name=&quot;android.intent.category.DEFAULT&quot;/&gt;&#10;        &lt;category android:name=&quot;android.intent.category.BROWSABLE&quot;/&gt;&#10;        &lt;data android:scheme=&quot;content&quot;/&gt;&#10;        &lt;data android:scheme=&quot;file&quot;/&gt;&#10;        &lt;data android:host=&quot;*&quot;/&gt;&#10;        &lt;data android:mimeType=&quot;*/*&quot;/&gt;&#10;        &lt;data android:pathPattern=&quot;.*\\.jloop&quot;/&gt;&#10;        &lt;data android:pathPattern=&quot;.*\\..*\\.jloop&quot;/&gt;&#10;        &lt;data android:pathPattern=&quot;.*\\..*\\..*\\.jloop&quot;/&gt;&#10;      &lt;/intent-filter&gt;&#10;    &lt;/activity&gt;&#10;  &lt;/application&gt;&#10;&lt;/manifest&gt;" microphonePermissionNeeded="1" androidEnableContentSharing="1" androidBluetoothScanNeeded="1" androidBluetoothConnectNeeded="1" smallIcon="IcOn01" bigIcon="IcOn01"
-                   androidVersionCode="101" androidMinimumSDK="24" androidScreenOrientation="landscape"
+                   androidVersionCode="102" androidMinimumSDK="24" androidScreenOrientation="landscape"
                    androidInternetNeeded="0" androidExternalWriteNeeded="0" androidPushNotifications="0"
                    androidReadMediaAudioPermission="0" androidReadMediaImagesPermission="0"
                    androidReadMediaVideoPermission="0">

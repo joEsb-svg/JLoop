@@ -236,6 +236,22 @@ KITS = [
     ("electrofunk", "Electro Funk", "retro", dict(kick=dict(d=0.6, f0=170, f1=48, btau=0.25, dist=1.6, sub=0.4, tail_tau=0.3), snare=dict(tone=230, crack=0.9, room=0.1),
         hat=dict(pitch=1.0, metal=0.9, noise_amt=0.2), perc1=("cowbell", 1.0, 1.0, 1.0), perc2=("clave", 1.0, 1.0, 1.0)),
         [("x_bass_square", "Basso"), ("x_vox_robot_yeah", "Robot"), ("x_fx_laser", "Laser"), ("x_stab_brass", "Brass")]),
+    # --- Pacchetto Electro Trash (0.91): sempre in fondo, cosi' i kit di prima non cambiano
+    ("electrotrash", "Electro Trash", "house", dict(kick=dict(d=0.38, f0=240, f1=50, btau=0.13, clk=1.1, dist=5.5, tok=0.45),
+        snare=dict(d=0.32, tone=210, crack=1.3, dist=5.0, room=0.05, clap_layer=0.55), clap=dict(bursts=4, spacing=0.008, tail=0.09, room=0.06),
+        hat=dict(tau=0.018, noise_amt=0.9, metal=0.3, dist=4.0), ohat=dict(tau=0.12, noise_amt=0.9, metal=0.3, dist=3.5),
+        tom=dict(f0=300, f1=120, tau=0.12, dist=3.5), perc1=("noise", 0.8, 0.9, 3.0), perc2=("zap", 1.0, 0.8, 2.5)),
+        [("x_crash_dist", "Crash dist."), ("x_vox_hey_shout", "Hey!"), ("x_fx_zap", "Zap"), ("x_bass_square", "Basso")]),
+    ("fidget", "Fidget House", "house", dict(kick=dict(d=0.3, f0=230, f1=55, btau=0.10, clk=0.9, dist=2.6, tok=0.3),
+        snare=dict(d=0.25, tone=260, crack=1.2, dist=2.0, room=0.04), clap=dict(bursts=5, spacing=0.012, tail=0.07, lo=1400, hi=4200, room=0.05),
+        hat=dict(tau=0.014, pitch=1.6, metal=0.9, noise_amt=0.3), ohat=dict(tau=0.09, pitch=1.5, metal=0.9),
+        perc1=("fm", 1.3, 0.7, 1.5), perc2=("cowbell", 1.2, 0.6, 1.5)),
+        [("x_clap_fidget", "Clap 2"), ("x_hat_fidget", "Hi-hat 2"), ("x_vox_yo", "Yo"), ("x_fx_laser", "Laser")]),
+    ("complextro", "Complextro", "house", dict(kick=dict(d=0.42, f0=250, f1=50, btau=0.14, clk=0.9, dist=3.2, tok=0.35, sub=0.25),
+        snare=dict(d=0.5, tone=200, crack=1.4, dist=2.8, room=0.3, clap_layer=0.5, ntau=0.14), clap=dict(room=0.3, tail=0.15),
+        hat=dict(tau=0.02, pitch=1.3, metal=0.7, noise_amt=0.5, dist=1.6), ohat=dict(tau=0.18, pitch=1.3, metal=0.7),
+        cym=dict(d=1.8, tau=0.6), perc1=("metal", 1.0, 0.8, 2.0), perc2=("zap", 0.7, 1.2, 1.5)),
+        [("x_bass_growl", "Growl"), ("x_fx_impact", "Impatto"), ("x_vox_go", "Go!"), ("x_fx_riser_tone", "Riser")]),
 ]
 
 PIECES = [  # (pezzo, famiglia di polish, categoria, nome)

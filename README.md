@@ -14,7 +14,18 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.90)
+## Stato attuale (v0.91)
+
+**0.91: Pacchetto Electro Trash.**
+- Tre kit nuovi (in DrumForge e tra i suoni della batteria): **Electro Trash** (cassa e rullante saturati, hi-hat
+  sporchi, colpi di rumore e zap), **Fidget House** (cassa corta, clap a raffica, hi-hat metallici, cowbell FM) e
+  **Complextro** (rullante grosso con stanza, piatto lungo, zap, impatti e riser).
+- Quattro preset di French Roulette, dalle ricette pubblicate dei classici: **Trash Flat Beat** (quadra un'ottava
+  sotto, passa basso stretto con risonanza mosso da un triangolo a 1/2), **Trash Light Bass** (impulso, filtro con
+  inviluppo veloce, clip duro), **Trash Banger Stab** (accordi di dente di sega sporchi e pompati), **Trash Bitcrush
+  Saw** (dente di sega + quadra all'ottava, pochi bit, clip duro). Volumi allineati agli altri preset.
+- Il generatore dei suoni (tools/soundgen) ora aggiorna AudioNaut.jucer.
+
 
 **0.90: SEGUI-VOLUME e NOTE SCIVOLO.**
 - **Segui-volume** (mixer, gruppo "Dinamica"; tipo Peak Controller). Ascolta il volume di una traccia (questa o un'altra:

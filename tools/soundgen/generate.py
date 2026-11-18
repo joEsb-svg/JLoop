@@ -2,7 +2,7 @@
 Genera la libreria suoni di JLoop:
   - Resources/Library/<id>.ogg            (mono, 44.1 kHz, Ogg Vorbis q6)
   - Source/Engine/LibraryIndex.h          (elenco per il codice C++)
-  - aggiorna il gruppo "Library" in JLoop.jucer (i file diventano BinaryData)
+  - aggiorna il gruppo "Library" in AudioNaut.jucer (i file diventano BinaryData)
 
 Uso:  python3 tools/soundgen/generate.py [id ...]     (senza id: tutti)
 """
@@ -199,7 +199,7 @@ def write_index():
 
 
 def update_jucer():
-    path = os.path.join(ROOT, "JLoop.jucer")
+    path = os.path.join(ROOT, "AudioNaut.jucer")
     text = open(path).read()
     start_tag = '<GROUP id="{LIBRARY-0000-0000-0000-000000000001}" name="Library">'
     files = "".join(

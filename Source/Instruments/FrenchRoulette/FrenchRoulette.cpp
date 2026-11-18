@@ -906,6 +906,38 @@ namespace fr
                                    { "tube", 0.4f }, { "clipDrive", 0.2f },
                                    { "pump", 0.5f },
                                    { "mode", 2 }, { "chorus", 0.3f }, { "dlyMix", 0.15f }, { "dlyTime", 2 }, { "revMix", 0.25f }, { "master", -2.6f } } },
+
+            // ---------------- ELECTRO TRASH (0.91; ricette da patch pubblicate dei classici 2007-2010)
+            // Quadra un'ottava sotto, passa basso 24 dB stretto con risonanza, triangolo a 1/2 sul filtro (stile "Flat Beat")
+            { "Trash Flat Beat", { { "o1Wave", 1 }, { "o1Oct", 1 }, { "o1Drift", 0.1f }, { "o1Level", 1.0f },
+                                   { "subLevel", 0.45f },
+                                   { "fType", 0 }, { "cutoff", 130 }, { "reso", 0.42f }, { "fEnv", 0.0f }, { "fKey", 1.0f },
+                                   { "aA", 0.0005f }, { "aS", 1.0f }, { "aR", 0.016f },
+                                   { "lfoShape", 1 }, { "lfoDiv", 1 }, { "lfoCut", 0.79f },
+                                   { "tube", 0.35f }, { "clipMode", 0 }, { "clipDrive", 0.3f }, { "rate", 0.0f },
+                                   { "mode", 0 }, { "master", 6.0f } } },
+            // Impulso medio un'ottava sotto, filtro sporco con inviluppo veloce, clip duro forte (stile "Let There Be Light")
+            { "Trash Light Bass", { { "o1Wave", 2 }, { "o1Pw", 0.3f }, { "o1Oct", 1 }, { "o1Level", 0.9f },
+                                    { "subLevel", 0.3f },
+                                    { "fType", 0 }, { "cutoff", 260 }, { "reso", 0.5f }, { "fEnv", 0.5f }, { "fA", 0.0005f }, { "fD", 0.152f }, { "fS", 0.16f }, { "fR", 0.09f }, { "fKey", 0.5f },
+                                    { "aA", 0.0005f }, { "aD", 0.363f }, { "aS", 0.82f }, { "aR", 0.032f },
+                                    { "tube", 0.5f }, { "clipMode", 1 }, { "clipDrive", 0.76f }, { "rate", 0.0f },
+                                    { "chorus", 0.07f }, { "mode", 0 }, { "master", -3.0f } } },
+            // Accordi di dente di sega sporchi e corti, pompati: lo "stab" da club francese
+            { "Trash Banger Stab", { { "o1Wave", 0 }, { "o1Oct", 2 }, { "o1Drift", 0.35f }, { "o1Level", 0.85f },
+                                     { "o2Table", 2 }, { "o2Wave", 0.2f }, { "o2Level", 0.55f }, { "o2Fine", -9 },
+                                     { "fType", 0 }, { "cutoff", 1500 }, { "reso", 0.35f }, { "fEnv", 0.6f }, { "fD", 0.15f }, { "fKey", 0.3f },
+                                     { "aA", 0.001f }, { "aD", 0.25f }, { "aS", 0.3f }, { "aR", 0.08f },
+                                     { "tube", 0.4f }, { "crunch", 0.2f }, { "bits", 8 }, { "rate", 0.0f }, { "clipMode", 1 }, { "clipDrive", 0.6f },
+                                     { "pump", 0.5f }, { "mode", 2 }, { "master", -1.5f } } },
+            // Dente di sega + quadra all'ottava, ridotto a pochi bit e tagliato duro: il basso "rotto" dell'electro trash
+            { "Trash Bitcrush Saw", { { "o1Wave", 0 }, { "o1Oct", 1 }, { "o1Drift", 0.2f }, { "o1Level", 0.85f },
+                                      { "o2Table", 5 }, { "o2Wave", 0.6f }, { "o2Level", 0.6f }, { "o2Semi", 12 },
+                                      { "subLevel", 0.45f }, { "subDrive", 0.3f },
+                                      { "fType", 0 }, { "cutoff", 1800 }, { "reso", 0.3f }, { "fEnv", 0.3f }, { "fD", 0.2f }, { "fS", 0.5f }, { "fKey", 0.4f },
+                                      { "aA", 0.001f }, { "aS", 1.0f }, { "aR", 0.04f },
+                                      { "tube", 0.5f }, { "crunch", 0.45f }, { "bits", 6 }, { "rate", 0.2f }, { "clipMode", 1 }, { "clipDrive", 0.8f },
+                                      { "mode", 1 }, { "glide", 0.02f }, { "master", -1.5f } } },
         };
         return list;
     }
