@@ -5,6 +5,7 @@
 #include <atomic>
 #include <vector>
 #include "../Common/ForgeFx.h"
+#include "../../Engine/SlideInput.h"
 
 //==============================================================================
 /**
@@ -50,7 +51,7 @@ namespace ms
         int getNote() const                 { return note; }
         float getPitch() const              { return pitch; }
         uint32_t age = 0;
-        void render (float* L, float* R, int n, const BlockParams& p, float glideCoef, int unisonLimit);
+        void render (float* L, float* R, int n, const BlockParams& p, float glideCoef, int unisonLimit, float slide);
 
     private:
         double sr = 48000.0;
@@ -72,6 +73,8 @@ namespace ms
         void allNotesOff();
         void killAll();
         void render (juce::AudioBuffer<float>& buffer, int start, int n, const BlockParams& p, double bpm);
+        float slideA = 0.0f, slideB = 0.0f;   // note scivolo: semitoni all'inizio e alla fine del blocco
+        int slideLen = 1;
 
     private:
         Voice* findVoice();
@@ -104,7 +107,7 @@ namespace ms
 }
 
 //==============================================================================
-class MegaSawAudioProcessor : public juce::AudioProcessor
+class MegaSawAudioProcessor : public juce::AudioProcessor, public SlideInput
 {
 public:
     MegaSawAudioProcessor();

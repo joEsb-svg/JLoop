@@ -5,6 +5,7 @@
 #include <atomic>
 #include <vector>
 #include "../../Engine/SampleStore.h"
+#include "../../Engine/SlideInput.h"
 
 //==============================================================================
 /**
@@ -51,6 +52,7 @@ namespace slicer
 
 //==============================================================================
 class SlicerAudioProcessor : public juce::AudioProcessor,
+                             public SlideInput,
                              private juce::AudioProcessorValueTreeState::Listener,
                              private juce::AsyncUpdater
 {

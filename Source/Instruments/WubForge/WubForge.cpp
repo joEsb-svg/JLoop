@@ -201,7 +201,8 @@ namespace wf
             if (! gate && env < 1.0e-5f) { env = 0.0f; continue; }
 
             pitch = glideCoef > 0.0f ? target + (pitch - target) * glideCoef : target;
-            const float semis = pitch + (float) (p.octave * 12) + p.amtPitch * depth * lfo;
+            const float slide = slideA + (slideB - slideA) * (float) (slideOffset + pos) / (float) slideLen;
+            const float semis = pitch + slide + (float) (p.octave * 12) + p.amtPitch * depth * lfo;
             const float f = mtof (semis);
             float inc[3];
             for (int u = 0; u < 3; ++u)
@@ -461,11 +462,14 @@ void WubForgeAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
         }
     const auto b = readParams();
     const double sr = getSampleRate() > 0.0 ? getSampleRate() : 48000.0;
+    beginSlideBlock (buffer.getNumSamples(), sr);
+    synth.slideA = slideStart; synth.slideB = slideNow; synth.slideLen = slideLen;
     auto* L = buffer.getWritePointer (0);
     auto* R = buffer.getNumChannels() > 1 ? buffer.getWritePointer (1) : L;
     auto renderTo = [&] (int from, int to)
     {
         if (to <= from) return;
+        synth.slideOffset = from;
         synth.render (L + from, R + from, to - from, b, bpm, ppq >= 0.0 ? ppq + bpm / 60.0 * from / sr : -1.0, *this);
     };
     int done = 0;

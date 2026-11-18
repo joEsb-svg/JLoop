@@ -25,6 +25,14 @@ namespace bf
     // 12 connessioni) valutata a SUB-FRAME di 16 campioni; pitch, wavetable position e livelli degli osc e
     // l'ampiezza sono applicati con RAMPE LINEARI per-campione (sample-accurate, nessuno zipper/jitter).
     // renderNextBlock() non alloca: tutto lo stato e' pre-allocato in prepare()/costruttore.
+    /** Note scivolo del piano roll di AudioNaut: semitoni a inizio e fine del blocco host (scritti dal processor). */
+    struct SlideShared
+    {
+        float a = 0.f, b = 0.f;
+        int len = 1;
+        float at(int s) const noexcept { return a + (b - a) * (float) s / (float) len; }
+    };
+
     class BassVoice : public juce::SynthesiserVoice
     {
     public:
@@ -43,6 +51,8 @@ namespace bf
         void setSharedMidi(const SharedMidiState* s) noexcept { shared = s; }
         /** Opzionale: pubblica la modulazione corrente verso la GUI (anelli di modulazione). */
         void setModMonitor(ModMonitor* m) noexcept { monitor = m; }
+        /** Note scivolo (possedute dal processor). nullptr = niente. */
+        void setSlideSource(const SlideShared* s) noexcept { slide = s; }
 
         bool canPlaySound(juce::SynthesiserSound* s) override { return dynamic_cast<SynthSound*>(s) != nullptr; }
         void startNote(int midiNote, float velocity, juce::SynthesiserSound*, int pitchWheel) override;
@@ -89,5 +99,7 @@ namespace bf
         int   currentNote = -1;
         float velocity = 0.f;
         float prevBendSemis = 0.f;       // pitch bend a fine sub-frame precedente (per la rampa di pitch)
+        const SlideShared* slide = nullptr;
+        float slideFrom = 0.f, slideTo = 0.f;   // note scivolo all'inizio e alla fine del sub-frame
     };
 }

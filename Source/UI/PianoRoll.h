@@ -221,9 +221,15 @@ public:
 
         // Note
         const auto colour = juce::Colour (engine.getChannel (channel).colour.load());
-        for (auto& n : engine.getNotes (channel))
+        const auto allNotes = engine.getNotes (channel);
+        for (auto& n : allNotes)
         {
             auto r = noteBounds (n);
+            if (n.slide)
+            {
+                paintSlideNote (g, n, allNotes, (dragIndex >= 0 && n == dragNote) || isSelected (n));
+                continue;
+            }
             if (! r.intersects (grid.toFloat()))
                 continue;
 
@@ -275,6 +281,58 @@ public:
         clampScroll();
     }
 
+    /** Una nota scivolo: bordo arancione, triangolo verso dove va, e la curva tratteggiata dalla nota che fa scivolare. */
+    void paintSlideNote (juce::Graphics& g, const SequencerEngine::NoteData& n, const std::vector<SequencerEngine::NoteData>& all, bool selected)
+    {
+        const auto r = noteBounds (n);
+        // la nota che sta suonando quando parte lo scivolo (l'ultima normale partita prima)
+        const SequencerEngine::NoteData* base = nullptr;
+        for (auto& o : all)
+            if (! o.slide && o.start <= n.start && (base == nullptr || o.start > base->start))
+                base = &o;
+        // da che altezza si parte: l'ultimo scivolo prima di questo, altrimenti la nota base
+        int fromPitch = base != nullptr ? base->pitch : n.pitch;
+        int lastSlideStart = -1;
+        for (auto& o : all)
+            if (o.slide && &o != &n && base != nullptr && o.start >= base->start && o.start < n.start && o.start > lastSlideStart)
+                { lastSlideStart = o.start; fromPitch = o.pitch; }
+        const bool up = n.pitch >= fromPitch;
+
+        if (base != nullptr)
+        {
+            juce::Path curve;
+            const float x0 = xForTick (n.start), x1 = xForTick (n.start + n.length);
+            const float y0 = yForPitch (fromPitch) + rowHeight * 0.5f, y1 = r.getCentreY();
+            curve.startNewSubPath (x0, y0);
+            curve.cubicTo (x0 + (x1 - x0) * 0.5f, y0, x0 + (x1 - x0) * 0.5f, y1, x1, y1);
+            juce::Path dashed;
+            const float dashes[] { 4.0f, 4.0f };
+            juce::PathStrokeType (1.6f).createDashedStroke (dashed, curve, dashes, 2);
+            g.setColour (Theme::accent.withAlpha (0.85f));
+            g.fillPath (dashed);
+        }
+        const float radius = juce::jmin (5.0f, r.getHeight() * 0.35f);
+        g.setColour (Theme::bg.withAlpha (0.85f));
+        g.fillRoundedRectangle (r, radius);
+        g.setColour (selected ? juce::Colours::white : Theme::accent);
+        g.drawRoundedRectangle (r.reduced (0.75f), radius, selected ? 2.0f : 1.6f);
+        // triangolo su o giu'
+        const float th = juce::jmin (r.getHeight() - 4.0f, 9.0f), tw = th * 1.2f;
+        if (th >= 4.0f && r.getWidth() > tw + 6.0f)
+        {
+            const float tx = r.getX() + 4.0f, ty = r.getCentreY();
+            juce::Path tri;
+            if (up) tri.addTriangle (tx, ty + th * 0.5f, tx + tw, ty + th * 0.5f, tx + tw * 0.5f, ty - th * 0.5f);
+            else    tri.addTriangle (tx, ty - th * 0.5f, tx + tw, ty - th * 0.5f, tx + tw * 0.5f, ty + th * 0.5f);
+            g.setColour (Theme::accent);
+            g.fillPath (tri);
+        }
+        // maniglia per allungare
+        auto handle = r;
+        g.setColour (Theme::accent.withAlpha (0.5f));
+        g.fillRoundedRectangle (handle.removeFromRight (juce::jmin (5.0f, r.getWidth() * 0.25f)).reduced (1.5f, 3.0f), 1.0f);
+    }
+
     //==============================================================================
     // Selezione e strumenti (agiscono sulle note selezionate, o su tutte se non ce ne sono)
 
@@ -297,9 +355,12 @@ public:
     void setGhostNotes (bool on)    { ghostNotes = on; repaint(); }
     bool getGhostNotes() const      { return ghostNotes; }
 
-    void setSelectMode (bool on)    { selectMode = on; if (! on) selection.clear(); repaint(); }
+    void setSelectMode (bool on)    { selectMode = on; if (on) slideMode = false; if (! on) selection.clear(); repaint(); }
 
-    void setChordMode (bool on)     { chordMode = on; if (on) setSelectMode (false); }
+    void setChordMode (bool on)     { chordMode = on; if (on) { setSelectMode (false); slideMode = false; } }
+    /** Note scivolo: i tocchi sul vuoto disegnano note che non suonano ma fanno scivolare quella che sta suonando. */
+    void setSlideMode (bool on)     { slideMode = on; if (on) { chordMode = false; setSelectMode (false); } repaint(); }
+    bool isSlideMode() const        { return slideMode; }
     bool isChordMode() const        { return chordMode; }
     void setChordType (int t)       { chordType = t; }
     int getChordType() const        { return chordType; }
@@ -610,8 +671,9 @@ public:
                 n.length = juce::jmin (lastLength, lengthTicks() - tick);
                 n.pitch = juce::jlimit (lowestNote, highestNote, (int) pitchAtY (e.position.y));
                 n.velocity = SequencerEngine::defaultVelocity;
+                n.slide = slideMode;
 
-                if (chordMode)
+                if (chordMode && ! slideMode)
                 {
                     // Un tocco = un accordo intero, costruito sulla scala
                     for (int p : theory::chordAt (n.pitch, engine.getScaleRoot(), engine.getScaleType(), chordType))
@@ -802,7 +864,7 @@ private:
 
     DragMode dragMode = DragMode::none;
     int dragIndex = -1;
-    bool moved = false, selectMode = false, chordMode = false;
+    bool moved = false, selectMode = false, chordMode = false, slideMode = false;
     int chordType = theory::triad;
     juce::Point<float> downPos, lastPos;
     std::vector<SequencerEngine::NoteData> selection, originalSelection, originalNotes;
@@ -1084,6 +1146,8 @@ public:
         voicingButton = addTool ("Note: insieme", [this] { showVoicingMenu(); }, 150);
         chordButton = addTool ("Accordi", [this] { grid.setChordMode (! grid.isChordMode()); }, 72);
         chordButton->setClickingTogglesState (true);
+        slideButton = addTool (juce::String (juce::CharPointer_UTF8 ("\xe2\x86\x98 Scivolo")), [this] { grid.setSlideMode (! grid.isSlideMode()); }, 86);
+        slideButton->setClickingTogglesState (true);
         chordTypeButton = addTool ("Triade", [this] { grid.setChordType ((grid.getChordType() + 1) % theory::numChordTypes); }, 76);
         addTool ("Progressioni", [this] { showProgressionPanel(); }, 100);
         ghostButton = addTool ("Fantasmi", [this] { grid.setGhostNotes (! grid.getGhostNotes()); }, 80);
@@ -1185,6 +1249,7 @@ public:
     void updateTools()
     {
         chordButton->setToggleState (grid.isChordMode(), juce::dontSendNotification);
+        slideButton->setToggleState (grid.isSlideMode(), juce::dontSendNotification);
         ghostButton->setToggleState (grid.getGhostNotes(), juce::dontSendNotification);
         laneButton->setToggleState (laneShown(), juce::dontSendNotification);
         chordTypeButton->setButtonText (theory::chordTypeName (grid.getChordType()));
@@ -1335,6 +1400,7 @@ private:
     juce::Component toolStrip;
     juce::OwnedArray<juce::TextButton> tools;
     juce::TextButton* voicingButton = nullptr;
+    juce::TextButton* slideButton = nullptr;
     juce::TextButton* selectButton = nullptr, *scaleButton = nullptr, *chordButton = nullptr, *chordTypeButton = nullptr, *ghostButton = nullptr, *laneButton = nullptr;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PianoRoll)

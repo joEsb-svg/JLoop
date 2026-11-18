@@ -5,6 +5,7 @@
 #include <atomic>
 #include <vector>
 #include "../Common/ForgeFx.h"
+#include "../../Engine/SlideInput.h"
 
 //==============================================================================
 /**
@@ -132,6 +133,8 @@ namespace fr
         void allNotesOff();
         void killAll();
         void render (juce::AudioBuffer<float>& buffer, int start, int n, const BlockParams& p, double bpm, double ppq, bool playing);
+        float slideA = 0.0f, slideB = 0.0f;   // note scivolo: semitoni a inizio e fine blocco
+        int slideLen = 1;
 
         /** Step della matrice che sta suonando (-1 = ferma), per la UI. */
         std::atomic<int> currentStep { -1 };
@@ -186,7 +189,7 @@ namespace fr
 }
 
 //==============================================================================
-class FrenchRouletteAudioProcessor : public juce::AudioProcessor
+class FrenchRouletteAudioProcessor : public juce::AudioProcessor, public SlideInput
 {
 public:
     FrenchRouletteAudioProcessor();

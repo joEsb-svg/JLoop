@@ -815,7 +815,7 @@ void MateriaAudioProcessor::render (float* L, float* R, int n, const Block& b, d
                 auto K = [&] (int i) { return juce::jlimit (0.0f, 1.0f, s.k[i] + mod[d0 + i]); };
                 const float level = juce::jlimit (0.0f, 1.5f, s.level * (1.0f + mod[d0 + sdLevel]));
                 const float pan = juce::jlimit (-1.0f, 1.0f, s.pan + mod[d0 + sdPan]);
-                const double midi = v.pitch + s.oct * 12 + s.semi + s.fine / 100.0 + pitchBend * 2.0 + mod[d0 + sdPitch] * 24.0;
+                const double midi = v.pitch + s.oct * 12 + s.semi + s.fine / 100.0 + (pitchBend * 2.0 + slideHere (start)) + mod[d0 + sdPitch] * 24.0;
                 const double f = juce::jlimit (8.0, sr * 0.45, mtof (midi));
                 std::fill (monoCur, monoCur + len, 0.0f);
 
@@ -1020,7 +1020,7 @@ void MateriaAudioProcessor::render (float* L, float* R, int n, const Block& b, d
                         if (st.count < 0) { std::fill (lines, lines + 2 * lineSize, 0.0f); st.count = 0; st.write = 0; }
                         const bool tube = s.mode == 1;
                         const float kd = juce::jlimit (0.03f, 0.99f, 1.0f - K (2) * 0.95f);
-                        const double f = juce::jlimit (12.0, sr * 0.4, mtof (v.pitch + pitchBend * 2.0 + resonatorSemis (s.k[0]) + mod[d0] * 24.0));
+                        const double f = juce::jlimit (12.0, sr * 0.4, mtof (v.pitch + (pitchBend * 2.0 + slideHere (start)) + resonatorSemis (s.k[0]) + mod[d0] * 24.0));
                         // il tubo (chiuso da una parte) inverte il segno: suona un'ottava sotto, quindi si accorcia della meta'
                         const double period = juce::jlimit (3.0, (double) lineSize - 4.0, sr / f * (tube ? 0.5 : 1.0) - (1.0 - kd) / kd);
                         const double t60 = 0.05 * std::pow (200.0, (double) K (1));
@@ -1136,10 +1136,12 @@ void MateriaAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce
     readBlock (b);
     auto* L = buffer.getWritePointer (0);
     auto* R = buffer.getNumChannels() > 1 ? buffer.getWritePointer (1) : L;
+    beginSlideBlock (buffer.getNumSamples(), sr);
     int done = 0;
     for (const auto meta : midi)
     {
         const int at = juce::jlimit (0, buffer.getNumSamples(), meta.samplePosition);
+        slideBase = done;
         render (L + done, R + done, at - done, b, bpm, ppq >= 0.0 ? ppq + bpm / 60.0 * done / sr : -1.0);
         done = at;
         const auto m = meta.getMessage();
@@ -1153,6 +1155,7 @@ void MateriaAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce
             for (auto& v : voices) { v.amp.stop(); for (auto& e : v.env) e.stop(); }
         }
     }
+    slideBase = done;
     render (L + done, R + done, buffer.getNumSamples() - done, b, bpm, ppq >= 0.0 ? ppq + bpm / 60.0 * done / sr : -1.0);
 }
 

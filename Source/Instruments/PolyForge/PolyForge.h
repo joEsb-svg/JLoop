@@ -5,6 +5,7 @@
 #include <atomic>
 #include <cmath>
 #include <vector>
+#include "../../Engine/SlideInput.h"
 
 //==============================================================================
 /**
@@ -207,7 +208,7 @@ namespace pf
         uint32_t age = 0;
 
         /** Aggiunge la voce a L/R. lfo: valore attuale (-1..1). */
-        void render (float* L, float* R, int n, const BlockParams& p, float lfo, float glideCoef);
+        void render (float* L, float* R, int n, const BlockParams& p, float lfo, float glideCoef, float slide = 0.0f);
 
     private:
         static inline float polyBlep (float t, float dt) noexcept
@@ -263,6 +264,8 @@ namespace pf
         void killAll();   // silenzio immediato: voci ed effetti
         void render (juce::AudioBuffer<float>& buffer, int start, int n, const BlockParams& p,
                      double bpm, double ppq, bool playing);
+        float slideA = 0.0f, slideB = 0.0f;   // note scivolo: semitoni a inizio e fine blocco
+        int slideLen = 1;
 
     private:
         Voice* findVoice();
@@ -315,7 +318,7 @@ namespace pf
 }
 
 //==============================================================================
-class PolyForgeAudioProcessor : public juce::AudioProcessor
+class PolyForgeAudioProcessor : public juce::AudioProcessor, public SlideInput
 {
 public:
     PolyForgeAudioProcessor();

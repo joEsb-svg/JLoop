@@ -6,6 +6,7 @@
 #include <vector>
 #include <memory>
 #include "../Common/ForgeFx.h"
+#include "../../Engine/SlideInput.h"
 
 //==============================================================================
 /**
@@ -218,6 +219,7 @@ namespace prisma
 
 //==============================================================================
 class PrismaAudioProcessor : public juce::AudioProcessor,
+                             public SlideInput,
                              private juce::AudioProcessorValueTreeState::Listener,
                              private juce::AsyncUpdater
 {

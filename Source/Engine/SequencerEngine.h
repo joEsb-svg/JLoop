@@ -11,6 +11,7 @@
 #include <limits>
 #include "DrumVoice.h"
 #include "Sampler.h"
+#include "SlideInput.h"
 #include "Mixer.h"
 #include "Mastering.h"
 #include "Automation.h"
@@ -64,7 +65,8 @@ public:
     struct NoteData
     {
         int start = 0, length = ticksPerStep, pitch = rootNote, velocity = defaultVelocity;
-        bool operator== (const NoteData& o) const { return start == o.start && length == o.length && pitch == o.pitch && velocity == o.velocity; }
+        bool slide = false;   // nota scivolo: non suona, porta la nota che sta suonando alla sua altezza nella sua durata
+        bool operator== (const NoteData& o) const { return start == o.start && length == o.length && pitch == o.pitch && velocity == o.velocity && slide == o.slide; }
     };
 
     /** Tipo di canale: batteria sintetizzata / campione (con il campionatore), oppure uno strumento (synth: BassForge, PolyForge...). */
@@ -191,12 +193,13 @@ public:
         return (uint64_t) (juce::jlimit (0, 4095, n.start)) << 26
              | (uint64_t) (juce::jlimit (1, 4095, n.length)) << 14
              | (uint64_t) (juce::jlimit (0, 127, n.pitch)) << 7
-             | (uint64_t) (juce::jlimit (1, 127, n.velocity));
+             | (uint64_t) (juce::jlimit (1, 127, n.velocity))
+             | (n.slide ? (uint64_t) 1 << 40 : 0);
     }
 
     static NoteData unpackNote (uint64_t v)
     {
-        return { (int) (v >> 26) & 4095, (int) (v >> 14) & 4095, (int) (v >> 7) & 127, (int) v & 127 };
+        return { (int) (v >> 26) & 4095, (int) (v >> 14) & 4095, (int) (v >> 7) & 127, (int) v & 127, ((v >> 40) & 1) != 0 };
     }
 
     /** Un pattern piazzato nella playlist: traccia, battuta d'inizio, quale pattern. */
@@ -1482,6 +1485,11 @@ public:
         {
             const auto& ch = channels[(size_t) c];
             instruments[(size_t) c] = ch.type.load() == synth ? ch.instrument.load() : nullptr;
+            if (instruments[(size_t) c] != slideRxOf[(size_t) c])   // note scivolo: chi le riceve (solo quando lo strumento cambia)
+            {
+                slideRxOf[(size_t) c] = instruments[(size_t) c];
+                slideRx[(size_t) c] = dynamic_cast<SlideInput*> (instruments[(size_t) c]);
+            }
         }
 
         // Note dalla tastiera a schermo
@@ -1561,6 +1569,8 @@ public:
                 samplers[(size_t) c].stopLong (0.6);
             }
         }
+        if (! wasPlaying && playing.load())
+            resetAllSlides();   // si riparte senza scivolate rimaste a meta'
         wasPlaying = playing.load();
 
         playHead.bpm.store (bpm.load());
@@ -2300,8 +2310,17 @@ private:
             const float v = l.valueAt (tick);
             if (v < 0.0f)
                 continue;
-            const int a = l.a.load(), b = l.b.load();
+            applyTargetValue (kind, l.a.load(), l.b.load(), l.c.load(), v);
+        }
+    }
 
+public:
+    /** Mette un controllo (bersaglio di automazione) al valore v (0..1). Thread audio o UI. */
+    void applyTargetValue (int kind, int a, int b, int c, float v) noexcept
+    {
+        using namespace automation;
+        v = juce::jlimit (0.0f, 1.0f, v);
+        {
             if (kind == master)
                 masterVolume.store (volumeGain (v, 3.5f));
             else if (kind == song)
@@ -2352,7 +2371,7 @@ private:
             {
                 auto& slot = tracks[(size_t) a].slots[(size_t) b];
                 const auto& inf = mixer::info (slot.type.load());
-                const int p = l.c.load();
+                const int p = c;
                 if (p == bypassParam)
                     slot.bypass.store (v < 0.5f);
                 else if (p >= 0 && p < inf.numParams)
@@ -2370,6 +2389,8 @@ private:
             }
         }
     }
+
+private:
 
     float* trackBuffer (int t, int which) noexcept    { return trackBuffers.data() + ((size_t) t * 4 + (size_t) which) * (size_t) chunk; }
     float* tL (int t) noexcept      { return trackBuffer (t, 0); }
@@ -2391,19 +2412,44 @@ private:
         return false;
     }
 
+    /** Segui-volume: sposta i suoi bersagli col volume appena ascoltato (partenza + quanto x livello). */
+    void applyFollow (int t, mixer::Slot& s, const float* params) noexcept
+    {
+        using namespace mixer::followParam;
+        const float env = static_cast<mixer::Follow*> (s.effect)->level();
+        const float amt = juce::jlimit (0.0f, 1.0f, params[amount]);
+        for (int i = 0; i < maxTargets; ++i)
+        {
+            const int kind = juce::roundToInt (params[target (i, tKind)]);
+            if (kind <= automation::none || kind == automation::song)
+                continue;
+            const int a = juce::roundToInt (params[target (i, tA)]), b = juce::roundToInt (params[target (i, tB)]), c = juce::roundToInt (params[target (i, tC)]);
+            if (kind == automation::effectParam && a >= 0 && a < mixer::numTracks && b >= 0 && b < mixer::numSlots
+                 && (&tracks[(size_t) a].slots[(size_t) b] == &s))
+                continue;   // non muove se stesso
+            const float v = params[target (i, tBase)] + amt * params[target (i, tDepth)] * juce::jmin (1.0f, env);
+            applyTargetValue (kind, a, b, c, v);
+        }
+        juce::ignoreUnused (t);
+    }
+
     /** EQ ed effetti di una traccia, sul posto. */
     void runTrackChain (int t, float* L, float* R, double sr, int n) noexcept
     {
         auto& tr = tracks[(size_t) t];
 
         // Niente in ingresso e le code degli effetti (riverbero, delay) finite: silenzio, non serve calcolare
-        bool hasEffects = false;
+        bool hasEffects = false, hasFollow = false;
         for (auto& s : tr.slots)
-            hasEffects = hasEffects || (s.effect != nullptr && ! s.bypass.load (std::memory_order_relaxed));
+        {
+            const bool active = s.effect != nullptr && ! s.bypass.load (std::memory_order_relaxed);
+            hasEffects = hasEffects || active;
+            hasFollow = hasFollow || (active && s.type.load (std::memory_order_relaxed) == mixer::follow);   // deve sentire anche il silenzio
+        }
         const float inPeak = juce::jmax (juce::FloatVectorOperations::findMaximum (L, n) - juce::FloatVectorOperations::findMinimum (L, n),
                                          juce::FloatVectorOperations::findMaximum (R, n) - juce::FloatVectorOperations::findMinimum (R, n));
         auto& outPeak = trackOutPeak[(size_t) t];
-        if (inPeak <= 1.0e-6f && (outPeak <= 1.0e-5f || ! hasEffects))
+        if (! hasFollow && inPeak <= 1.0e-6f && (outPeak <= 1.0e-5f || ! hasEffects))
         {
             outPeak = 0.0f;
             return;
@@ -2427,7 +2473,8 @@ private:
                 params[p] = s.params[(size_t) p].load();
 
             ctx.keyL = ctx.keyR = nullptr;
-            if (s.type.load() == mixer::sidechain)
+            const int type = s.type.load();
+            if (type == mixer::sidechain || (type == mixer::follow && juce::roundToInt (params[0]) > 0))
             {
                 const int src = juce::jlimit (1, mixer::numInserts, juce::roundToInt (params[0]));
                 if (src != t && keyReady[(size_t) src])
@@ -2437,6 +2484,8 @@ private:
                 }
             }
             s.effect->process (L, R, n, params, ctx);
+            if (type == mixer::follow)
+                applyFollow (t, s, params);
         }
 
         outPeak = juce::jmax (juce::FloatVectorOperations::findMaximum (L, n) - juce::FloatVectorOperations::findMinimum (L, n),
@@ -2462,7 +2511,8 @@ private:
         keyReady.fill (false);
         for (int t = 0; t < mixer::numTracks; ++t)
             for (auto& s : tracks[(size_t) t].slots)
-                if (s.effect != nullptr && ! s.bypass.load() && s.type.load() == mixer::sidechain)
+                if (s.effect != nullptr && ! s.bypass.load()
+                     && (s.type.load() == mixer::sidechain || (s.type.load() == mixer::follow && juce::roundToInt (s.params[0].load()) > 0)))
                 {
                     const int src = juce::jlimit (1, mixer::numInserts, juce::roundToInt (s.params[0].load()));
                     if (keyReady[(size_t) src])
@@ -2841,6 +2891,7 @@ private:
                 for (int i = 0; i < juce::jmin (noteCount, maxNotes); ++i)
                 {
                     const auto n = unpackNote (pattern.notes[(size_t) c][(size_t) i].load());
+                    if (n.slide) continue;
                     const int localStep = n.start / ticksPerStep;
                     if (localStep >= patLen) continue;
                     // ultima volta che la nota parte dentro la clip prima della partenza
@@ -2954,6 +3005,7 @@ private:
             playPatternNotes (patterns[(size_t) playingPattern.load()], tick);
         }
 
+        advanceSlides();
         runArpeggiators();
         ++arpClock;
     }
@@ -3025,6 +3077,8 @@ private:
             if (pattern.noteCount[(size_t) c].load() <= 0)
                 continue;
 
+            NoteData slides[8];
+            int numSlides = 0;
             for (auto& slot : pattern.notes[(size_t) c])
             {
                 const auto v = slot.load();
@@ -3033,6 +3087,11 @@ private:
 
                 const auto n = unpackNote (v);
                 const int length = juce::jmax (1, juce::jmin (n.length, maxLength));
+                if (n.slide)   // nota scivolo: dopo le note normali dello stesso tick
+                {
+                    if (numSlides < 8) { slides[numSlides] = n; slides[numSlides].length = length; ++numSlides; }
+                    continue;
+                }
                 // corsia SUONO: la nota va al canale B/C/D dello step in cui comincia
                 if (const int t = soundRoute (pattern, c, tick / ticksPerStep); t != c)
                 {
@@ -3043,10 +3102,77 @@ private:
                     }
                     continue;
                 }
+                slideNoteStarted (c, n.pitch);
                 if (instruments[(size_t) c] != nullptr)
                     instNoteOn (c, n.pitch, (float) n.velocity / 127.0f, length);   // lo strumento riceve l'altezza vera
                 else
                     triggerChannel (c, (float) n.velocity / 127.0f, humanizeAmt[(size_t) c], n.pitch, length, true);
+            }
+            for (int i = 0; i < numSlides; ++i)
+                startSlide (c, slides[i].pitch, slides[i].length);
+        }
+    }
+
+    //==============================================================================
+    // Note scivolo: per ogni canale lo spostamento (semitoni) delle note che suonano, rispetto all'ultima nota normale
+
+    /** Una nota normale parte: la scivolata riparte da zero (subito) e questa e' la nota di riferimento. */
+    void slideNoteStarted (int c, int pitch) noexcept
+    {
+        slideBasePitch[(size_t) c] = pitch;
+        slideLeft[(size_t) c] = 0;
+        if (slideNow[(size_t) c] != 0.0f)
+        {
+            slideNow[(size_t) c] = 0.0f;
+            pushSlide (c, true);
+        }
+    }
+
+    /** Una nota scivolo parte: in 'length' tick si va dall'altezza attuale alla sua. */
+    void startSlide (int c, int pitch, int length) noexcept
+    {
+        if (slideBasePitch[(size_t) c] < 0) return;   // niente da far scivolare
+        slideFrom[(size_t) c] = slideNow[(size_t) c];
+        slideTo[(size_t) c] = (float) (pitch - slideBasePitch[(size_t) c]);
+        slideTotal[(size_t) c] = slideLeft[(size_t) c] = juce::jmax (1, length);
+    }
+
+    /** Ogni tick: le scivolate in corso avanzano. */
+    void advanceSlides() noexcept
+    {
+        for (int c = 0; c < numActive; ++c)
+        {
+            auto& left = slideLeft[(size_t) c];
+            if (left <= 0) continue;
+            --left;
+            const float t = 1.0f - (float) left / (float) slideTotal[(size_t) c];
+            slideNow[(size_t) c] = slideFrom[(size_t) c] + (slideTo[(size_t) c] - slideFrom[(size_t) c]) * t;
+            pushSlide (c, false);
+        }
+    }
+
+    void pushSlide (int c, bool jump) noexcept
+    {
+        const float v = slideNow[(size_t) c];
+        if (auto* rx = slideRx[(size_t) c])
+        {
+            if (jump && v == 0.0f) rx->resetSlide();
+            else rx->setSlideSemitones (v);
+        }
+        samplers[(size_t) c].setSlide (v, jump);
+    }
+
+    /** Trasporto che parte o si ferma: niente scivolate rimaste a meta'. */
+    void resetAllSlides() noexcept
+    {
+        for (int c = 0; c < maxChannels; ++c)
+        {
+            slideBasePitch[(size_t) c] = -1;
+            slideLeft[(size_t) c] = 0;
+            if (slideNow[(size_t) c] != 0.0f || c < numActive)
+            {
+                slideNow[(size_t) c] = 0.0f;
+                if (c < numActive) pushSlide (c, true);
             }
         }
     }
@@ -3334,6 +3460,11 @@ private:
     std::atomic<double> preparedRate { 0.0 };
     juce::AudioBuffer<float> instBuffer;
     std::array<juce::AudioProcessor*, maxChannels> instruments {};
+    std::array<juce::AudioProcessor*, maxChannels> slideRxOf {};   // note scivolo: lo strumento per cui vale slideRx
+    std::array<SlideInput*, maxChannels> slideRx {};
+    std::array<int, maxChannels> slideBasePitch = [] { std::array<int, maxChannels> a {}; a.fill (-1); return a; }();
+    std::array<int, maxChannels> slideLeft {}, slideTotal {};
+    std::array<float, maxChannels> slideNow {}, slideFrom {}, slideTo {};
     std::array<juce::MidiBuffer, maxChannels> instMidi;
     std::array<std::array<int, 128>, maxChannels> instOffTicks {};   // tick mancanti alla fine di ogni nota (0 = spenta)
     std::array<int, maxChannels> instActiveNotes {}, instPreviewNote {}, instPreviewLeft {};

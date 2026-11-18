@@ -314,7 +314,7 @@ void AcidLineAudioProcessor::render (float* L, float* R, int n, const acid::Bloc
 
         // --- voce
         pitch = target + (pitch - target) * glide;
-        const double f = acid::mtof (pitch);
+        const double f = acid::mtof (pitch + slideHere (i));   // + note scivolo del piano roll
         const double dt = f / sr;
         ph += dt; if (ph >= 1.0) ph -= 1.0;
         double osc;
@@ -368,10 +368,12 @@ void AcidLineAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
     auto* L = buffer.getWritePointer (0);
     auto* R = buffer.getNumChannels() > 1 ? buffer.getWritePointer (1) : L;
     auto posAt = [&] (int offset) { return ppq >= 0.0 ? ppq + bpm / 60.0 * offset / sr : freeBeats; };
+    beginSlideBlock (buffer.getNumSamples(), sr);
     int done = 0;
     for (const auto meta : midi)
     {
         const int at = juce::jlimit (0, buffer.getNumSamples(), meta.samplePosition);
+        slideBase = done;
         render (L + done, R + done, at - done, b, bpm, ppq >= 0.0 ? posAt (done) : -1.0);
         done = at;
         const auto m = meta.getMessage();
@@ -402,6 +404,7 @@ void AcidLineAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
         }
         else if (m.isAllNotesOff() || m.isAllSoundOff()) { held.clear(); latchEnd = -1.0; gateOpen = false; }
     }
+    slideBase = done;
     render (L + done, R + done, buffer.getNumSamples() - done, b, bpm, ppq >= 0.0 ? posAt (done) : -1.0);
 }
 

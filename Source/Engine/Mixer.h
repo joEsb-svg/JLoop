@@ -37,7 +37,7 @@ namespace mixer
     // Tipi di effetto e i loro parametri
 
     enum FxType { none = 0, compressor, saturation, filter, delay, reverb, chorus, bitcrusher, sidechain, stereo, ott, glitch, trash, vowel,
-                  gate, tremolo, phaser, flanger, peq, transient, exciter, vinyl, limiter, pitch, ringmod, shimmer, blood, fet, fornace, shaper, tagliola, numFxTypes };
+                  gate, tremolo, phaser, flanger, peq, transient, exciter, vinyl, limiter, pitch, ringmod, shimmer, blood, fet, fornace, shaper, tagliola, follow, numFxTypes };
 
     enum class Unit { percent, dB, ms, hz, ratio, choice, track, bits, times, semis };
 
@@ -68,6 +68,19 @@ namespace mixer
         inline int bend (int l, int i)   { return px (l, i) + 2; }
         inline constexpr int numParams = firstLane + numLanes * laneSize;
         inline constexpr double lengthBeats[5] { 1.0, 2.0, 4.0, 8.0, 16.0 };
+    }
+
+    /** Dove stanno i parametri di SEGUI-VOLUME: chi ascolta, come segue il volume e fino a 4 controlli da muovere.
+        Ogni bersaglio e' un'automazione (tipo, a, b, c come in automation::Target), con il valore di partenza
+        (0..1) e quanto si sposta (-1..1: negativo = scende quando il suono sale). */
+    namespace followParam
+    {
+        enum { source = 0, amount, attack, release, gain, firstTarget };
+        inline constexpr int maxTargets = 4;
+        inline constexpr int targetSize = 6;
+        enum { tKind = 0, tA, tB, tC, tBase, tDepth };
+        inline int target (int i, int what)   { return firstTarget + i * targetSize + what; }
+        inline constexpr int numParams = firstTarget + maxTargets * targetSize;
     }
 
     struct FxInfo
@@ -121,6 +134,35 @@ namespace mixer
                 f.params[(size_t) py (l, i)]   = { names[k++].c_str(), 0.0f, 1.0f, y, Unit::percent, 0.0f, nullptr, true };
                 f.params[(size_t) bend (l, i)] = { names[k++].c_str(), -1.0f, 1.0f, b, Unit::percent, 0.0f, nullptr, true };
             }
+        }
+        return f;
+    }
+
+
+    /** La scheda di SEGUI-VOLUME. */
+    inline FxInfo makeFollowInfo()
+    {
+        using namespace followParam;
+        static std::vector<std::string> names;
+        if (names.empty())
+            for (int i = 0; i < maxTargets; ++i)
+                for (const char* w : { " tipo", " a", " b", " c", " partenza", " quanto" })
+                    names.push_back ("Bersaglio " + std::to_string (i + 1) + w);
+        FxInfo f { "follow", "Segui-volume", "Il volume di un suono muove le manopole di un altro: sidechain, filtri che si aprono col rullante...", numParams, {} };
+        f.params[source]  = { "Ascolta", 0.0f, (float) numInserts, 0.0f, Unit::track };
+        f.params[amount]  = { "Quanto", 0.0f, 1.0f, 1.0f, Unit::percent };
+        f.params[attack]  = { "Attacco", 0.5f, 200.0f, 3.0f, Unit::ms, 15.0f };
+        f.params[release] = { "Ritorno", 10.0f, 2000.0f, 120.0f, Unit::ms, 250.0f };
+        f.params[gain]    = { "Sensibilita'", -12.0f, 24.0f, 6.0f, Unit::dB };
+        size_t k = 0;
+        for (int i = 0; i < maxTargets; ++i)
+        {
+            f.params[(size_t) target (i, tKind)]  = { names[k++].c_str(), 0.0f, 10.0f, 0.0f, Unit::choice, 0.0f, nullptr, true };
+            f.params[(size_t) target (i, tA)]     = { names[k++].c_str(), 0.0f, 1000.0f, 0.0f, Unit::choice, 0.0f, nullptr, true };
+            f.params[(size_t) target (i, tB)]     = { names[k++].c_str(), 0.0f, 1000.0f, 0.0f, Unit::choice, 0.0f, nullptr, true };
+            f.params[(size_t) target (i, tC)]     = { names[k++].c_str(), 0.0f, 1000.0f, 0.0f, Unit::choice, 0.0f, nullptr, true };
+            f.params[(size_t) target (i, tBase)]  = { names[k++].c_str(), 0.0f, 1.0f, 0.5f, Unit::percent, 0.0f, nullptr, true };
+            f.params[(size_t) target (i, tDepth)] = { names[k++].c_str(), -1.0f, 1.0f, 0.5f, Unit::percent, 0.0f, nullptr, true };
         }
         return f;
     }
@@ -376,6 +418,7 @@ namespace mixer
                 { "P12 Y", -1.0f, 1.0f, 0.0f, Unit::percent },
                 { "P12 Curva", -1.0f, 1.0f, 0.0f, Unit::percent } }} },
             makeTagliolaInfo(),
+            makeFollowInfo(),
         }};
         return infos[(size_t) juce::jlimit (0, numFxTypes - 1, type)];
     }
@@ -418,7 +461,7 @@ namespace mixer
             case Unit::times:   return juce::String (juce::roundToInt (v)) + "x";
             case Unit::semis:   return (v > 0.5f ? "+" : "") + juce::String (juce::roundToInt (v)) + " st";
             case Unit::bits:    return juce::String (juce::roundToInt (v)) + " bit";
-            case Unit::track:   return "Insert " + juce::String (juce::roundToInt (v));
+            case Unit::track:   return juce::roundToInt (v) <= 0 ? juce::String ("Questa traccia") : "Insert " + juce::String (juce::roundToInt (v));
             case Unit::choice:
             {
                 const auto list = juce::StringArray::fromTokens (p.choices != nullptr ? p.choices : "", "|", "");
@@ -2716,6 +2759,41 @@ namespace mixer
         bool first = true;
     };
 
+
+    /** SEGUI-VOLUME: ascolta il volume di una traccia (questa o un'altra) e lo rende come un valore 0..1.
+        Il suono passa senza cambiare; i controlli da muovere li sposta il mixer (SequencerEngine) subito dopo. */
+    class Follow : public Effect
+    {
+    public:
+        std::atomic<float> shownLevel { 0.0f };   // per la UI
+
+        void prepare (double sampleRate) override   { sr = sampleRate; reset(); }
+        void reset() override                        { env = 0.0f; }
+        float level() const noexcept                 { return env; }
+
+        void process (float* L, float* R, int n, const float* p, const Context& ctx) override
+        {
+            using namespace followParam;
+            const float* kl = ctx.keyL != nullptr ? ctx.keyL : L;
+            const float* kr = ctx.keyR != nullptr ? ctx.keyR : R;
+            const float a = std::exp (-1.0f / (juce::jmax (0.0005f, p[attack] / 1000.0f) * (float) sr));
+            const float r = std::exp (-1.0f / (juce::jmax (0.005f, p[release] / 1000.0f) * (float) sr));
+            const float g = juce::Decibels::decibelsToGain (p[gain]);
+            for (int i = 0; i < n; ++i)
+            {
+                const float x = juce::jmax (std::abs (kl[i]), std::abs (kr[i])) * g;
+                env = x > env ? a * env + (1.0f - a) * x : r * env + (1.0f - r) * x;
+            }
+            if (! std::isfinite (env)) env = 0.0f;
+            env = juce::jlimit (0.0f, 4.0f, env);
+            shownLevel.store (juce::jmin (1.0f, env), std::memory_order_relaxed);
+        }
+
+    private:
+        double sr = 48000.0;
+        float env = 0.0f;
+    };
+
     inline std::unique_ptr<Effect> createEffect (int type)
     {
         switch (type)
@@ -2750,6 +2828,7 @@ namespace mixer
             case fornace:    return std::make_unique<Fornace>();
             case shaper:     return std::make_unique<Shaper>();
             case tagliola:   return std::make_unique<Tagliola>();
+            case follow:     return std::make_unique<Follow>();
             default:         return nullptr;
         }
     }

@@ -5,6 +5,7 @@
 #include <atomic>
 #include <vector>
 #include "../Common/ForgeFx.h"
+#include "../../Engine/SlideInput.h"
 
 //==============================================================================
 /**
@@ -68,7 +69,7 @@ namespace acid
 }
 
 //==============================================================================
-class AcidLineAudioProcessor : public juce::AudioProcessor
+class AcidLineAudioProcessor : public juce::AudioProcessor, public SlideInput
 {
 public:
     AcidLineAudioProcessor();

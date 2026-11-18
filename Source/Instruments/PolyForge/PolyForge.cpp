@@ -154,7 +154,7 @@ namespace pf
         targetFreq = mtof ((float) midiNote);
     }
 
-    void Voice::render (float* L, float* R, int n, const BlockParams& p, float lfo, float glideCoef)
+    void Voice::render (float* L, float* R, int n, const BlockParams& p, float lfo, float glideCoef, float slide)
     {
         if (! active)
             return;
@@ -166,7 +166,7 @@ namespace pf
         freq = targetFreq * std::pow (freq / targetFreq, glideCoef);
 
         // Coefficienti del blocco (aggiornati ogni 16 campioni dal chiamante)
-        const float vib = std::exp2 (lfo * p.lfoPitch * 0.5f / 12.0f);   // vibrato fino a mezzo tono
+        const float vib = std::exp2 ((lfo * p.lfoPitch * 0.5f + slide) / 12.0f);   // vibrato fino a mezzo tono (+ note scivolo)
         const float f0 = freq * vib;
         const float invSr = (float) (1.0 / sr);
 
@@ -457,6 +457,7 @@ namespace pf
         for (int pos = 0; pos < n; pos += controlRate)
         {
             const int m = juce::jmin (controlRate, n - pos);
+            const float slide = slideA + (slideB - slideA) * (float) (start + pos) / (float) slideLen;
             const float prev = (float) lfoPhase;
             lfoPhase += lfoHz * m / sr;
             if (lfoPhase >= 1.0)
@@ -470,7 +471,7 @@ namespace pf
 
             for (auto& v : voices)
                 if (v.isActive())
-                    v.render (L + pos, R + pos, m, p, lfo, glideCoef);
+                    v.render (L + pos, R + pos, m, p, lfo, glideCoef, slide);
         }
 
         // ---- Effetti
@@ -785,6 +786,8 @@ void PolyForgeAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
         }
 
     const auto p = readParams();
+    beginSlideBlock (buffer.getNumSamples(), getSampleRate());
+    synth.slideA = slideStart; synth.slideB = slideNow; synth.slideLen = slideLen;
     int done = 0;
 
     for (const auto meta : midi)

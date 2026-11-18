@@ -336,7 +336,7 @@ void ZapFMAudioProcessor::render (float* L, float* R, int n, const zap::BlockPar
             const double zapEnv = std::exp (-ts / zapTau);
             const double off = zapDir > 0 ? zapSemis * zapEnv : zapSemis * (1.0 - zapEnv) * 0.6;
             const double base = keyNote + b.tune + (b.octave - 1) * 12.0;
-            const double f = zap::mtof (juce::jmin (base + off, 135.0));
+            const double f = zap::mtof (juce::jmin (base + off + slideHere (i), 135.0));
             const double amp = juce::jmin (1.0, ts / 0.0006) * std::exp (-ts / decayT);
             const double idx = maxIndex * ((1.0 - b.metal) + b.metal * std::exp (-ts / metalTau))
                               * juce::jmin (1.0, 2500.0 / f);   // in alto meno indice: niente fruscio (aliasing)
@@ -390,10 +390,12 @@ void ZapFMAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
     auto* L = buffer.getWritePointer (0);
     auto* R = buffer.getNumChannels() > 1 ? buffer.getWritePointer (1) : L;
     auto posAt = [&] (int offset) { return ppq >= 0.0 ? ppq + bpm / 60.0 * offset / sr : freeBeats; };
+    beginSlideBlock (buffer.getNumSamples(), sr);
     int done = 0;
     for (const auto meta : midi)
     {
         const int at = juce::jlimit (0, buffer.getNumSamples(), meta.samplePosition);
+        slideBase = done;
         render (L + done, R + done, at - done, b, bpm, ppq >= 0.0 ? posAt (done) : -1.0);
         done = at;
         const auto m = meta.getMessage();
@@ -423,6 +425,7 @@ void ZapFMAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
         }
         else if (m.isAllNotesOff() || m.isAllSoundOff()) { held.clear(); latchEnd = -1.0; ratchetLeft = 0; }
     }
+    slideBase = done;
     render (L + done, R + done, buffer.getNumSamples() - done, b, bpm, ppq >= 0.0 ? posAt (done) : -1.0);
 }
 

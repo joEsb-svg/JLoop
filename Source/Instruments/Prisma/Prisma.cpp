@@ -1128,7 +1128,7 @@ void PrismaAudioProcessor::render (float* L, float* R, int n, const Block& b, do
                 on.pos = juce::jlimit (0.0f, 1.0f, s.pos + b.morph + mod[k == 0 ? dstPosA : dstPosB]);
                 on.warpAmt = juce::jlimit (0.0f, 1.0f, s.warpAmt + mod[k == 0 ? dstWarpA : dstWarpB]);
                 on.gain = juce::jlimit (0.0f, 1.5f, s.level * (1.0f + mod[k == 0 ? dstLevelA : dstLevelB])) / std::sqrt ((float) s.uni);
-                const double midi = v.pitch + s.oct * 12 + s.semi + s.fine / 100.0 + pitchBend * 2.0 + mod[k == 0 ? dstPitchA : dstPitchB] * 24.0;
+                const double midi = v.pitch + s.oct * 12 + s.semi + s.fine / 100.0 + (pitchBend * 2.0 + slideHere (start)) + mod[k == 0 ? dstPitchA : dstPitchB] * 24.0;
                 const double f = mtof (midi);
                 const float detune = juce::jlimit (0.0f, 1.0f, s.detune + mod[dstDetune]);
                 double maxF = f;
@@ -1150,7 +1150,7 @@ void PrismaAudioProcessor::render (float* L, float* R, int n, const Block& b, do
 
             // sub e rumore
             const float subGain = b.subOn ? juce::jlimit (0.0f, 1.5f, b.subLevel + mod[dstSub]) * 0.7f : 0.0f;
-            const double subInc = mtof (v.pitch - 12.0 * b.subOct + pitchBend * 2.0) / sr;
+            const double subInc = mtof (v.pitch - 12.0 * b.subOct + (pitchBend * 2.0 + slideHere (start))) / sr;
             const float noiseGain = juce::jlimit (0.0f, 1.0f, b.noise + mod[dstNoise]) * 0.4f;
             const float noiseK = 0.05f + 0.95f * b.noiseColor;
 
@@ -1281,10 +1281,12 @@ void PrismaAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
     readBlock (b);
     auto* L = buffer.getWritePointer (0);
     auto* R = buffer.getNumChannels() > 1 ? buffer.getWritePointer (1) : L;
+    beginSlideBlock (buffer.getNumSamples(), sr);
     int done = 0;
     for (const auto meta : midi)
     {
         const int at = juce::jlimit (0, buffer.getNumSamples(), meta.samplePosition);
+        slideBase = done;
         render (L + done, R + done, at - done, b, bpm, ppq >= 0.0 ? ppq + bpm / 60.0 * done / sr : -1.0);
         done = at;
         const auto m = meta.getMessage();
@@ -1298,6 +1300,7 @@ void PrismaAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
             for (auto& v : voices) { v.amp.stop(); v.mod.stop(); }
         }
     }
+    slideBase = done;
     render (L + done, R + done, buffer.getNumSamples() - done, b, bpm, ppq >= 0.0 ? ppq + bpm / 60.0 * done / sr : -1.0);
 }
 

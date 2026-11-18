@@ -674,6 +674,7 @@ namespace fr
             mods.cutOct += p.lfoCut * lfo * 3.0f;
             mods.wave = p.lfoWave * (0.5f + 0.5f * lfo);
             mods.pitch += p.lfoPitch * lfo * 2.0f;
+            mods.pitch += slideA + (slideB - slideA) * (float) (start + pos) / (float) slideLen;   // note scivolo
 
             // --- Pump (sidechain simulato): giu' di colpo sul battito, poi risale
             float duck = 0.0f;
@@ -1066,6 +1067,8 @@ void FrenchRouletteAudioProcessor::processBlock (juce::AudioBuffer<float>& buffe
 
     const auto p = readParams();
     const double beatsPerSample = bpm / 60.0 / getSampleRate();
+    beginSlideBlock (buffer.getNumSamples(), getSampleRate());
+    synth.slideA = slideStart; synth.slideB = slideNow; synth.slideLen = slideLen;
     int done = 0;
     for (const auto meta : midi)
     {

@@ -68,6 +68,7 @@ namespace midiexport
         for (int rep = startTick / patTicks; rep * patTicks < endTick; ++rep)
             for (auto& n : notes)
             {
+                if (n.slide) continue;   // le note scivolo non sono note MIDI
                 const int on = n.start + rep * patTicks;
                 if (on < startTick || on >= endTick) continue;
                 const int off = juce::jmin (on + juce::jmax (1, n.length), endTick);

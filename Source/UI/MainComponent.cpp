@@ -2966,6 +2966,21 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
         }
     }
 
+    if (const int i = args.indexOf ("--follow"); i >= 0)   // test: finestra di Segui-volume (0 = vuota, 1 = sidechain + filtro)
+    {
+        auto& fxView = mixerPanel.getEffectsView();
+        fxView.openFollow();
+        if (auto* fv = fxView.getFollowView())
+        {
+            if (args[i + 1].getIntValue() > 0)
+            {
+                fv->addDuck();
+                fv->addTarget ({ automation::effectParam, 1, 1, 1 }, 0.6f);
+            }
+            fv->showTestLevel();
+        }
+    }
+
     if (const int i = args.indexOf ("--tagliola"); i >= 0)   // test: finestra della Tagliola (preset, curva, riga di dove suona)
     {
         auto& fxView = mixerPanel.getEffectsView();
@@ -2994,6 +3009,14 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
         c.name = "Kit " + df::Presets::factoryName (c.kit);
         c.colour = 0xffff6b5b;
         applySoundChoice (-1, c);
+    }
+
+    if (const int i = args.indexOf ("--slide-demo"); i >= 0)   // test: note scivolo nel piano roll del canale indicato
+    {
+        using N = SequencerEngine::NoteData;
+        const int T = SequencerEngine::ticksPerStep, c = juce::jlimit (0, engine.getNumChannels() - 1, args[i + 1].getIntValue());
+        engine.setNotes (c, { N { 0, 8 * T, 48, 100, false }, N { 4 * T, 3 * T, 55, 100, true },
+                              N { 8 * T, 8 * T, 51, 100, false }, N { 12 * T, 2 * T, 39, 100, true } });
     }
 
     if (const int i = args.indexOf ("--roll"); i >= 0)

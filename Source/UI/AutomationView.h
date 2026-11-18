@@ -757,6 +757,8 @@ public:
     }
 
     std::function<void (automation::Target)> onChoose;
+    juce::String title { "Cosa vuoi far muovere da solo?" };
+    bool includeSong = true;     // tempo e swing (non per Segui-volume)
 
     void open()
     {
@@ -764,8 +766,11 @@ public:
         std::vector<TileList::Item> items;
         sources.push_back ({ automation::master, 0 });
         items.push_back ({ "Master", "Volume generale", Theme::accent, true });
-        sources.push_back ({ automation::song, 0 });
-        items.push_back ({ "Canzone", "Tempo (BPM) e swing", Theme::cyan, true });
+        if (includeSong)
+        {
+            sources.push_back ({ automation::song, 0 });
+            items.push_back ({ "Canzone", "Tempo (BPM) e swing", Theme::cyan, true });
+        }
         for (int c = 0; c < engine.getNumChannels(); ++c)
         {
             sources.push_back ({ automation::channelParam, c });
@@ -792,7 +797,7 @@ public:
         g.fillRoundedRectangle (r, Theme::corner);
         g.setColour (Theme::textBright);
         g.setFont (Theme::font (16.0f, true));
-        g.drawFittedText ("Cosa vuoi far muovere da solo?", titleArea, juce::Justification::centredLeft, 1);
+        g.drawFittedText (title, titleArea, juce::Justification::centredLeft, 1);
     }
 
     void resized() override

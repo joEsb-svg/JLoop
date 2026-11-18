@@ -5,6 +5,7 @@
 #include <atomic>
 #include <vector>
 #include "../Common/ForgeFx.h"
+#include "../../Engine/SlideInput.h"
 
 class WubForgeAudioProcessor;
 
@@ -54,6 +55,8 @@ namespace wf
 
         int slot = 0;
         float lfoPhase = 0.0f, lfoOut = 0.0f;
+        float slideA = 0.0f, slideB = 0.0f;   // note scivolo: semitoni a inizio e fine blocco
+        int slideLen = 1, slideOffset = 0;    // slideOffset: dove parte questo pezzo dentro il blocco
 
     private:
         struct Svf
@@ -96,7 +99,7 @@ namespace wf
 }
 
 //==============================================================================
-class WubForgeAudioProcessor : public juce::AudioProcessor
+class WubForgeAudioProcessor : public juce::AudioProcessor, public SlideInput
 {
 public:
     WubForgeAudioProcessor();

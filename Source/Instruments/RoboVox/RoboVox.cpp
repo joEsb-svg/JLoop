@@ -264,7 +264,7 @@ void RoboVoxAudioProcessor::render (float* L, float* R, int n, const rv::BlockPa
     float inc[rv::maxVoices][3];
     for (size_t vi = 0; vi < voices.size(); ++vi)
         for (int u = 0; u < 3; ++u)
-            inc[vi][u] = rv::mtof ((float) voices[vi].note + (float) (b.octave * 12) + (b.carrier == 0 ? (float) (u - 1) * b.detune * 0.25f : 0.0f)) / (float) sr;
+            inc[vi][u] = rv::mtof ((float) voices[vi].note + slideHere (n / 2) + (float) (b.octave * 12) + (b.carrier == 0 ? (float) (u - 1) * b.detune * 0.25f : 0.0f)) / (float) sr;
 
     std::array<float, rv::maxBands> peak {};
     for (int i = 0; i < n; ++i)
@@ -385,10 +385,12 @@ void RoboVoxAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce
     const auto b = readParams();
     auto* L = buffer.getWritePointer (0);
     auto* R = buffer.getNumChannels() > 1 ? buffer.getWritePointer (1) : L;
+    beginSlideBlock (buffer.getNumSamples(), sr);
     int done = 0;
     for (const auto meta : midi)
     {
         const int pos = juce::jlimit (0, buffer.getNumSamples(), meta.samplePosition);
+        slideBase = done;
         render (L + done, R + done, pos - done, b, bpm, ppq >= 0.0 ? ppq + bpm / 60.0 * done / sr : -1.0);
         done = pos;
         const auto m = meta.getMessage();
@@ -396,6 +398,7 @@ void RoboVoxAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce
         else if (m.isNoteOff()) noteOff (m.getNoteNumber());
         else if (m.isAllNotesOff() || m.isAllSoundOff()) for (auto& v : voices) v.on = false;
     }
+    slideBase = done;
     render (L + done, R + done, buffer.getNumSamples() - done, b, bpm, ppq >= 0.0 ? ppq + bpm / 60.0 * done / sr : -1.0);
 }
 

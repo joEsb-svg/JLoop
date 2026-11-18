@@ -11,8 +11,9 @@
 #include "Synth/SynthSound.h"
 #include "Synth/BassVoice.h"
 #include "Presets/PresetManager.h"
+#include "../../Source/Engine/SlideInput.h"
 
-class BassForgeAudioProcessor : public juce::AudioProcessor
+class BassForgeAudioProcessor : public juce::AudioProcessor, public SlideInput
 {
 public:
     /** Latenza totale dichiarata all'host: FIR di oversampling dell'Hyper-Drive + lookahead del limiter. */
@@ -78,6 +79,7 @@ private:
     bf::PresetManager presets { apvts, performers };
     std::atomic<float> hostBpm { 120.0f }; // aggiornato a ogni blocco dal playhead
     bf::SharedMidiState sharedMidi;        // mod wheel globale
+    bf::SlideShared slideShared;           // note scivolo per le voci
     bf::ModMonitor    modMonitor;          // modulazione live -> GUI
     bf::ScopeBuffer   scope;               // ultimi campioni di uscita -> GUI
     std::array<float, 8192> scopeTmp{};    // mono scratch per lo scope (nessuna allocazione nel callback)

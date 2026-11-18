@@ -5,6 +5,7 @@
 #include <atomic>
 #include <vector>
 #include "../Common/ForgeFx.h"
+#include "../../Engine/SlideInput.h"
 #include "../Prisma/Prisma.h"   // le wavetable (prisma::Bank) e l'inviluppo
 
 //==============================================================================
@@ -112,6 +113,7 @@ namespace materia
 
 //==============================================================================
 class MateriaAudioProcessor : public juce::AudioProcessor,
+                             public SlideInput,
                               private juce::AudioProcessorValueTreeState::Listener
 {
 public:

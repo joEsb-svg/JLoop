@@ -14,7 +14,20 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.89)
+## Stato attuale (v0.90)
+
+**0.90: SEGUI-VOLUME e NOTE SCIVOLO.**
+- **Segui-volume** (mixer, gruppo "Dinamica"; tipo Peak Controller). Ascolta il volume di una traccia (questa o un'altra:
+  di partenza quella della cassa) e con quello muove fino a 4 controlli qualsiasi: volume o pan di tracce e canali,
+  manopole degli effetti, manopole dei synth. Per ognuno "Da" (il valore col silenzio) e "Quanto" (di quanto si sposta
+  col suono forte; a sinistra scende). "Abbassa questa traccia" = sidechain in un tocco. Manopole Quanto, Attacco,
+  Ritorno, Sensibilita'. Togliendo un controllo torna al valore di partenza.
+- **Note scivolo** nel piano roll (come le slide note di FL Studio): con "Scivolo" acceso i tocchi disegnano note col
+  bordo arancione che non suonano, ma portano la nota che sta suonando alla loro altezza nel tempo della loro durata
+  (una curva tratteggiata mostra la scivolata, il triangolo dice se sale o scende). Funzionano con tutti i synth
+  (tranne DrumForge) e con i campioni. Una nota normale nuova riparte dalla sua altezza. Salvate nel progetto; non
+  finiscono nel MIDI esportato.
+
 
 **0.89: TAGLIOLA** (mixer, gruppo "Movimento"; tipo Gross Beat / LFO Tool). Tre curve disegnate che si ripetono a tempo:
 Volume, Filtro (passa basso o passa alto, con risonanza) e Pan. Si sceglie la curva a sinistra; tocca per aggiungere un

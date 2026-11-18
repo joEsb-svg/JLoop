@@ -9,6 +9,7 @@
 #include "FornaceView.h"
 #include "ShaperView.h"
 #include "TagliolaView.h"
+#include "FollowView.h"
 #include "SidePicker.h"
 
 //==============================================================================
@@ -640,7 +641,7 @@ public:
             auto* row = slotRows.add (new SlotRow (*this, s));
             addAndMakeVisible (row);
         }
-        openFornaceButton.onClick = [this] { if (shownType == mixer::shaper) openShaper(); else if (shownType == mixer::tagliola) openTagliola(); else openFornace(); };
+        openFornaceButton.onClick = [this] { if (shownType == mixer::shaper) openShaper(); else if (shownType == mixer::tagliola) openTagliola(); else if (shownType == mixer::follow) openFollow(); else openFornace(); };
         addChildComponent (openFornaceButton);
     }
 
@@ -687,8 +688,23 @@ public:
 
     TagliolaView* getTagliolaView() { return tagliolaView.get(); }
 
+    /** Apre la finestra di Segui-volume (se lo slot scelto e' un Segui-volume). */
+    void openFollow()
+    {
+        if (engine.getTrack (track).slots[(size_t) selectedSlot].type.load() != mixer::follow)
+            return;
+        followView = std::make_unique<FollowView> (engine, track, selectedSlot);
+        followView->onChanged = [this] { if (onChanged) onChanged(); };
+        followView->onClose = [this] { juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<TrackEffectsView> (this)] { if (safe != nullptr) safe->followView.reset(); }); };
+        addAndMakeVisible (*followView);
+        followView->setBounds (getLocalBounds());
+    }
+
+    FollowView* getFollowView()     { return followView.get(); }
+
     void setTrack (int t)
     {
+        followView.reset();
         tagliolaView.reset();
         shaperView.reset();
         fornaceView.reset();
@@ -798,6 +814,8 @@ public:
             shaperView->setBounds (getLocalBounds());
         if (tagliolaView != nullptr)
             tagliolaView->setBounds (getLocalBounds());
+        if (followView != nullptr)
+            followView->setBounds (getLocalBounds());
     }
 
 private:
@@ -961,7 +979,7 @@ private:
         using namespace mixer;
         struct G { const char* name; std::initializer_list<int> types; };
         const G groups[] {
-            { "Dinamica",          { compressor, ott, transient, limiter, sidechain } },
+            { "Dinamica",          { compressor, ott, transient, limiter, sidechain, follow } },
             { "Tono ed EQ",        { filter, peq, exciter, vowel } },
             { "Spazio",            { reverb, shimmer, delay, chorus, stereo } },
             { "Movimento",         { tagliola, gate, tremolo, phaser, flanger } },
@@ -1004,8 +1022,8 @@ private:
                 return;
             safe->engine.setTrackEffect (trackIndex, slot, result - 1);
             // Sidechain: parte dalla traccia della cassa, se c'e'
-            if (result - 1 == mixer::sidechain)
-                if (const int kick = safe->findKickTrack(); kick > 0)
+            if (result - 1 == mixer::sidechain || result - 1 == mixer::follow)
+                if (const int kick = safe->findKickTrack(); kick > 0 && kick != trackIndex)
                     safe->engine.getTrack (trackIndex).slots[(size_t) slot].params[0].store ((float) kick);
             safe->selectedSlot = slot;
             safe->refresh();
@@ -1016,6 +1034,8 @@ private:
                 safe->openShaper();
             if (result - 1 == mixer::tagliola)
                 safe->openTagliola();
+            if (result - 1 == mixer::follow)
+                safe->openFollow();
             if (safe->onChanged) safe->onChanged();
         };
         top->addAndMakeVisible (*picker);
@@ -1076,9 +1096,11 @@ private:
         fornaceView.reset();
         shaperView.reset();
         tagliolaView.reset();
-        const bool ownWindow = shownType == mixer::fornace || shownType == mixer::shaper || shownType == mixer::tagliola;
+        followView.reset();
+        const bool ownWindow = shownType == mixer::fornace || shownType == mixer::shaper || shownType == mixer::tagliola || shownType == mixer::follow;
         openFornaceButton.setVisible (ownWindow);
-        openFornaceButton.setButtonText (shownType == mixer::shaper ? "Apri CURVATORE" : shownType == mixer::tagliola ? "Apri TAGLIOLA" : "Apri FORNACE");
+        openFornaceButton.setButtonText (shownType == mixer::shaper ? "Apri CURVATORE" : shownType == mixer::tagliola ? "Apri TAGLIOLA"
+                                       : shownType == mixer::follow ? "Apri SEGUI-VOLUME" : "Apri FORNACE");
         for (int p = 0; p < inf.numParams; ++p)
         {
             if (ownWindow)
@@ -1195,6 +1217,7 @@ private:
     std::unique_ptr<FornaceView> fornaceView;
     std::unique_ptr<ShaperView> shaperView;
     std::unique_ptr<TagliolaView> tagliolaView;
+    std::unique_ptr<FollowView> followView;
     std::unique_ptr<SidePicker> picker;
     bool forTest = false;
     juce::TextButton openFornaceButton { "Apri FORNACE" };

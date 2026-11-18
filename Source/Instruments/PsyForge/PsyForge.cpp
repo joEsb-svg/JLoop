@@ -325,7 +325,7 @@ void PsyForgeAudioProcessor::render (float* L, float* R, int n, const psy::Block
             const double env = juce::jmin (1.0, t / 0.0012) * std::exp (-t / bDecay);
             const double fe = std::exp (-t / fDecay);
             // ZAP: l'intonazione parte alta e cade subito (colpo "laser" dell'hi-tech)
-            const double f = bassF * std::pow (2.0, (bOffset + 24.0 * b.zap * std::exp (-t / 0.012)) / 12.0);
+            const double f = bassF * std::pow (2.0, (bOffset + slideHere (i) + 24.0 * b.zap * std::exp (-t / 0.012)) / 12.0);
             bPh += f / sr; bPh -= std::floor (bPh);
             double osc;
             switch (b.bassWave)
@@ -409,10 +409,12 @@ void PsyForgeAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
     auto* L = buffer.getWritePointer (0);
     auto* R = buffer.getNumChannels() > 1 ? buffer.getWritePointer (1) : L;
     auto posAt = [&] (int offset) { return ppq >= 0.0 ? ppq + bpm / 60.0 * offset / sr : freeBeats; };
+    beginSlideBlock (buffer.getNumSamples(), sr);
     int done = 0;
     for (const auto meta : midi)
     {
         const int at = juce::jlimit (0, buffer.getNumSamples(), meta.samplePosition);
+        slideBase = done;
         render (L + done, R + done, at - done, b, bpm, ppq >= 0.0 ? posAt (done) : -1.0);
         done = at;
         const auto m = meta.getMessage();
@@ -432,6 +434,7 @@ void PsyForgeAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
         }
         else if (m.isAllNotesOff() || m.isAllSoundOff()) { held.clear(); latchEnd = -1.0; }
     }
+    slideBase = done;
     render (L + done, R + done, buffer.getNumSamples() - done, b, bpm, ppq >= 0.0 ? posAt (done) : -1.0);
 }
 

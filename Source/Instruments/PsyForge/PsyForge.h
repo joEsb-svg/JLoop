@@ -5,6 +5,7 @@
 #include <atomic>
 #include <vector>
 #include "../Common/ForgeFx.h"
+#include "../../Engine/SlideInput.h"
 
 //==============================================================================
 /**
@@ -65,7 +66,7 @@ namespace psy
 }
 
 //==============================================================================
-class PsyForgeAudioProcessor : public juce::AudioProcessor
+class PsyForgeAudioProcessor : public juce::AudioProcessor, public SlideInput
 {
 public:
     PsyForgeAudioProcessor();

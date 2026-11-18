@@ -5,6 +5,7 @@
 #include <atomic>
 #include <vector>
 #include "../Common/ForgeFx.h"
+#include "../../Engine/SlideInput.h"
 
 //==============================================================================
 /**
@@ -69,7 +70,7 @@ namespace zap
 }
 
 //==============================================================================
-class ZapFMAudioProcessor : public juce::AudioProcessor
+class ZapFMAudioProcessor : public juce::AudioProcessor, public SlideInput
 {
 public:
     ZapFMAudioProcessor();

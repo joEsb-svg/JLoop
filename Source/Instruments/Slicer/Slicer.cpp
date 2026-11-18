@@ -300,6 +300,8 @@ void SlicerAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
     auto* R = buffer.getNumChannels() > 1 ? buffer.getWritePointer (1) : L;
     const int n = buffer.getNumSamples();
     int done = 0;
+    beginSlideBlock (n, getSampleRate());
+    const bool slid = sliding();
 
     auto render = [&] (int from, int to)
     {
@@ -331,7 +333,7 @@ void SlicerAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
                 const float y = x * v.env * v.gain * edge;
                 L[i] += y;
                 R[i] += y;
-                v.pos += v.inc;
+                v.pos += slid ? v.inc * std::exp2 ((double) slideAtSample (i) / 12.0) : v.inc;   // note scivolo
             }
         }
     };

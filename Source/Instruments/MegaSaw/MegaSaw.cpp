@@ -103,7 +103,7 @@ namespace ms
         }
     }
 
-    void Voice::render (float* L, float* R, int n, const BlockParams& p, float glideCoef, int unisonLimit)
+    void Voice::render (float* L, float* R, int n, const BlockParams& p, float glideCoef, int unisonLimit, float slide)
     {
         if (! isActive()) return;
         amp.set (sr, p.aA, p.aD, p.aS, p.aR);
@@ -116,7 +116,7 @@ namespace ms
         if (pwm > 1.0f) pwm -= 1.0f;
 
         const int uni = juce::jlimit (1, juce::jmin (unisonLimit, maxUnison), p.unison);
-        const float base = pitch + (float) (p.octave * 12) - p.scoop * scoopEnv;
+        const float base = pitch + slide + (float) (p.octave * 12) - p.scoop * scoopEnv;
         const float detune = p.detune * (0.35f + 0.65f * p.thick) * (p.mode == 2 ? 0.45f : 1.0f);
         float inc[maxUnison], panL[maxUnison], panR[maxUnison];
         for (int u = 0; u < uni; ++u)
@@ -270,9 +270,10 @@ namespace ms
         for (int pos = 0; pos < n; pos += controlRate)
         {
             const int m = juce::jmin (controlRate, n - pos);
+            const float slide = slideA + (slideB - slideA) * (float) (start + pos) / (float) slideLen;
             for (auto& v : voices)
                 if (v.isActive())
-                    v.render (L + pos, R + pos, m, p, glideCoef, unisonLimit);
+                    v.render (L + pos, R + pos, m, p, glideCoef, unisonLimit, slide);
         }
         fx.process (L, R, n, p.fx, bpm);
         // limitatore morbido: accordi grossi a tutto volume non graffiano
@@ -396,6 +397,8 @@ void MegaSawAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce
     double bpm = 120.0;
     if (auto* ph = getPlayHead()) if (auto pos = ph->getPosition()) if (auto b = pos->getBpm()) bpm = *b;
     const auto b = readParams();
+    beginSlideBlock (buffer.getNumSamples(), getSampleRate());
+    synth.slideA = slideStart; synth.slideB = slideNow; synth.slideLen = slideLen;
     int done = 0;
     for (const auto meta : midi)
     {

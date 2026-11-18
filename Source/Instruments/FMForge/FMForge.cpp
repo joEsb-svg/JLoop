@@ -132,7 +132,7 @@ namespace fm
         targetFreq = mtof ((float) midiNote);
     }
 
-    void Voice::render (float* out, int n, const BlockParams& p, float lfo, float glideCoef)
+    void Voice::render (float* out, int n, const BlockParams& p, float lfo, float glideCoef, float slide)
     {
         if (! active)
             return;
@@ -141,7 +141,7 @@ namespace fm
             env[(size_t) o].set (sr, p.ops[(size_t) o].a, p.ops[(size_t) o].d, p.ops[(size_t) o].s, p.ops[(size_t) o].r);
 
         freq = targetFreq * std::pow (freq / targetFreq, glideCoef);
-        const float f0 = freq * std::exp2 (lfo * p.lfoVib * 0.5f / 12.0f);
+        const float f0 = freq * std::exp2 ((lfo * p.lfoVib * 0.5f + slide) / 12.0f);
         const auto& alg = algorithm (p.algo);
         const float invSr = (float) (1.0 / sr);
 
@@ -342,9 +342,10 @@ namespace fm
                             : p.lfoWave == 1 ? 1.0f - 4.0f * std::abs (t - 0.5f)
                             : p.lfoWave == 2 ? (t < 0.5f ? 1.0f : -1.0f) : lfoHold;
 
+            const float slide = slideA + (slideB - slideA) * (float) (start + pos) / (float) slideLen;
             for (auto& v : voices)
                 if (v.isActive())
-                    v.render (mono.data() + pos, m, p, lfo, glideCoef);
+                    v.render (mono.data() + pos, m, p, lfo, glideCoef, slide);
         }
 
         // Tono (passa-basso dolce) e uscita stereo
@@ -592,6 +593,8 @@ void FMForgeAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce
         }
 
     const auto p = readParams();
+    beginSlideBlock (buffer.getNumSamples(), getSampleRate());
+    synth.slideA = slideStart; synth.slideB = slideNow; synth.slideLen = slideLen;
     int done = 0;
     for (const auto meta : midi)
     {

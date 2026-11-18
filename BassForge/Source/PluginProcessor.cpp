@@ -22,6 +22,7 @@ BassForgeAudioProcessor::BassForgeAudioProcessor()
         v->setTempoSource(&hostBpm);
         v->setSharedMidi(&sharedMidi);
         v->setModMonitor(&modMonitor);
+        v->setSlideSource(&slideShared);
         synth.addVoice(v);                                          // il Synthesiser ne prende l'ownership
     }
 
@@ -86,6 +87,10 @@ void BassForgeAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juc
         if (m.isController() && m.getControllerNumber() == 1)
             sharedMidi.modWheel.store((float) m.getControllerValue() * (1.0f / 127.0f), std::memory_order_relaxed);
     }
+
+    // Note scivolo del piano roll
+    beginSlideBlock(numSamples, getSampleRate());
+    slideShared.a = slideStart; slideShared.b = slideNow; slideShared.len = slideLen;
 
     // MIDI -> voci (note on/off, pitch bend, aftertouch, CC) e rendering sample-accurate
     synth.renderNextBlock(buffer, midi, 0, numSamples);

@@ -192,7 +192,11 @@ namespace ProjectIO
             {
                 juce::Array<juce::var> list;
                 for (auto& n : engine.getNotes (p, c))
-                    list.add (juce::Array<juce::var> { n.start, n.length, n.pitch, n.velocity });
+                {
+                    juce::Array<juce::var> f { n.start, n.length, n.pitch, n.velocity };
+                    if (n.slide) f.add (1);   // quinto valore: nota scivolo
+                    list.add (f);
+                }
                 anyNotes = anyNotes || ! list.isEmpty();
                 notes.add (list);
             }
@@ -445,7 +449,7 @@ namespace ProjectIO
                         if (auto* arr = notes->getReference (c).getArray())
                             for (auto& n : *arr)
                                 if (auto* f = n.getArray(); f != nullptr && f->size() >= 4)
-                                    list.push_back ({ (int) (*f)[0], (int) (*f)[1], (int) (*f)[2], (int) (*f)[3] });
+                                    list.push_back ({ (int) (*f)[0], (int) (*f)[1], (int) (*f)[2], (int) (*f)[3], f->size() >= 5 && (int) (*f)[4] != 0 });
                         engine.setNotes (p, c, list);
                     }
                 }

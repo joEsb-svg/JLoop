@@ -6,6 +6,7 @@
 #include <vector>
 #include "../../Engine/SampleStore.h"
 #include "../Common/ForgeFx.h"
+#include "../../Engine/SlideInput.h"
 
 //==============================================================================
 /**
@@ -53,7 +54,7 @@ namespace rv
 }
 
 //==============================================================================
-class RoboVoxAudioProcessor : public juce::AudioProcessor
+class RoboVoxAudioProcessor : public juce::AudioProcessor, public SlideInput
 {
 public:
     RoboVoxAudioProcessor();

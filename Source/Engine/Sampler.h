@@ -85,6 +85,13 @@ public:
         v.active    = true;
     }
 
+    /** Note scivolo: sposta di 'semis' semitoni tutte le note che suonano (jump = subito, per una nota nuova). */
+    void setSlide (float semis, bool jump = false) noexcept
+    {
+        slideTarget = std::pow (2.0, (double) semis / 12.0);
+        if (jump) slideRatio = slideTarget;
+    }
+
     /** Un tick del sequencer: conta le durate delle note del piano roll. */
     void tick() noexcept
     {
@@ -149,6 +156,11 @@ public:
         const int len = sample->audio.getNumSamples();
         float sum = 0.0f;
         bool any = false;
+        if (slideRatio != slideTarget)
+        {
+            slideRatio += (slideTarget - slideRatio) * slideCoef;
+            if (std::abs (slideRatio - slideTarget) < 1.0e-6) slideRatio = slideTarget;
+        }
 
         for (auto& v : voices)
         {
@@ -171,7 +183,7 @@ public:
 
             const float frac = (float) (v.pos - pos);
             const float x = data[pos] + frac * (data[pos + 1] - data[pos]);
-            v.pos += v.step;
+            v.pos += v.step * slideRatio;
 
             if (v.ramp < 1.0f) v.ramp = juce::jmin (1.0f, v.ramp + v.rampInc);
             sum += x * v.level * v.env * v.release * v.ramp;
@@ -244,6 +256,7 @@ private:
         lowCoef = (float) (1.0 - std::exp (-juce::MathConstants<double>::twoPi * juce::jlimit (150.0, sr * 0.45, cutoff) / sr));
         shelfCoef = (float) (1.0 - std::exp (-juce::MathConstants<double>::twoPi * 2500.0 / sr));
 
+        slideCoef = 1.0 - std::exp (-1.0 / (0.008 * sr));
         driveAmount = 1.0f + 3.0f * shape.drive;
         driveNorm = 1.0f / std::tanh (driveAmount);
     }
@@ -253,7 +266,7 @@ private:
     SoundShape shape;
     std::array<Voice, numVoices> voices {};
     uint32_t ageCounter = 0;
-    double baseStep = 1.0;
+    double baseStep = 1.0, slideRatio = 1.0, slideTarget = 1.0, slideCoef = 0.003;
     float fade = 1.0f, releaseCoef = 0.999f, cutCoef = 0.99f, lowCoef = 1.0f, shelfCoef = 0.3f, driveAmount = 1.0f, driveNorm = 1.0f;
     float lowState = 0.0f, shelfState = 0.0f;
 };

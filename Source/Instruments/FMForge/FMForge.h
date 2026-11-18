@@ -7,6 +7,7 @@
 #include <vector>
 #include "../PolyForge/PolyForge.h"   // pf::Adsr, pf::Svf
 #include "../Common/ForgeFx.h"
+#include "../../Engine/SlideInput.h"
 
 //==============================================================================
 /**
@@ -91,7 +92,7 @@ namespace fm
         float getFrequency() const          { return freq; }
         uint32_t age = 0;
 
-        void render (float* out, int n, const BlockParams& p, float lfo, float glideCoef);
+        void render (float* out, int n, const BlockParams& p, float lfo, float glideCoef, float slide);
 
     private:
         double sr = 48000.0;
@@ -112,6 +113,8 @@ namespace fm
         void allNotesOff();
         void killAll()  { heldNotes.clear(); for (auto& v : voices) v.reset(); fx.reset(); }
         void render (juce::AudioBuffer<float>& buffer, int start, int n, const BlockParams& p, double bpm, double ppq, bool playing);
+        float slideA = 0.0f, slideB = 0.0f;   // note scivolo: semitoni a inizio e fine blocco
+        int slideLen = 1;
 
     private:
         Voice* findVoice();
@@ -150,7 +153,7 @@ namespace fm
 }
 
 //==============================================================================
-class FMForgeAudioProcessor : public juce::AudioProcessor
+class FMForgeAudioProcessor : public juce::AudioProcessor, public SlideInput
 {
 public:
     FMForgeAudioProcessor();

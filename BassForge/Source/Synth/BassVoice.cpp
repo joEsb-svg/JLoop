@@ -167,6 +167,8 @@ void BassVoice::renderNextBlock(juce::AudioBuffer<float>& out, int startSample, 
     while (done < numSamples)
     {
         const int len = juce::jmin(kControlBlock, numSamples - done);
+        slideFrom = slide != nullptr ? slide->at(startSample + done) : 0.f;
+        slideTo   = slide != nullptr ? slide->at(startSample + done + len) : 0.f;
         renderControlBlock(l + done, r != nullptr ? r + done : nullptr, d != nullptr ? d + done : nullptr, len);
         done += len;
 
@@ -196,8 +198,8 @@ void BassVoice::renderControlBlock(float* outL, float* outR, float* direct, int 
     const float baseHz    = (float) juce::MidiMessage::getMidiNoteInHertz(currentNote);
     const float bendSemis = vm.midi().bend() * load(pc.pitchBendRange);
     const auto  pitchR    = mx.ramp(DstPitch);
-    const float pitchStart = prevBendSemis + pitchR.start * modscale::kPitchSemis;
-    const float pitchEnd   = bendSemis     + pitchR.end   * modscale::kPitchSemis;
+    const float pitchStart = prevBendSemis + pitchR.start * modscale::kPitchSemis + slideFrom;
+    const float pitchEnd   = bendSemis     + pitchR.end   * modscale::kPitchSemis + slideTo;
     prevBendSemis = bendSemis;
 
     struct OscState { bool on; float gl, dgl, gr, dgr; };
