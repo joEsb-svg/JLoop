@@ -2966,6 +2966,18 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
         }
     }
 
+    if (const int i = args.indexOf ("--tagliola"); i >= 0)   // test: finestra della Tagliola (preset, curva, riga di dove suona)
+    {
+        auto& fxView = mixerPanel.getEffectsView();
+        fxView.openTagliola();
+        if (auto* tv = fxView.getTagliolaView())
+        {
+            if (args[i + 1].containsOnly ("0123456789") && args[i + 1].isNotEmpty()) tv->applyPreset (args[i + 1].getIntValue());
+            if (args.size() > i + 2 && args[i + 2].containsOnly ("0123456789") && args[i + 2].isNotEmpty()) tv->selectLane (args[i + 2].getIntValue());
+            tv->showTestPlayhead (0.3f);
+        }
+    }
+
     if (const int i = args.indexOf ("--fornace"); i >= 0)   // test: finestra di FORNACE (banda, preset)
     {
         auto& fxView = mixerPanel.getEffectsView();

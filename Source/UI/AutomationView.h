@@ -866,7 +866,7 @@ private:
                 if (type != mixer::none)
                     add ({ automation::effectParam, t, s, automation::bypassParam }, "Effetto " + juce::String (s + 1));
                 for (int p = 0; p < inf.numParams; ++p)
-                    if (inf.params[(size_t) p].unit != mixer::Unit::track && ! (type == mixer::gate && p == 0))
+                    if (inf.params[(size_t) p].unit != mixer::Unit::track && ! inf.params[(size_t) p].hidden && ! (type == mixer::gate && p == 0))
                         add ({ automation::effectParam, t, s, p }, "Effetto " + juce::String (s + 1));
             }
         }

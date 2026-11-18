@@ -14,7 +14,16 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.88)
+## Stato attuale (v0.89)
+
+**0.89: TAGLIOLA** (mixer, gruppo "Movimento"; tipo Gross Beat / LFO Tool). Tre curve disegnate che si ripetono a tempo:
+Volume, Filtro (passa basso o passa alto, con risonanza) e Pan. Si sceglie la curva a sinistra; tocca per aggiungere un
+punto (fino a 16 per curva), trascinalo, doppio tocco per toglierlo, pallino azzurro per piegare il tratto; due punti
+sulla stessa riga verticale fanno un taglio netto. I punti si agganciano alla griglia (Libera, 1/8, 1/16, 1/32).
+Durata del giro: 1/4, 1/2, 1, 2 o 4 battute. Forme pronte: Pompa, Gate 1/16, Stutter, Trance gate, Wobble, Sale,
+Ping-pong, Dritta. Manopole Quanto, Morbido (toglie i click), Risonanza, Mix. Una riga azzurra mostra dove sta suonando.
+Gli effetti ora possono avere fino a 160 parametri (i punti delle curve non compaiono tra le automazioni).
+
 
 **0.88: CURVATORE** (mixer, gruppo "Sporco e lo-fi"; tipo Fruity WaveShaper). Si disegna la curva della distorsione:
 tocca per aggiungere un punto (fino a 12), trascinalo, doppio tocco per toglierlo; il pallino azzurro a meta' di ogni

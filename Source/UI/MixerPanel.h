@@ -8,6 +8,7 @@
 #include "ChannelEditor.h"   // LabeledKnob
 #include "FornaceView.h"
 #include "ShaperView.h"
+#include "TagliolaView.h"
 #include "SidePicker.h"
 
 //==============================================================================
@@ -639,7 +640,7 @@ public:
             auto* row = slotRows.add (new SlotRow (*this, s));
             addAndMakeVisible (row);
         }
-        openFornaceButton.onClick = [this] { if (shownType == mixer::shaper) openShaper(); else openFornace(); };
+        openFornaceButton.onClick = [this] { if (shownType == mixer::shaper) openShaper(); else if (shownType == mixer::tagliola) openTagliola(); else openFornace(); };
         addChildComponent (openFornaceButton);
     }
 
@@ -672,8 +673,23 @@ public:
 
     ShaperView* getShaperView()     { return shaperView.get(); }
 
+    /** Apre la finestra della TAGLIOLA (se lo slot scelto e' una Tagliola). */
+    void openTagliola()
+    {
+        if (engine.getTrack (track).slots[(size_t) selectedSlot].type.load() != mixer::tagliola)
+            return;
+        tagliolaView = std::make_unique<TagliolaView> (engine, track, selectedSlot);
+        tagliolaView->onChanged = [this] { if (onChanged) onChanged(); };
+        tagliolaView->onClose = [this] { juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<TrackEffectsView> (this)] { if (safe != nullptr) safe->tagliolaView.reset(); }); };
+        addAndMakeVisible (*tagliolaView);
+        tagliolaView->setBounds (getLocalBounds());
+    }
+
+    TagliolaView* getTagliolaView() { return tagliolaView.get(); }
+
     void setTrack (int t)
     {
+        tagliolaView.reset();
         shaperView.reset();
         fornaceView.reset();
         track = juce::jlimit (0, mixer::numTracks - 1, t);
@@ -780,6 +796,8 @@ public:
             fornaceView->setBounds (getLocalBounds());
         if (shaperView != nullptr)
             shaperView->setBounds (getLocalBounds());
+        if (tagliolaView != nullptr)
+            tagliolaView->setBounds (getLocalBounds());
     }
 
 private:
@@ -946,7 +964,7 @@ private:
             { "Dinamica",          { compressor, ott, transient, limiter, sidechain } },
             { "Tono ed EQ",        { filter, peq, exciter, vowel } },
             { "Spazio",            { reverb, shimmer, delay, chorus, stereo } },
-            { "Movimento",         { gate, tremolo, phaser, flanger } },
+            { "Movimento",         { tagliola, gate, tremolo, phaser, flanger } },
             { "Sporco e lo-fi",    { saturation, shaper, fornace, blood, fet, trash, bitcrusher, vinyl } },
             { "Creativi",          { glitch, pitch, ringmod } },
         };
@@ -996,6 +1014,8 @@ private:
                 safe->openFornace();
             if (result - 1 == mixer::shaper)
                 safe->openShaper();
+            if (result - 1 == mixer::tagliola)
+                safe->openTagliola();
             if (safe->onChanged) safe->onChanged();
         };
         top->addAndMakeVisible (*picker);
@@ -1055,11 +1075,13 @@ private:
         eqView.reset();
         fornaceView.reset();
         shaperView.reset();
-        openFornaceButton.setVisible (shownType == mixer::fornace || shownType == mixer::shaper);
-        openFornaceButton.setButtonText (shownType == mixer::shaper ? "Apri CURVATORE" : "Apri FORNACE");
+        tagliolaView.reset();
+        const bool ownWindow = shownType == mixer::fornace || shownType == mixer::shaper || shownType == mixer::tagliola;
+        openFornaceButton.setVisible (ownWindow);
+        openFornaceButton.setButtonText (shownType == mixer::shaper ? "Apri CURVATORE" : shownType == mixer::tagliola ? "Apri TAGLIOLA" : "Apri FORNACE");
         for (int p = 0; p < inf.numParams; ++p)
         {
-            if (shownType == mixer::fornace || shownType == mixer::shaper)
+            if (ownWindow)
                 break;   // hanno la loro finestra
             if (shownType == mixer::glitch && p > 0)
                 break;   // la griglia sostituisce i parametri 2 e 3
@@ -1172,6 +1194,7 @@ private:
     std::unique_ptr<EqCurveView> eqView;
     std::unique_ptr<FornaceView> fornaceView;
     std::unique_ptr<ShaperView> shaperView;
+    std::unique_ptr<TagliolaView> tagliolaView;
     std::unique_ptr<SidePicker> picker;
     bool forTest = false;
     juce::TextButton openFornaceButton { "Apri FORNACE" };

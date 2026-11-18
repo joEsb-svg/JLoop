@@ -7,6 +7,7 @@
 #include <cmath>
 #include <complex>
 #include <memory>
+#include <string>
 #include <vector>
 
 //==============================================================================
@@ -30,13 +31,13 @@ namespace mixer
     inline constexpr int numInserts = 32;
     inline constexpr int numTracks  = numInserts + 1;   // 0 = Master
     inline constexpr int numSlots   = 6;
-    inline constexpr int maxParams  = 44;   // FORNACE ne usa 43; gli altri molti meno
+    inline constexpr int maxParams  = 160;  // TAGLIOLA ne usa 157 (3 curve da 16 punti); gli altri molti meno
 
     //==========================================================================
     // Tipi di effetto e i loro parametri
 
     enum FxType { none = 0, compressor, saturation, filter, delay, reverb, chorus, bitcrusher, sidechain, stereo, ott, glitch, trash, vowel,
-                  gate, tremolo, phaser, flanger, peq, transient, exciter, vinyl, limiter, pitch, ringmod, shimmer, blood, fet, fornace, shaper, numFxTypes };
+                  gate, tremolo, phaser, flanger, peq, transient, exciter, vinyl, limiter, pitch, ringmod, shimmer, blood, fet, fornace, shaper, tagliola, numFxTypes };
 
     enum class Unit { percent, dB, ms, hz, ratio, choice, track, bits, times, semis };
 
@@ -47,7 +48,27 @@ namespace mixer
         Unit unit;
         float centre = 0.0f;                 // per le scale "a curva" (frequenze, tempi): il valore a meta' corsa
         const char* choices = nullptr;       // per Unit::choice: voci separate da '|'
+        bool hidden = false;                 // dati interni (punti delle curve): non si automatizzano
     };
+
+
+    /** Dove stanno i parametri della TAGLIOLA (filtro e volume disegnati a tempo).
+        Tre curve (Volume, Filtro, Pan) di 2-16 punti ciascuna: x = posizione nel giro (0..1), y = 0..1,
+        "Curva" piega il tratto che parte dal punto (-1..1). Due punti con la stessa x fanno un salto. */
+    namespace tagliolaParam
+    {
+        enum { length = 0, amount, smooth, resonance, mix, filterType, grid, firstLane };
+        enum Lane { volume = 0, cutoff, pan, numLanes };
+        inline constexpr int maxPoints = 16;
+        inline constexpr int laneSize = 2 + maxPoints * 3;
+        inline int laneOn (int l)        { return firstLane + l * laneSize; }
+        inline int laneCount (int l)     { return firstLane + l * laneSize + 1; }
+        inline int px (int l, int i)     { return firstLane + l * laneSize + 2 + i * 3; }
+        inline int py (int l, int i)     { return px (l, i) + 1; }
+        inline int bend (int l, int i)   { return px (l, i) + 2; }
+        inline constexpr int numParams = firstLane + numLanes * laneSize;
+        inline constexpr double lengthBeats[5] { 1.0, 2.0, 4.0, 8.0, 16.0 };
+    }
 
     struct FxInfo
     {
@@ -57,6 +78,52 @@ namespace mixer
         int numParams;
         std::array<ParamDef, maxParams> params;
     };
+
+
+    /** La scheda della TAGLIOLA (i parametri dei punti sono tanti: si fanno qui con un giro). */
+    inline FxInfo makeTagliolaInfo()
+    {
+        using namespace tagliolaParam;
+        static std::vector<std::string> names;   // i nomi devono restare vivi
+        if (names.empty())
+        {
+            names.reserve ((size_t) numParams);
+            const char* laneNames[] { "Volume", "Filtro", "Pan" };
+            for (int l = 0; l < numLanes; ++l)
+            {
+                names.push_back (std::string (laneNames[l]) + ": curva accesa");
+                names.push_back (std::string (laneNames[l]) + ": punti");
+                for (int i = 0; i < maxPoints; ++i)
+                    for (const char* w : { " X", " Y", " Curva" })
+                        names.push_back (std::string (laneNames[l]) + " P" + std::to_string (i + 1) + w);
+            }
+        }
+        FxInfo f { "tagliola", "Tagliola", "Disegni come si muovono volume, filtro e pan dentro la battuta: pompa, gate, stutter, wobble", numParams, {} };
+        f.params[length]     = { "Durata", 0.0f, 4.0f, 0.0f, Unit::choice, 0.0f, "1/4|1/2|1 battuta|2 battute|4 battute" };
+        f.params[amount]     = { "Quanto", 0.0f, 1.0f, 1.0f, Unit::percent };
+        f.params[smooth]     = { "Morbido", 0.0f, 1.0f, 0.15f, Unit::percent };
+        f.params[resonance]  = { "Risonanza", 0.0f, 1.0f, 0.3f, Unit::percent };
+        f.params[mix]        = { "Mix", 0.0f, 1.0f, 1.0f, Unit::percent };
+        f.params[filterType] = { "Tipo di filtro", 0.0f, 1.0f, 0.0f, Unit::choice, 0.0f, "Passa basso|Passa alto" };
+        f.params[grid]       = { "Griglia", 0.0f, 3.0f, 2.0f, Unit::choice, 0.0f, "Libera|1/8|1/16|1/32", true };
+        size_t k = 0;
+        for (int l = 0; l < numLanes; ++l)
+        {
+            f.params[(size_t) laneOn (l)]    = { names[k++].c_str(), 0.0f, 1.0f, l == volume ? 1.0f : 0.0f, Unit::choice, 0.0f, "No|Si'" };
+            f.params[(size_t) laneCount (l)] = { names[k++].c_str(), 2.0f, (float) maxPoints, 3.0f, Unit::choice, 0.0f, "0|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16", true };
+            for (int i = 0; i < maxPoints; ++i)
+            {
+                // di partenza: Volume = pompa (giu' e risale), Filtro e Pan = dritti a meta'/aperto
+                float x = i == 0 ? 0.0f : i == 1 ? 0.55f : i == 2 ? 1.0f : 0.0f;
+                float y = l == volume ? (i == 0 ? 0.0f : 1.0f) : l == cutoff ? 1.0f : 0.5f;
+                float b = (l == volume && i == 0) ? -0.6f : 0.0f;
+                f.params[(size_t) px (l, i)]   = { names[k++].c_str(), 0.0f, 1.0f, x, Unit::percent, 0.0f, nullptr, true };
+                f.params[(size_t) py (l, i)]   = { names[k++].c_str(), 0.0f, 1.0f, y, Unit::percent, 0.0f, nullptr, true };
+                f.params[(size_t) bend (l, i)] = { names[k++].c_str(), -1.0f, 1.0f, b, Unit::percent, 0.0f, nullptr, true };
+            }
+        }
+        return f;
+    }
 
     inline const FxInfo& info (int type)
     {
@@ -308,6 +375,7 @@ namespace mixer
                 { "P12 X", -1.0f, 1.0f, 0.0f, Unit::percent },
                 { "P12 Y", -1.0f, 1.0f, 0.0f, Unit::percent },
                 { "P12 Curva", -1.0f, 1.0f, 0.0f, Unit::percent } }} },
+            makeTagliolaInfo(),
         }};
         return infos[(size_t) juce::jlimit (0, numFxTypes - 1, type)];
     }
@@ -2504,6 +2572,150 @@ namespace mixer
         std::array<std::array<float, maxChunk>, 2> dry {};
     };
 
+
+    //==========================================================================
+    namespace tagliolaParam
+    {
+        /** Una curva letta dai parametri, in una tabella di n valori per x da 0 a 1 (0 = curva spenta o vuota). */
+        template <typename Get>
+        inline bool buildTable (Get&& get, int lane, float* table, int n)
+        {
+            const int count = juce::jlimit (2, maxPoints, (int) std::round (get (laneCount (lane))));
+            float xs[maxPoints], ys[maxPoints], bs[maxPoints];
+            for (int i = 0; i < count; ++i)
+            {
+                xs[i] = juce::jlimit (0.0f, 1.0f, get (px (lane, i)));
+                ys[i] = juce::jlimit (0.0f, 1.0f, get (py (lane, i)));
+                bs[i] = juce::jlimit (-1.0f, 1.0f, get (bend (lane, i)));
+            }
+            for (int i = 1; i < count; ++i)   // in ordine di x (stabile: i salti restano nell'ordine scritto)
+                for (int j = i; j > 0 && xs[j] < xs[j - 1]; --j) { std::swap (xs[j], xs[j - 1]); std::swap (ys[j], ys[j - 1]); std::swap (bs[j], bs[j - 1]); }
+            int seg = 0;
+            for (int k = 0; k < n; ++k)
+            {
+                const float x = (float) k / (float) (n - 1);
+                if (x <= xs[0]) { table[k] = ys[0]; continue; }
+                if (x >= xs[count - 1]) { table[k] = ys[count - 1]; continue; }
+                while (seg < count - 2 && x >= xs[seg + 1]) ++seg;
+                const float w = xs[seg + 1] - xs[seg];
+                const float t = w > 1.0e-6f ? (x - xs[seg]) / w : 1.0f;
+                table[k] = ys[seg] + (ys[seg + 1] - ys[seg]) * shaperParam::bendT (t, bs[seg]);
+            }
+            return get (laneOn (lane)) > 0.5f;
+        }
+    }
+
+    /** TAGLIOLA: volume, filtro e pan seguono curve disegnate che si ripetono a tempo (tipo Gross Beat / LFO Tool). */
+    class Tagliola : public Effect
+    {
+    public:
+        static constexpr int tableSize = 1025;
+        std::atomic<float> phaseShown { -1.0f };   // dove sta suonando nel giro (per la UI); -1 = fermo
+
+        void prepare (double sampleRate) override   { sr = sampleRate; reset(); }
+        void reset() override
+        {
+            clock = {};
+            for (auto& s : svf) s = {};
+            vol = 1.0f; cut = 1.0f; panV = 0.5f;
+            first = true;
+            signature = -1.0;
+        }
+
+        void process (float* L, float* R, int n, const float* p, const Context& ctx) override
+        {
+            using namespace tagliolaParam;
+            double sig = 0.0;
+            for (int i = firstLane; i < numParams; ++i) sig = sig * 1.000003 + (double) p[i] * (double) (i + 1);
+            if (sig != signature)
+            {
+                signature = sig;
+                for (int l = 0; l < numLanes; ++l)
+                    on[l] = buildTable ([p] (int i) { return p[i]; }, l, tables[(size_t) l].data(), tableSize);
+            }
+            const double beats = lengthBeats[juce::jlimit (0, 4, juce::roundToInt (p[length]))];
+            const float q = juce::jlimit (0.0f, 1.0f, p[amount]);
+            const float tau = 0.0003f + p[smooth] * p[smooth] * 0.03f;
+            const float a = 1.0f - std::exp (-1.0f / (tau * (float) sr));
+            const float res = 0.6f + juce::jlimit (0.0f, 1.0f, p[resonance]) * 9.0f;
+            const bool hp = p[filterType] > 0.5f;
+            const float wet = juce::jlimit (0.0f, 1.0f, p[mix]);
+            const float nyq = (float) sr * 0.45f;
+
+            auto look = [this] (int l, float ph) noexcept
+            {
+                const float pos = ph * (float) (tableSize - 1);
+                const int i0 = juce::jlimit (0, tableSize - 2, (int) pos);
+                const auto& t = tables[(size_t) l];
+                return t[(size_t) i0] + (t[(size_t) i0 + 1] - t[(size_t) i0]) * (pos - (float) i0);
+            };
+
+            float ph = 0.0f;
+            for (int i = 0; i < n; ++i)
+            {
+                ph = frac01 (clock.beatAt (ctx, sr, i) / beats);
+                const float tv = on[volume] ? look (volume, ph) : 1.0f;
+                const float tc = on[cutoff] ? look (cutoff, ph) : 1.0f;
+                const float tp = on[pan] ? look (pan, ph) : 0.5f;
+                if (first) { vol = tv; cut = tc; panV = tp; first = false; }
+                vol += a * (tv - vol); cut += a * (tc - cut); panV += a * (tp - panV);
+
+                const float dl = L[i], dr = R[i];
+                float l = dl, r = dr;
+                if (on[cutoff])
+                {
+                    if ((i & 7) == 0)
+                    {
+                        const float y = 1.0f - q * (1.0f - cut);
+                        const float hz = juce::jmin (nyq, 40.0f * std::pow (500.0f, hp ? 1.0f - y : y));
+                        g = std::tan (juce::MathConstants<float>::pi * hz / (float) sr);
+                        k = 1.0f / res;
+                    }
+                    l = svf[0].run (l, g, k, hp);
+                    r = svf[1].run (r, g, k, hp);
+                }
+                if (on[volume])
+                {
+                    const float v = 1.0f - q * (1.0f - vol * vol);
+                    l *= v; r *= v;
+                }
+                if (on[pan])
+                {
+                    const float pp = juce::jlimit (-1.0f, 1.0f, q * (panV - 0.5f) * 2.0f);
+                    l *= juce::jmin (1.0f, 1.0f - pp);
+                    r *= juce::jmin (1.0f, 1.0f + pp);
+                }
+                L[i] = dl + wet * (l - dl);
+                R[i] = dr + wet * (r - dr);
+            }
+            phaseShown.store (ph, std::memory_order_relaxed);
+            clock.advance (ctx, sr, n);
+        }
+
+    private:
+        struct Svf
+        {
+            float s1 = 0.0f, s2 = 0.0f;
+            float run (float x, float g, float k, bool hp) noexcept
+            {
+                const float hpOut = (x - (k + g) * s1 - s2) / (1.0f + g * (g + k));
+                const float bp = g * hpOut + s1;
+                const float lp = g * bp + s2;
+                s1 = g * hpOut + bp;
+                s2 = g * bp + lp;
+                return hp ? hpOut : lp;
+            }
+        };
+
+        double sr = 48000.0, signature = -1.0;
+        TempoClock clock;
+        std::array<std::array<float, tableSize>, tagliolaParam::numLanes> tables {};
+        bool on[tagliolaParam::numLanes] {};
+        Svf svf[2];
+        float vol = 1.0f, cut = 1.0f, panV = 0.5f, g = 0.5f, k = 1.0f;
+        bool first = true;
+    };
+
     inline std::unique_ptr<Effect> createEffect (int type)
     {
         switch (type)
@@ -2537,6 +2749,7 @@ namespace mixer
             case fet:        return std::make_unique<Fet>();
             case fornace:    return std::make_unique<Fornace>();
             case shaper:     return std::make_unique<Shaper>();
+            case tagliola:   return std::make_unique<Tagliola>();
             default:         return nullptr;
         }
     }
