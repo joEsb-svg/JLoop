@@ -22,8 +22,14 @@ class SynthPanel : public juce::Component,
 public:
     explicit SynthPanel (SequencerEngine& e) : engine (e)
     {
-        for (auto* b : { &presetButton, &arpButton, &mixButton, &keysButton, &closeButton })
+        for (auto* b : { &presetButton, &savePresetButton, &saveSampleButton, &arpButton, &mixButton, &keysButton, &closeButton })
             addAndMakeVisible (b);
+        savePresetButton.onClick = [this] { if (onSavePreset) onSavePreset (channel); };
+        saveSampleButton.onClick = [this] { if (onSaveSample) onSaveSample (channel); };
+        savePresetButton.setTooltip ("Salva le manopole come tuo preset (lo ritrovi a sinistra, sotto il synth)");
+        saveSampleButton.setTooltip ("Registra il suono in un campione dentro \"I miei campioni\"");
+        savePresetButton.setColour (juce::TextButton::textColourOffId, Theme::accent);
+        saveSampleButton.setColour (juce::TextButton::textColourOffId, Theme::accent);
         arpButton.onClick = [this] { showArpPanel(); };
 
         closeButton.onClick = [this] { if (onClose) onClose(); };
@@ -51,6 +57,7 @@ public:
 
     std::function<void()> onClose, onOpenMix;
     std::function<void (juce::Component&)> onShowPresets;
+    std::function<void (int channel)> onSavePreset, onSaveSample;   // "Salva" (preset) e "Campione" (registra il suono)
 
     /** Apre lo strumento del canale indicato. */
     void open (int channelIndex)
@@ -161,6 +168,12 @@ public:
         bar.removeFromRight (6);
         keysButton.setBounds (bar.removeFromRight (compact ? 70 : 84));
         bar.removeFromRight (10);
+        saveSampleButton.setButtonText (compact ? juce::String (juce::CharPointer_UTF8 ("\xe2\x97\x8f")) : juce::String (juce::CharPointer_UTF8 ("\xe2\x97\x8f Campione")));
+        savePresetButton.setButtonText (compact ? juce::String (juce::CharPointer_UTF8 ("\xe2\x98\x85")) : juce::String (juce::CharPointer_UTF8 ("\xe2\x98\x85 Salva")));
+        saveSampleButton.setBounds (bar.removeFromRight (compact ? 34 : 96));
+        bar.removeFromRight (4);
+        savePresetButton.setBounds (bar.removeFromRight (compact ? 34 : 74));
+        bar.removeFromRight (6);
         presetButton.setBounds (bar.removeFromLeft (juce::jmin (300, bar.getWidth())));
 
         const bool showKeys = keysButton.getToggleState();
@@ -204,6 +217,7 @@ private:
     juce::MidiKeyboardComponent keyboard { keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard };
     juce::TextButton arpButton { "Arp" };
     juce::TextButton presetButton, mixButton { "Mix" }, keysButton { "Tastiera" }, closeButton { "Chiudi" };
+    juce::TextButton savePresetButton, saveSampleButton;
     juce::Rectangle<float> barArea;
     static constexpr float titleWidth = 150.0f;
     bool compact = false;

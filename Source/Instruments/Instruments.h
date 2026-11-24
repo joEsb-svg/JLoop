@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <map>
 #include <memory>
 #include <vector>
 #include "../Engine/SequencerEngine.h"
@@ -114,6 +115,25 @@ namespace Instruments
         else if (id == "prisma")         fill (prisma::Presets::numFactory(), [] (int i) { return prisma::Presets::factoryName (i); });
         else if (id == "materia")        fill (materia::Presets::numFactory(), [] (int i) { return materia::Presets::factoryName (i); });
         return names;
+    }
+
+    /** I preset salvati dall'utente per un synth, dal suo id, senza crearlo (cartella ed estensione di ogni synth). */
+    inline juce::Array<juce::File> userPresetFiles (const juce::String& id)
+    {
+        static const std::map<juce::String, std::pair<const char*, const char*>> where {
+            { "bassforge", { "BassForge/Presets", "*.bfpreset" } },   { "polyforge", { "PolyForge/Presets", "*.pfpreset" } },
+            { "fmforge", { "FMForge/Presets", "*.fmpreset" } },        { "drumforge", { "DrumForge/Kits", "*.dfkit" } },
+            { "frenchroulette", { "FrenchRoulette/Presets", "*.frpreset" } }, { "slicer", { "Slicer/Presets", "*.slicerpreset" } },
+            { "megasaw", { "MegaSaw/Presets", "*.mspreset" } },        { "wubforge", { "WubForge/Presets", "*.wfpreset" } },
+            { "robovox", { "RoboVox/Presets", "*.rvpreset" } },        { "psyforge", { "PsyForge/Presets", "*.psypreset" } },
+            { "acidline", { "AcidLine/Presets", "*.acidpreset" } },    { "zapfm", { "ZapFM/Presets", "*.zappreset" } },
+            { "prisma", { "Prisma/Presets", "*.prismapreset" } },      { "materia", { "Materia/Presets", "*.materiapreset" } } };
+        const auto it = where.find (id);
+        if (it == where.end()) return {};
+        auto files = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+                         .getChildFile (it->second.first).findChildFiles (juce::File::findFiles, false, it->second.second);
+        files.sort();
+        return files;
     }
 
     inline juce::StringArray factoryPresets (juce::AudioProcessor* p)

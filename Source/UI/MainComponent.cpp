@@ -48,6 +48,8 @@ MainComponent::MainComponent()
             openEditor (c);
     };
     synthPanel->onShowPresets = [this] (juce::Component& target) { showPresetMenu (synthPanel->getChannel(), target); };
+    synthPanel->onSavePreset = [this] (int c) { saveUserPreset (c); };
+    synthPanel->onSaveSample = [this] (int c) { saveSynthAsSample (c); };
     addChildComponent (*synthPanel);
 
     // Scelta dei preset a tutto schermo (al posto del menu a tendina)
@@ -2203,6 +2205,8 @@ void MainComponent::openSynthPanel (int channel)
         auto window = std::make_unique<SynthWindow> (*this, engine, channel);
         auto* panel = window->panel.get();
         panel->onShowPresets = [this, channel] (juce::Component& target) { showPresetMenu (channel, target); };
+        panel->onSavePreset = [this] (int c) { saveUserPreset (c); };
+        panel->onSaveSample = [this] (int c) { saveSynthAsSample (c); };
         panel->onOpenMix = [this, channel] { closeSynthWindow (channel); if (engine.isSynth (channel)) openEditor (channel); };
         synthWindows[channel] = std::move (window);
         return;
@@ -3029,6 +3033,15 @@ void MainComponent::handleCommandLine (const juce::String& commandLine)
     if (args.contains ("--prog-panel") && pianoRoll.isVisible())
         pianoRoll.showProgressionPanelForTest();
 
+    if (const int i = args.indexOf ("--save-sample"); i >= 0)   // test: "Salva come campione" del synth del canale (registrato subito)
+    {
+        const int c = args[i + 1].getIntValue();
+        if (args.contains ("--save-preset-demo"))   // test: un mio preset salvato, da vedere nella colonna a sinistra
+            Instruments::saveUser (engine.getInstrument (c), "Basso Trash Joe");
+        if (auto* d = saveSynthAsSample (c))
+            d->renderForTest (48, 1);
+    }
+
     if (const int i = args.indexOf ("--open-synth"); i >= 0)       // test: pannello di uno strumento (canale, scheda)
     {
         if (const int k = args.indexOf ("--prisma-preset"); k >= 0)   // test: preset di Prisma (indice) prima di aprire
@@ -3692,17 +3705,7 @@ void MainComponent::handleSoundMenu (int channel, int result)
         openSynthPanel (channel);
     else if (result == 660)
     {
-        juce::Component::SafePointer<MainComponent> safeThis (this);
-        askText ("Salva preset", Instruments::presetName (proc), [safeThis, channel] (juce::String name)
-        {
-            if (safeThis == nullptr)
-                return;
-            if (! Instruments::saveUser (safeThis->engine.getInstrument (channel), name))
-                safeThis->showMessage ("Preset", "Non riesco a salvare il preset.");
-            safeThis->synthPanel->refreshPresetName();
-            if (safeThis->presetBrowser.isVisible())
-                safeThis->presetBrowser.rebuild();
-        });
+        saveUserPreset (channel);
         return;
     }
     else if (result >= 600 && result < 650)
@@ -3722,6 +3725,49 @@ void MainComponent::handleSoundMenu (int channel, int result)
         row->repaint();
     if (editor.isVisible())
         editor.refreshFromEngine();
+}
+
+void MainComponent::saveUserPreset (int channel)
+{
+    auto* proc = engine.getInstrument (channel);
+    if (proc == nullptr)
+        return;
+    juce::Component::SafePointer<MainComponent> safeThis (this);
+    askText ("Salva come mio preset", Instruments::presetName (proc), [safeThis, channel] (juce::String name)
+    {
+        if (safeThis == nullptr)
+            return;
+        if (! Instruments::saveUser (safeThis->engine.getInstrument (channel), name))
+            safeThis->showMessage ("Preset", "Non riesco a salvare il preset.");
+        safeThis->synthPanel->refreshPresetName();
+        for (auto& [c, w] : safeThis->synthWindows)
+            if (auto* sw = dynamic_cast<SynthWindow*> (w.get()); sw != nullptr && sw->panel != nullptr)
+                sw->panel->refreshPresetName();
+        if (safeThis->presetBrowser.isVisible())
+            safeThis->presetBrowser.rebuild();
+        safeThis->browser.refreshAfterSave();
+        safeThis->deskBrowser.refreshAfterSave();
+    });
+}
+
+SaveSampleDialog* MainComponent::saveSynthAsSample (int channel)
+{
+    if (engine.getInstrument (channel) == nullptr)
+        return nullptr;
+    auto dialog = std::make_unique<SaveSampleDialog> (engine, sampleStore, channel);
+    auto* raw = dialog.get();
+    auto* overlay = CenteredOverlay::show (*this, std::move (dialog), [raw] (int w) { return raw->preferredHeight (w); }, 560);
+    juce::Component::SafePointer<CenteredOverlay> safeOverlay (overlay);
+    juce::Component::SafePointer<MainComponent> safeThis (this);
+    raw->onDone = [safeOverlay] { if (safeOverlay != nullptr) safeOverlay->close(); };
+    raw->onSaved = [safeThis] (const juce::String& file)
+    {
+        if (safeThis == nullptr) return;
+        safeThis->browser.refreshAfterSave();
+        safeThis->deskBrowser.refreshAfterSave();
+        safeThis->showMessage ("Campione salvato", "\"" + SampleStore::displayName (file) + "\" ora e' in \"I miei campioni\": trascinalo su un canale quando vuoi.");
+    };
+    return raw;
 }
 
 void MainComponent::showPresetMenu (int channel, juce::Component&)
@@ -4161,7 +4207,9 @@ void MainComponent::applySoundChoice (int channel, const SoundChoice& choice)
 
         engine.makeInstrumentChannel (channel, choice.id, name, choice.colour);
         instruments->resolve();          // crea lo strumento
-        if (choice.preset >= 0)          // scelto dal pannello a sinistra: direttamente un preset
+        if (choice.userPreset.isNotEmpty())   // un mio preset scelto dal pannello a sinistra
+            Instruments::loadUser (engine.getInstrument (channel), juce::File (choice.userPreset));
+        else if (choice.preset >= 0)          // scelto dal pannello a sinistra: direttamente un preset
             Instruments::loadFactory (engine.getInstrument (channel), choice.preset);
         if (! ch.customName)
             ch.name = name;

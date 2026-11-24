@@ -192,6 +192,8 @@ public:
         SampleData::Ptr data = new SampleData();
         data->name = fileName;
         data->sampleRate = reader->sampleRate;
+        if (const auto unity = reader->metadataValues.getValue ("MidiUnityNote", {}); unity.isNotEmpty())   // nota scritta nel file (blocco smpl)
+            data->rootNote = juce::jlimit (0, 127, unity.getIntValue());
         data->audio.setSize (1, length);
         data->audio.clear();
 

@@ -25,6 +25,8 @@ struct SoundChoice
     juce::uint32 colour = 0xff8aa0b8;
     int drumType = 0, kit = 0;
     int preset = -1;            // synth: preset di fabbrica da caricare (-1 = quello iniziale)
+    juce::String userPreset;    // synth: preset salvato dall'utente (percorso del file; vuoto = nessuno)
+    bool hasPreset() const      { return preset >= 0 || userPreset.isNotEmpty(); }
 };
 
 //==============================================================================
@@ -431,7 +433,7 @@ public:
             g.setFont (Theme::font (12.0f, chosen.kind != SoundChoice::none));
             g.drawFittedText (chosen.kind == SoundChoice::none ? juce::String ("Tocca un suono per sentirlo, poi trascinalo su un canale")
                                                                : juce::String (juce::CharPointer_UTF8 ("\xe2\x99\xaa  ")) + chosen.name
-                                                                 + (chosen.preset >= 0 ? juce::String (juce::CharPointer_UTF8 (" \xc2\xb7 ")) + chosenLabel : juce::String())
+                                                                 + (chosen.hasPreset() ? juce::String (juce::CharPointer_UTF8 (" \xc2\xb7 ")) + chosenLabel : juce::String())
                                                                  + juce::String ("   (trascinalo su un canale)"),
                               footerText.toNearestInt(), juce::Justification::centredLeft, 1, 0.8f);
             return;
@@ -684,8 +686,9 @@ private:
         else if (top == topSynth)
             for (auto& info : Instruments::list())
             {
-                const int n = Instruments::factoryPresetNames (info.id).size();
-                add (info.name, n > 0 ? juce::String (n) + " preset" : juce::String(), juce::Colour (info.colour));
+                const int n = Instruments::factoryPresetNames (info.id).size(), mine = Instruments::userPresetFiles (info.id).size();
+                add (info.name, (n > 0 ? juce::String (n) + " preset" : juce::String())
+                                    + (mine > 0 ? juce::String (" + ") + juce::String (mine) + " miei" : juce::String()), juce::Colour (info.colour));
             }
         else if (top == topKits)
         {
@@ -708,6 +711,15 @@ private:
             const auto& list = Instruments::list();
             if (sub < 0 || sub >= (int) list.size()) return;
             const auto& info = list[(size_t) sub];
+            // prima i preset salvati dall'utente (con la stella), poi quelli di fabbrica
+            for (auto& f : Instruments::userPresetFiles (info.id))
+            {
+                SoundChoice c;
+                c.kind = SoundChoice::instrument;
+                c.id = info.id; c.name = info.name; c.colour = info.colour; c.userPreset = f.getFullPathName();
+                ch.push_back (c);
+                items.push_back ({ juce::String (juce::CharPointer_UTF8 ("\xe2\x98\x85 ")) + f.getFileNameWithoutExtension(), "mio", Theme::accent, true });
+            }
             const auto names = Instruments::factoryPresetNames (info.id);
             for (int i = 0; i < names.size(); ++i)
             {
@@ -812,7 +824,8 @@ private:
 
     static bool sameChoice (const SoundChoice& a, const SoundChoice& b)
     {
-        return a.kind != SoundChoice::none && a.kind == b.kind && a.id == b.id && a.kit == b.kit && a.drumType == b.drumType && a.preset == b.preset;
+        return a.kind != SoundChoice::none && a.kind == b.kind && a.id == b.id && a.kit == b.kit && a.drumType == b.drumType && a.preset == b.preset
+               && a.userPreset == b.userPreset;
     }
 
     void treeClick (int r)
@@ -851,6 +864,7 @@ private:
                                                  && ch.drumType.load() == c.drumType && ch.kit.load() == c.kit;
             case SoundChoice::instrument:
                 if (! engine.isSynth (targetChannel) || ch.instrumentKind != c.id) return false;
+                if (c.userPreset.isNotEmpty()) return Instruments::presetName (engine.getInstrument (targetChannel)) == juce::File (c.userPreset).getFileNameWithoutExtension();
                 if (c.preset < 0) return true;
                 return Instruments::presetName (engine.getInstrument (targetChannel)) == Instruments::factoryPresetNames (c.id)[c.preset];
             default: return false;
@@ -902,9 +916,9 @@ private:
             const auto& kit = df::factoryKits()[(size_t) juce::jlimit (0, df::Presets::numFactory() - 1, c.kit)];
             s = samples.load (SampleStore::libraryName (kit.pads[0].sample));
         }
-        if (c.kind == SoundChoice::instrument && c.preset >= 0)
+        if (c.kind == SoundChoice::instrument && c.hasPreset())
             s = synthPreview (c);
-        wave.setEmptyText (c.kind == SoundChoice::instrument ? (c.preset >= 0 ? "Questo preset da solo non fa suono (gli serve un campione o una voce)"
+        wave.setEmptyText (c.kind == SoundChoice::instrument ? (c.hasPreset() ? "Questo preset da solo non fa suono (gli serve un campione o una voce)"
                                                                                : "Apri il synth per vedere i suoi preset")
                                                              : "Qui vedi la forma d'onda del suono che tocchi");
         wave.setSample (s, juce::Colour (c.colour));
@@ -932,7 +946,7 @@ private:
             if (auto* s = samples.load (SampleStore::libraryName (kit.pads[0].sample)))
                 engine.previewSample (s);
         }
-        else if (c.kind == SoundChoice::instrument && c.preset >= 0)
+        else if (c.kind == SoundChoice::instrument && c.hasPreset())
         {
             if (auto* s = synthPreview (c))
                 engine.previewSample (s);
@@ -953,11 +967,13 @@ private:
         Si fa la prima volta che lo tocchi e poi resta pronto. */
     const SampleData* synthPreview (const SoundChoice& c)
     {
-        const auto key = c.id + ":" + juce::String (c.preset);
+        const auto key = c.userPreset.isNotEmpty() ? c.userPreset + ":" + juce::String (juce::File (c.userPreset).getLastModificationTime().toMilliseconds())   // risalvato: si rifa'
+                                                   : c.id + ":" + juce::String (c.preset);
         if (auto it = previews.find (key); it != previews.end()) return it->second.get();
         auto p = Instruments::create (c.id);
         if (p == nullptr) return nullptr;
-        Instruments::loadFactory (p.get(), c.preset);
+        if (c.userPreset.isNotEmpty()) Instruments::loadUser (p.get(), juce::File (c.userPreset));
+        else                           Instruments::loadFactory (p.get(), c.preset);
         const double sr = 44100.0;
         const int block = 512, total = (int) (sr * 1.6), noteOff = (int) (sr * 0.9);
         p->setPlayConfigDetails (0, 2, sr, block);
@@ -994,6 +1010,15 @@ private:
     }
 
 public:
+    /** Dopo un salvataggio (preset o campione): l'albero e la lista si rifanno, restando dove erano. */
+    void refreshAfterSave()
+    {
+        const int y = treeView.getViewPositionY();
+        rebuildTree (false);
+        treeView.setViewPosition (0, y);
+        if (lastTab == 3) showTab (3, 0);
+    }
+
     /** Il suono che si sta trascinando sul rack (vuoto se non e' un trascinamento di questo pannello). */
     SoundChoice takeDragged (const juce::var& description)
     {

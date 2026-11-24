@@ -14,7 +14,19 @@ L'ultimo APK è sempre qui:
 Sul telefono: scaricalo, aprilo e consenti l'installazione da "origini sconosciute" quando richiesto.
 Gli aggiornamenti si installano sopra la versione precedente.
 
-## Stato attuale (v0.91)
+## Stato attuale (v0.92)
+
+**0.92: salvare i suoni dei synth.**
+- Nella finestra di ogni synth, in alto: **Salva** (le manopole diventano un tuo preset) e **Campione** (il suono
+  registrato in un file audio). Sul telefono in verticale sono la stella e il pallino.
+- I tuoi preset compaiono nella colonna a sinistra (PC), dentro Synth > nome del synth, in cima e con la stella
+  (la cartella dice "N preset + N miei"): un tocco per sentirli, poi si trascinano su un canale.
+- **Salva come campione**: nome, nota (- / + semitono, -ott / +ott), lunghezza (1/8, 1/4, 1/2, 1 o 2 battute),
+  Ascolta con l'onda, poi "Salva in I miei campioni". Si registra una copia del synth (manopole ed effetti del synth
+  compresi, LFO a tempo col BPM del progetto) con la coda finche' c'e' suono (al massimo 6 s dopo il rilascio).
+  Mono, picco a -1 dB; non sovrascrive mai un campione che c'e' gia'. La nota registrata viene scritta nel file
+  (blocco smpl del WAV) e AudioNaut ora la legge: nel piano roll il campione suona alle altezze giuste.
+
 
 **0.91: Pacchetto Electro Trash.**
 - Tre kit nuovi (in DrumForge e tra i suoni della batteria): **Electro Trash** (cassa e rullante saturati, hi-hat

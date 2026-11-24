@@ -13,6 +13,7 @@
 #include "PianoRoll.h"
 #include "SynthPanel.h"
 #include "SoundBrowser.h"
+#include "SaveSampleDialog.h"
 #include "Playlist.h"
 #include "ExportPanel.h"
 #include "MixerPanel.h"
@@ -218,6 +219,8 @@ private:
     juce::TextButton liveButton { "LIVE" };
     void openSynthPanel (int channel);
     void showPresetMenu (int channel, juce::Component& target);
+    void saveUserPreset (int channel);       // "Salva": le manopole del synth come mio preset
+    SaveSampleDialog* saveSynthAsSample (int channel);    // "Campione": il suono del synth registrato in "I miei campioni"
     juce::AudioDeviceManager deviceManager;
     struct PerfLog
     {
